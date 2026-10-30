@@ -36,9 +36,9 @@ On one mount: `mkdir`, write and read a small file, `ln -s`, `mv`, `rm`, `rmdir`
 
 ## Benchmark
 
-We packed a git clone of Ansible into `ansible.tar` (27 MiB, 5,868 files). On each filesystem we unpacked that archive, packed the tree again, copied the archive onto the mount, and listed it with `tar -tf` without unpacking. The fs-relay times are from 2026-10-31 01:42 +03. The other columns are earlier runs of the same archive.
+We packed a git clone of Ansible into `ansible.tar` (27 MiB, 5,868 files). On each filesystem we unpacked that archive, packed the tree again, copied the archive onto the mount, and listed it with `tar -tf` without unpacking. We benchmarked against [kvfs](https://github.com/muayyad-alsadi/kvfs), [rustfs](https://github.com/rustfs/rustfs), and [fuse-nfs](https://github.com/sahlberg/fuse-nfs). The fs-relay times are from 2026-10-31 01:42 +03. The other columns are earlier runs of the same archive.
 
-| | local directory | kvfs | fs-relay POST | fs-relay `-ws` | s3fs on rustfs | fuse-nfs |
+| | local directory | [kvfs](https://github.com/muayyad-alsadi/kvfs) | fs-relay POST | fs-relay `-ws` | s3fs on [rustfs](https://github.com/rustfs/rustfs) | [fuse-nfs](https://github.com/sahlberg/fuse-nfs) |
 |---|---:|---:|---:|---:|---:|---:|
 | extract | 0.14 s | 23.64 s | 23.38 s | 19.48 s | 211.10 s | 108.04 s |
 | archive | 0.10 s | 14.26 s | 6.26 s | 5.49 s | 58.61 s | 48.12 s |
