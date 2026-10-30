@@ -1,0 +1,105 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"fs-relay/internal/client"
+	"fs-relay/internal/wire"
+
+	"github.com/hanwen/go-fuse/v2/fs"
+	"github.com/hanwen/go-fuse/v2/fuse"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "fs-relay-bind: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	url := flag.String("url", "http://127.0.0.1:8080", "fs-relay base URL")
+	ns := flag.String("ns", "default", "namespace")
+	useWS := flag.Bool("ws", false, "use one /ws/ socket instead of one POST per call")
+	allowOther := flag.Bool("allow-other", false, "allow other users to access the mount")
+	debug := flag.Bool("debug", false, "enable FUSE debug logging")
+	flag.Parse()
+	if flag.NArg() != 1 {
+		fmt.Fprintf(os.Stderr, "usage: %s [flags] <mountpoint>\n", os.Args[0])
+		flag.PrintDefaults()
+		os.Exit(2)
+	}
+	if err := wire.CheckNS(*ns); err != nil {
+		return fmt.Errorf("namespace: %w", err)
+	}
+	c, events, stop, err := openHTTP(*url, *ns)
+	if *useWS {
+		c, events, stop, err = openSocket(*url, *ns)
+	}
+	if err != nil {
+		return err
+	}
+	defer stop()
+	k := newKernel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go k.loop(ctx, events)
+	root := &node{c: c, k: k, ino: 1}
+	server, err := fs.Mount(flag.Arg(0), root, mountOptions(*allowOther, *debug))
+	if err != nil {
+		return fmt.Errorf("mount: %w", err)
+	}
+	log.Printf("fs-relay-bind mounted on %s (ns=%s url=%s ws=%t)", flag.Arg(0), *ns, *url, *useWS)
+	go unmountOnSignal(server)
+	server.Wait()
+	return nil
+}
+
+func mountOptions(allowOther, debug bool) *fs.Options {
+	attr := time.Second
+	neg := 500 * time.Millisecond
+	opts := &fs.Options{
+		AttrTimeout:     &attr,
+		EntryTimeout:    &attr,
+		NegativeTimeout: &neg,
+		UID:             uint32(os.Getuid()),
+		GID:             uint32(os.Getgid()),
+	}
+	opts.AllowOther = allowOther
+	opts.Debug = debug
+	opts.FsName = "fs-relay"
+	opts.Name = "fs-relay"
+	opts.DisableXAttrs = true
+	opts.MaxWrite = wire.MaxWrite
+	opts.RootStableAttr = &fs.StableAttr{Ino: 1, Mode: syscall.S_IFDIR}
+	return opts
+}
+
+func openHTTP(url, ns string) (caller, <-chan wire.Change, func(), error) {
+	c := &client.Client{URL: url, NS: ns}
+	ctx, cancel := context.WithCancel(context.Background())
+	go c.Listen(ctx)
+	return c, c.Events(), func() { cancel() }, nil
+}
+
+func openSocket(url, ns string) (caller, <-chan wire.Change, func(), error) {
+	sock, err := client.Dial(context.Background(), url, ns)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return sock, sock.Events(), func() { _ = sock.Close() }, nil
+}
+
+func unmountOnSignal(server *fuse.Server) {
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+	<-sigc
+	_ = server.Unmount()
+}

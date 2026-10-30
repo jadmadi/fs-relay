@@ -1,0 +1,100 @@
+package main
+
+import (
+	"errors"
+	"net/http"
+	"strings"
+	"syscall"
+
+	"fs-relay/internal/local"
+	"fs-relay/internal/wire"
+)
+
+func newHandler(tree *local.Tree) http.Handler {
+	return handler(tree, newHub())
+}
+
+func handler(tree *local.Tree, h *hub) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", serveRoot)
+	mux.HandleFunc("POST /fs/{ns}", func(w http.ResponseWriter, r *http.Request) {
+		serve(h, tree, w, r)
+	})
+	mux.HandleFunc("GET /ws/{ns}", func(w http.ResponseWriter, r *http.Request) {
+		serveWS(h, tree, w, r)
+	})
+	return mux
+}
+
+func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
+	ns := r.PathValue("ns")
+	if err := wire.CheckNS(ns); err != nil {
+		http.Error(w, "bad namespace", http.StatusBadRequest)
+		return
+	}
+	if !msgpackType(r.Header.Get("Content-Type")) {
+		http.Error(w, "content type", http.StatusBadRequest)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, wire.MaxBody)
+	req, err := wire.DecodeRequest(r.Body)
+	if err != nil || req.Params.Namespace != ns {
+		http.Error(w, "bad body", http.StatusBadRequest)
+		return
+	}
+	if req.Method == wire.Join {
+		serveJoin(h, ns, w, r, req.Params.Client)
+		return
+	}
+	res, err := tree.Call(r.Context(), req.Method, req.Params)
+	publishCall(h, tree, ns, req.Method, req.Params, err)
+	writeCall(w, res, err)
+}
+
+func publishCall(h *hub, tree *local.Tree, ns, method string, p wire.Params, err error) {
+	if err != nil {
+		return
+	}
+	h.evict(ns, tree.Changed(method, p))
+}
+
+func msgpackType(ct string) bool {
+	return ct == wire.ContentType || strings.HasPrefix(ct, wire.ContentType+";")
+}
+
+func writeCall(w http.ResponseWriter, res wire.Result, err error) {
+	if err == nil {
+		writeResult(w, res)
+		return
+	}
+	if errors.Is(err, wire.ErrParams) || errors.Is(err, wire.ErrUnknown) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var n syscall.Errno
+	if errors.As(err, &n) && n != 0 {
+		b, merr := wire.MarshalCallError(wire.Error{Code: uint32(n), Message: n.Error()})
+		if merr != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		writeMsgpack(w, http.StatusOK, b)
+		return
+	}
+	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+}
+
+func writeResult(w http.ResponseWriter, res wire.Result) {
+	b, err := wire.MarshalResult(res)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	writeMsgpack(w, http.StatusOK, b)
+}
+
+func writeMsgpack(w http.ResponseWriter, status int, b []byte) {
+	w.Header().Set("Content-Type", wire.ContentType)
+	w.WriteHeader(status)
+	_, _ = w.Write(b)
+}
