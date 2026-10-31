@@ -36,13 +36,14 @@ The default mount unpacks about thirteen times faster than s3fs (15.47 s against
 | copy the archive | 0.13 s | 3.12 s | 0.65 s | 0.79 s | 1.14 s | 2.65 s |
 | list the archive | 5.62 s | 7.21 s | 6.13 s | 6.12 s | 6.74 s | 10.30 s |
 
+The tables above have fs-relay ahead of rustfs through s3fs, and both of those mounts use FUSE. A separate DuckDB run reads the same files once through the fs-relay mount and once straight from rustfs over S3, with no FUSE on the S3 path. The mount is still substantially faster, so the lead is not an artifact of FUSE overhead on s3fs. The method and the results are in [Benchmark.md](./Benchmark.md).
+
 On this archive the default mount unpacks ahead of s3fs (9.78 s against 21.01 s) and ahead of fuse-nfs (9.78 s against 36.13 s). Packing is 2.38 s on the default mount, 5.31 s on s3fs, and 10.37 s on fuse-nfs.
 
 ## Run
 
 ```bash
-go build -o fs-relay ./cmd/fs-relay
-go build -o fs-relay-bind ./cmd/fs-relay-bind
+just build
 
 mkdir -p data /mnt/fs-relay
 ./fs-relay -listen 127.0.0.1:8080 -data data
