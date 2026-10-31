@@ -100,6 +100,22 @@ func TestCheckNS(t *testing.T) {
 	}
 }
 
+func TestCopyFileRangeRoundTrip(t *testing.T) {
+	p := Params{Namespace: "demo", Inode: 4, Fh: 0, Offset: 0, Size: 0, FhOut: 9, OffsetOut: 0}
+	b, err := MarshalRequest(CopyFileRange, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := DecodeRequest(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := req.Params
+	if req.Method != CopyFileRange || got.Inode != 4 || got.Fh != 0 || got.Offset != 0 || got.Size != 0 || got.FhOut != 9 || got.OffsetOut != 0 {
+		t.Fatalf("decoded %+v", got)
+	}
+}
+
 func TestClientAndReleaseRoundTrip(t *testing.T) {
 	b, err := MarshalRequest(Join, Params{Namespace: "demo", Client: "01a18f33-1f73-7000-b869-6772b604713a"})
 	if err != nil {

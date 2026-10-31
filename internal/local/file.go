@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"syscall"
@@ -73,9 +74,6 @@ func open(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 
 func openFlags(flags uint32) int {
 	out := int(flags & syscall.O_ACCMODE)
-	if flags&syscall.O_APPEND != 0 {
-		out |= os.O_APPEND
-	}
 	if flags&syscall.O_TRUNC != 0 {
 		out |= os.O_TRUNC
 	}
@@ -95,36 +93,37 @@ func read(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 	if p.Size > wire.MaxWrite {
 		return wire.Result{}, wire.ErrParams
 	}
-	if p.Fh != 0 {
-		return readFH(t, p)
+	f, done, err := t.source(p.Namespace, p.Inode, p.Fh)
+	if err != nil {
+		return wire.Result{}, wrap("read", err)
 	}
-	return readInode(t, p)
+	defer done()
+	return readFile(f, p)
 }
 
-func readFH(t *Tree, p wire.Params) (wire.Result, error) {
-	h, err := t.use(p.Fh)
-	if err != nil {
-		return wire.Result{}, wrap("read", err)
+// source opens the file a read names: the handle when fh is set, else the inode read-only.
+// done releases what source took. It is nil when err is set.
+func (t *Tree) source(ns string, ino, fh uint64) (*os.File, func(), error) {
+	if fh != 0 {
+		h, err := t.use(fh)
+		if err != nil {
+			return nil, nil, err
+		}
+		return h.f, func() { t.done(h) }, nil
 	}
-	defer t.done(h)
-	return readFile(h.f, p)
-}
-
-func readInode(t *Tree, p wire.Params) (wire.Result, error) {
-	rel, err := t.relOf(p.Namespace, p.Inode)
+	rel, err := t.relOf(ns, ino)
 	if err != nil {
-		return wire.Result{}, wrap("read", err)
+		return nil, nil, err
 	}
-	abs, err := t.abs(p.Namespace, rel)
+	abs, err := t.abs(ns, rel)
 	if err != nil {
-		return wire.Result{}, wrap("read", err)
+		return nil, nil, err
 	}
 	f, err := os.OpenFile(abs, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if err != nil {
-		return wire.Result{}, wrap("read", err)
+		return nil, nil, err
 	}
-	defer f.Close()
-	return readFile(f, p)
+	return f, func() { f.Close() }, nil
 }
 
 func reads(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
@@ -188,6 +187,192 @@ func readFile(f *os.File, p wire.Params) (wire.Result, error) {
 		return wire.Result{}, wrap("read", err)
 	}
 	return wire.Result{Data: buf[:n]}, nil
+}
+
+func copyRange(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
+	if err := ctx.Err(); err != nil {
+		return wire.Result{}, err
+	}
+	if p.Flags != 0 {
+		return wire.Result{}, wrap("copyfilerange", syscall.EINVAL)
+	}
+	if p.FhOut == 0 {
+		return wire.Result{}, wire.ErrParams
+	}
+	n := p.Size
+	if n > wire.MaxCopy {
+		n = wire.MaxCopy
+	}
+	out, err := t.use(p.FhOut)
+	if err != nil {
+		return wire.Result{}, wrap("copyfilerange", err)
+	}
+	defer t.done(out)
+	in, done, err := t.source(p.Namespace, p.Inode, p.Fh)
+	if err != nil {
+		return wire.Result{}, wrap("copyfilerange", err)
+	}
+	defer done()
+	copied, err := copyFDs(in, p.Offset, out.f, p.OffsetOut, int(n))
+	if err != nil {
+		return wire.Result{}, wrap("copyfilerange", err)
+	}
+	return wire.Result{Written: uint32(copied)}, nil
+}
+
+func copyFDs(in *os.File, offIn int64, out *os.File, offOut int64, n int) (int, error) {
+	if n == 0 {
+		return 0, nil
+	}
+	inSc, err := in.SyscallConn()
+	if err != nil {
+		return 0, err
+	}
+	outSc, err := out.SyscallConn()
+	if err != nil {
+		return 0, err
+	}
+	copied, opErr := 0, error(nil)
+	ctrlErr := inSc.Control(func(rfd uintptr) {
+		inner := outSc.Control(func(wfd uintptr) {
+			copied, opErr = copyLoop(int(rfd), offIn, int(wfd), offOut, n)
+		})
+		if inner != nil {
+			opErr = inner
+		}
+	})
+	if ctrlErr != nil {
+		return copied, ctrlErr
+	}
+	return copied, opErr
+}
+
+func copyLoop(rfd int, offIn int64, wfd int, offOut int64, n int) (int, error) {
+	copied := 0
+	for copied < n {
+		roff := offIn + int64(copied)
+		woff := offOut + int64(copied)
+		c, err := unix.CopyFileRange(rfd, &roff, wfd, &woff, n-copied, 0)
+		copied += c
+		if err == nil {
+			if c == 0 {
+				return copied, nil
+			}
+			continue
+		}
+		if errors.Is(err, syscall.EINTR) {
+			continue
+		}
+		return copied, err
+	}
+	return copied, nil
+}
+
+// SpliceRead moves up to n bytes from the named file into pipe. A short count is EOF.
+func (t *Tree) SpliceRead(ctx context.Context, ns string, ino, fh uint64, off int64, n int, pipe *Pipe) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	f, done, err := t.source(ns, ino, fh)
+	if err != nil {
+		return 0, wrap("read", err)
+	}
+	defer done()
+	return spliceFile(f, &off, pipe.WriteFd(), n)
+}
+
+// SpliceWrite moves n bytes from pipe into fh at off. A filesystem that refuses splice is copied.
+func (t *Tree) SpliceWrite(ctx context.Context, ns string, fh uint64, off int64, pipe *Pipe, n int) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	h, err := t.use(fh)
+	if err != nil {
+		return 0, wrap("write", err)
+	}
+	defer t.done(h)
+	moved, err := spliceInto(pipe.ReadFd(), h.f, &off, n)
+	if err == nil || moved > 0 || !errors.Is(err, syscall.EINVAL) {
+		return moved, err
+	}
+	return copyFromPipe(pipe, h.f, off, n)
+}
+
+func spliceFile(f *os.File, off *int64, wfd, n int) (int, error) {
+	sc, err := f.SyscallConn()
+	if err != nil {
+		return 0, err
+	}
+	var moved int
+	var opErr error
+	ctrlErr := sc.Control(func(fd uintptr) {
+		moved, opErr = spliceExact(int(fd), off, wfd, nil, n, unix.SPLICE_F_MOVE)
+	})
+	if ctrlErr != nil {
+		return moved, ctrlErr
+	}
+	return moved, opErr
+}
+
+func spliceInto(rfd int, f *os.File, off *int64, n int) (int, error) {
+	sc, err := f.SyscallConn()
+	if err != nil {
+		return 0, err
+	}
+	var moved int
+	var opErr error
+	ctrlErr := sc.Control(func(fd uintptr) {
+		moved, opErr = spliceExact(rfd, nil, int(fd), off, n, unix.SPLICE_F_MOVE)
+	})
+	if ctrlErr != nil {
+		return moved, ctrlErr
+	}
+	return moved, opErr
+}
+
+func spliceExact(rfd int, roff *int64, wfd int, woff *int64, n, flags int) (int, error) {
+	got := 0
+	for got < n {
+		c, err := unix.Splice(rfd, roff, wfd, woff, n-got, flags)
+		if c > 0 {
+			got += int(c)
+		}
+		if err == nil {
+			if c == 0 {
+				return got, nil
+			}
+			continue
+		}
+		if errors.Is(err, syscall.EINTR) {
+			continue
+		}
+		return got, err
+	}
+	return got, nil
+}
+
+func copyFromPipe(pipe *Pipe, f *os.File, off int64, n int) (int, error) {
+	buf := make([]byte, n)
+	got := 0
+	for got < n {
+		c, err := unix.Read(pipe.ReadFd(), buf[got:])
+		if c > 0 {
+			got += c
+		}
+		if err != nil {
+			if errors.Is(err, syscall.EINTR) {
+				continue
+			}
+			return got, err
+		}
+		if c == 0 {
+			break
+		}
+	}
+	if _, err := f.WriteAt(buf[:got], off); err != nil {
+		return 0, err
+	}
+	return got, nil
 }
 
 func write(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {

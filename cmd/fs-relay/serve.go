@@ -11,10 +11,13 @@ import (
 )
 
 func newHandler(tree *local.Tree) http.Handler {
-	return handler(tree, newHub())
+	h, _ := handler(tree, newHub())
+	return h
 }
 
-func handler(tree *local.Tree, h *hub) http.Handler {
+func handler(tree *local.Tree, h *hub) (http.Handler, *rawSet) {
+	set := newRawSet()
+	min, max := rawLimits(tree)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", serveRoot)
 	mux.HandleFunc("POST /fs/{ns}", func(w http.ResponseWriter, r *http.Request) {
@@ -23,7 +26,10 @@ func handler(tree *local.Tree, h *hub) http.Handler {
 	mux.HandleFunc("GET /ws/{ns}", func(w http.ResponseWriter, r *http.Request) {
 		serveWS(h, tree, w, r)
 	})
-	return mux
+	mux.HandleFunc("GET /raw/{ns}", func(w http.ResponseWriter, r *http.Request) {
+		serveRaw(h, tree, set, min, max, w, r)
+	})
+	return mux, set
 }
 
 func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {

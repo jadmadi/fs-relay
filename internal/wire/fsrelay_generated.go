@@ -921,8 +921,32 @@ func (rcv *FbParams) Client() []byte {
 	return nil
 }
 
+func (rcv *FbParams) FhOut() uint64 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(44))
+	if o != 0 {
+		return rcv._tab.GetUint64(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FbParams) MutateFhOut(n uint64) bool {
+	return rcv._tab.MutateUint64Slot(44, n)
+}
+
+func (rcv *FbParams) OffsetOut() int64 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(46))
+	if o != 0 {
+		return rcv._tab.GetInt64(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FbParams) MutateOffsetOut(n int64) bool {
+	return rcv._tab.MutateInt64Slot(46, n)
+}
+
 func FbParamsStart(builder *flatbuffers.Builder) {
-	builder.StartObject(20)
+	builder.StartObject(22)
 }
 func FbParamsAddNamespace(builder *flatbuffers.Builder, namespace flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(namespace), 0)
@@ -989,6 +1013,12 @@ func FbParamsStartInodesVector(builder *flatbuffers.Builder, numElems int) flatb
 }
 func FbParamsAddClient(builder *flatbuffers.Builder, client flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(19, flatbuffers.UOffsetT(client), 0)
+}
+func FbParamsAddFhOut(builder *flatbuffers.Builder, fhOut uint64) {
+	builder.PrependUint64Slot(20, fhOut, 0)
+}
+func FbParamsAddOffsetOut(builder *flatbuffers.Builder, offsetOut int64) {
+	builder.PrependInt64Slot(21, offsetOut, 0)
 }
 func FbParamsEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

@@ -17,7 +17,8 @@ func TestJoinEvictAndRejoin(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
 	h := newHub()
-	srv := httptest.NewServer(handler(tree, h))
+	hnd, _ := handler(tree, h)
+	srv := httptest.NewServer(hnd)
 	t.Cleanup(srv.Close)
 	httpClient := srv.Client()
 
@@ -70,7 +71,8 @@ func TestJoinEvictAndRejoin(t *testing.T) {
 func TestWSEvict(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
-	srv := httptest.NewServer(handler(tree, newHub()))
+	hnd, _ := handler(tree, newHub())
+	srv := httptest.NewServer(hnd)
 	t.Cleanup(srv.Close)
 	ctx := context.Background()
 	one, err := client.Dial(ctx, srv.URL, "demo")

@@ -17,6 +17,8 @@ func (t *Tree) Changed(method string, p wire.Params) []wire.Change {
 		return append(old, oneChange(p.NewInode, p.NewName)...)
 	case wire.Write, wire.Setattr:
 		return t.fileChange(p)
+	case wire.CopyFileRange:
+		return t.fileChange(wire.Params{Namespace: p.Namespace, Fh: p.FhOut})
 	default:
 		return nil
 	}

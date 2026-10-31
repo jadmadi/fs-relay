@@ -117,6 +117,8 @@ func putParams(b *flatbuffers.Builder, p *Params) flatbuffers.UOffsetT {
 	addOffset(b, data, FbParamsAddData)
 	addOffset(b, inodes, FbParamsAddInodes)
 	addOffset(b, client, FbParamsAddClient)
+	FbParamsAddFhOut(b, p.FhOut)
+	FbParamsAddOffsetOut(b, p.OffsetOut)
 	return FbParamsEnd(b)
 }
 
@@ -303,6 +305,8 @@ func paramsFrom(p *FbParams) Params {
 		Data:      p.DataBytes(),
 		Inodes:    inodesFrom(p),
 		Client:    string(p.Client()),
+		FhOut:     p.FhOut(),
+		OffsetOut: p.OffsetOut(),
 	}
 }
 

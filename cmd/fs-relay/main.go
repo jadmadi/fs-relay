@@ -27,11 +27,13 @@ func run() error {
 
 	tree := local.New(*data)
 	defer tree.Close()
+	h, raw := handler(tree, newHub())
 	srv := &http.Server{
 		Addr:              *listen,
-		Handler:           newHandler(tree),
+		Handler:           h,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	srv.RegisterOnShutdown(raw.closeAll)
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()
 

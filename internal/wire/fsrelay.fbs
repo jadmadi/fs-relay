@@ -62,6 +62,8 @@ table FbParams {
   data:[ubyte];
   inodes:[ulong];
   client:string;
+  fh_out:ulong;
+  offset_out:long;
 }
 
 table FbResult {

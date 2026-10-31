@@ -5,6 +5,7 @@ import (
 	"sync"
 	"syscall"
 
+	"fs-relay/internal/client"
 	"fs-relay/internal/wire"
 
 	"github.com/hanwen/go-fuse/v2/fs"
@@ -19,13 +20,17 @@ type caller interface {
 // node is one protocol inode. Every method is one call.
 type node struct {
 	fs.Inode
-	c   caller
-	k   *kernel
-	ino uint64
+	c         caller
+	k         *kernel
+	r         *client.Raw
+	ino       uint64
+	rawMin    int
+	spliceMax int
 
 	mu    sync.Mutex
 	attr  wire.Attr
 	known bool
+	dirty map[*handle]int64
 }
 
 var (
@@ -45,6 +50,7 @@ var (
 	_ fs.NodeStatfser       = (*node)(nil)
 	_ fs.NodeOnAdder        = (*node)(nil)
 	_ fs.NodeOnForgetter    = (*node)(nil)
+	_ fs.NodeCopyFileRanger = (*node)(nil)
 )
 
 func (n *node) OnAdd(context.Context) {
@@ -68,8 +74,7 @@ func (n *node) call(ctx context.Context, method string, p wire.Params) (wire.Res
 }
 
 func (n *node) spawn(ctx context.Context, a wire.Attr, out *fuse.EntryOut) (*node, *fs.Inode) {
-	fillAttr(&out.Attr, a)
-	ch := &node{c: n.c, k: n.k, ino: a.Ino}
+	ch := &node{c: n.c, k: n.k, r: n.r, ino: a.Ino, rawMin: n.rawMin, spliceMax: n.spliceMax}
 	mode := a.Mode & syscall.S_IFMT
 	ino := n.NewInode(ctx, ch, fs.StableAttr{Mode: mode, Ino: a.Ino})
 	live, ok := ino.Operations().(*node)
@@ -77,6 +82,7 @@ func (n *node) spawn(ctx context.Context, a wire.Attr, out *fuse.EntryOut) (*nod
 		live = ch
 	}
 	live.remember(a)
+	live.fill(&out.Attr, a)
 	return live, ino
 }
 
@@ -104,7 +110,7 @@ func (n *node) Getattr(ctx context.Context, f fs.FileHandle, out *fuse.AttrOut) 
 		return h.getattr(ctx, out)
 	}
 	if a, ok := n.cached(); ok {
-		fillAttr(&out.Attr, a)
+		n.fill(&out.Attr, a)
 		return 0
 	}
 	res, errno := n.call(ctx, wire.Getattr, wire.Params{})
@@ -112,7 +118,7 @@ func (n *node) Getattr(ctx context.Context, f fs.FileHandle, out *fuse.AttrOut) 
 		return errno
 	}
 	n.remember(*res.Attr)
-	fillAttr(&out.Attr, *res.Attr)
+	n.fill(&out.Attr, *res.Attr)
 	return 0
 }
 
@@ -124,12 +130,15 @@ func (n *node) Setattr(ctx context.Context, f fs.FileHandle, in *fuse.SetAttrIn,
 }
 
 func (n *node) setattr(ctx context.Context, in *fuse.SetAttrIn, out *fuse.AttrOut) syscall.Errno {
+	if errno := n.drain(ctx); errno != 0 {
+		return errno
+	}
 	res, errno := n.call(ctx, wire.Setattr, setattrParams(in))
 	if errno != 0 {
 		return errno
 	}
 	n.remember(*res.Attr)
-	fillAttr(&out.Attr, *res.Attr)
+	n.fill(&out.Attr, *res.Attr)
 	return 0
 }
 
@@ -137,7 +146,7 @@ func (n *node) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fs
 	if child := n.GetChild(name); child != nil {
 		if cn, ok := child.Operations().(*node); ok {
 			if a, hit := cn.cached(); hit {
-				fillAttr(&out.Attr, a)
+				cn.fill(&out.Attr, a)
 				return child, 0
 			}
 		}
@@ -224,6 +233,33 @@ func (n *node) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32, s
 
 func readOnly(flags uint32) bool {
 	return flags&syscall.O_ACCMODE == syscall.O_RDONLY && flags&syscall.O_TRUNC == 0
+}
+
+func (n *node) CopyFileRange(ctx context.Context, fhIn fs.FileHandle, offIn uint64, out *fs.Inode, fhOut fs.FileHandle, offOut, length, flags uint64) (uint32, syscall.Errno) {
+	hin, inOK := fhIn.(*handle)
+	hout, outOK := fhOut.(*handle)
+	dst, dstOK := out.Operations().(*node)
+	if !inOK || !outOK || !dstOK || hout.fh == 0 {
+		return 0, syscall.EBADF
+	}
+	if errno := n.drain(ctx); errno != 0 {
+		return 0, errno
+	}
+	if errno := dst.drain(ctx); errno != 0 {
+		return 0, errno
+	}
+	res, errno := n.call(ctx, wire.CopyFileRange, wire.Params{
+		Inode: hin.ino, Fh: hin.fh, Offset: int64(offIn), Size: length,
+		Flags: uint32(flags), FhOut: hout.fh, OffsetOut: int64(offOut),
+	})
+	if errno != 0 {
+		return 0, errno
+	}
+	dst.forgetAttr()
+	if n.k != nil {
+		n.k.forgetIno(dst.ino)
+	}
+	return res.Written, 0
 }
 
 func (n *node) Access(ctx context.Context, mask uint32) syscall.Errno {

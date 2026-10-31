@@ -10,6 +10,7 @@ The server runs on the machine that holds the files. Mount it from as many hosts
 - One connection for the mount, which is the faster way to run it. `-post` sends each operation as its own request instead.
 - Several hosts can mount the same name at once and see the same files.
 - SQLite works with its default rollback journal. `PRAGMA journal_mode=WAL` fails, because WAL needs a shared-memory file this filesystem cannot provide.
+- Writes reach other mounts when the file is closed or synced.
 
 ## How it compares
 
@@ -19,23 +20,23 @@ On each filesystem we unpacked an archive, packed the tree again, copied the arc
 
 | | local directory | kvfs | fs-relay | fs-relay `-post` | s3fs on rustfs | fuse-nfs |
 |---|---:|---:|---:|---:|---:|---:|
-| unpack | 0.14 s | 25.76 s | 16.56 s | 20.04 s | 203.56 s | 107.89 s |
-| pack | 0.10 s | 12.58 s | 4.82 s | 5.78 s | 57.53 s | 39.68 s |
-| copy the archive | 0.02 s | 0.48 s | 0.34 s | 0.26 s | 0.38 s | 0.45 s |
-| list the archive | 0.03 s | 0.82 s | 0.26 s | 0.29 s | 0.16 s | 0.48 s |
+| unpack | 0.14 s | 25.76 s | 17.72 s | 20.47 s | 203.56 s | 107.89 s |
+| pack | 0.10 s | 12.58 s | 5.64 s | 6.09 s | 57.53 s | 39.68 s |
+| copy the archive | 0.02 s | 0.48 s | 0.11 s | 0.12 s | 0.38 s | 0.45 s |
+| list the archive | 0.03 s | 0.82 s | 0.22 s | 0.24 s | 0.16 s | 0.48 s |
 
-The default mount unpacks about twelve times faster than s3fs (16.56 s against 203.56 s) and about six and a half times faster than fuse-nfs (16.56 s against 107.89 s). Packing is about twelve times faster than s3fs (4.82 s against 57.53 s) and about eight times faster than fuse-nfs (4.82 s against 39.68 s).
+The default mount unpacks about eleven and a half times faster than s3fs (17.72 s against 203.56 s) and about six times faster than fuse-nfs (17.72 s against 107.89 s). Packing is about ten times faster than s3fs (5.64 s against 57.53 s) and about seven times faster than fuse-nfs (5.64 s against 39.68 s).
 
 `Antigravity.tar.gz` is mostly a few large files, about 500 MiB unpacked.
 
 | | local directory | kvfs | fs-relay | fs-relay `-post` | s3fs on rustfs | fuse-nfs |
 |---|---:|---:|---:|---:|---:|---:|
-| unpack | 5.60 s | 30.71 s | 26.19 s | 30.26 s | 21.01 s | 36.13 s |
-| pack | 0.49 s | 19.77 s | 4.85 s | 4.19 s | 5.31 s | 10.37 s |
-| copy the archive | 0.13 s | 3.12 s | 1.88 s | 1.54 s | 1.14 s | 2.65 s |
-| list the archive | 5.62 s | 7.21 s | 7.22 s | 7.30 s | 6.74 s | 10.30 s |
+| unpack | 5.60 s | 30.71 s | 9.78 s | 9.36 s | 21.01 s | 36.13 s |
+| pack | 0.49 s | 19.77 s | 2.38 s | 2.40 s | 5.31 s | 10.37 s |
+| copy the archive | 0.13 s | 3.12 s | 0.65 s | 0.79 s | 1.14 s | 2.65 s |
+| list the archive | 5.62 s | 7.21 s | 6.13 s | 6.12 s | 6.74 s | 10.30 s |
 
-On this archive s3fs unpacks ahead of the default mount (21.01 s against 26.19 s). Packing is close: 4.85 s on the default mount, 5.31 s on s3fs, and 10.37 s on fuse-nfs.
+On this archive the default mount unpacks ahead of s3fs (9.78 s against 21.01 s) and ahead of fuse-nfs (9.78 s against 36.13 s). Packing is 2.38 s on the default mount, 5.31 s on s3fs, and 10.37 s on fuse-nfs.
 
 ## Run
 
@@ -48,11 +49,11 @@ mkdir -p data /mnt/fs-relay
 ./fs-relay-bind -url http://127.0.0.1:8080 -ns demo /mnt/fs-relay
 ```
 
-`-listen` defaults to `127.0.0.1:8080` and `-data` to `data`. Each name under `data` is one independent tree. `-url` defaults to `http://127.0.0.1:8080` and `-ns` to `default`. Add `-post` to send each operation as its own request. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
+`-listen` defaults to `127.0.0.1:8080` and `-data` to `data`. Each name under `data` is one independent tree. `-url` defaults to `http://127.0.0.1:8080` and `-ns` to `default`. Add `-post` to send each operation as its own request. `-raw=false` sends large reads and writes on the main connection. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
 
 Open the server URL in a browser for a welcome page. `curl` against the same URL returns a short status. Unmount with `fusermount3 -u /mnt/fs-relay`.
 
-On a new mount, create a directory, write and read a small file, make a symlink, rename, and delete. Mount the same name a second time, write on one, and read on the other.
+On a new mount, create a directory, write and read a small file, make a symlink, rename, and delete. Mount the same name a second time, write on one, and read on the other. Copy a file from one path on the mount to another. Append with `>>`. Write about 10 MiB with `dd bs=10k` and read it back. Repeat that write with `-raw=false` and compare the bytes.
 
 ## Earlier designs
 

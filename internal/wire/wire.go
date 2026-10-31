@@ -16,6 +16,8 @@ const (
 	MaxNamespace = 64
 	MaxWrite     = 1 << 20
 	MaxBody      = MaxWrite + 64*1024
+	// MaxCopy bounds one copyfilerange. Written is a uint32, so the count fits.
+	MaxCopy = 1 << 30
 	// MaxReads and MaxPrefetch bound one reads call: a window of small files.
 	MaxReads    = 32
 	MaxPrefetch = 64 << 10
@@ -23,29 +25,30 @@ const (
 
 // Method names are the go-fuse methods, lowercased.
 const (
-	Lookup     = "lookup"
-	Getattr    = "getattr"
-	Setattr    = "setattr"
-	Access     = "access"
-	Statfs     = "statfs"
-	Mkdir      = "mkdir"
-	Create     = "create"
-	Open       = "open"
-	Read       = "read"
-	Reads      = "reads"
-	Write      = "write"
-	Flush      = "flush"
-	Fsync      = "fsync"
-	Release    = "release"
-	Opendir    = "opendir"
-	Readdir    = "readdir"
-	Releasedir = "releasedir"
-	Unlink     = "unlink"
-	Rmdir      = "rmdir"
-	Rename     = "rename"
-	Symlink    = "symlink"
-	Readlink   = "readlink"
-	Join       = "join"
+	Lookup        = "lookup"
+	Getattr       = "getattr"
+	Setattr       = "setattr"
+	Access        = "access"
+	Statfs        = "statfs"
+	Mkdir         = "mkdir"
+	Create        = "create"
+	Open          = "open"
+	Read          = "read"
+	Reads         = "reads"
+	Write         = "write"
+	Flush         = "flush"
+	Fsync         = "fsync"
+	Release       = "release"
+	Opendir       = "opendir"
+	Readdir       = "readdir"
+	Releasedir    = "releasedir"
+	Unlink        = "unlink"
+	Rmdir         = "rmdir"
+	Rename        = "rename"
+	Symlink       = "symlink"
+	Readlink      = "readlink"
+	Join          = "join"
+	CopyFileRange = "copyfilerange"
 )
 
 // Setattr bits match Linux FUSE FATTR_* so the mount can pass Valid through.
@@ -98,6 +101,8 @@ type Params struct {
 	Data      []byte
 	Inodes    []uint64
 	Client    string
+	FhOut     uint64
+	OffsetOut int64
 }
 
 // Blob is one whole small file returned by reads.

@@ -1,11 +1,14 @@
 package local
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"fs-relay/internal/wire"
 	"golang.org/x/sys/unix"
@@ -65,6 +68,234 @@ func TestReadsSkipsWhatItCannotTake(t *testing.T) {
 	err := callErr(t, tr, wire.Reads, wire.Params{Inodes: make([]uint64, wire.MaxReads+1)})
 	if !errors.Is(err, wire.ErrParams) {
 		t.Fatalf("reads: %v", err)
+	}
+}
+
+func TestAppendWritesAtSentOffset(t *testing.T) {
+	tr, _ := newTree(t)
+	file := call(t, tr, wire.Create, wire.Params{
+		Inode: 1, Name: "a", Mode: 0o644, Flags: syscall.O_WRONLY | syscall.O_APPEND,
+	})
+	call(t, tr, wire.Write, wire.Params{Fh: file.Fh, Offset: 0, Data: []byte("hello")})
+	call(t, tr, wire.Write, wire.Params{Fh: file.Fh, Offset: 5, Data: []byte("!")})
+	call(t, tr, wire.Release, wire.Params{Fh: file.Fh})
+	rd := call(t, tr, wire.Read, wire.Params{Inode: file.Attr.Ino, Size: 16})
+	if string(rd.Data) != "hello!" {
+		t.Fatalf("read %q", rd.Data)
+	}
+}
+
+func TestSpliceRoundTrip(t *testing.T) {
+	tr, _ := newTree(t)
+	file := call(t, tr, wire.Create, wire.Params{Inode: 1, Name: "a", Mode: 0o644, Flags: syscall.O_RDWR})
+	pipe, err := NewPipe(1 << 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pipe.Close() })
+	body := []byte("hello!!")
+	if _, err := unix.Write(pipe.WriteFd(), body); err != nil {
+		t.Fatal(err)
+	}
+	n, err := tr.SpliceWrite(context.Background(), "demo", file.Fh, 3, pipe, len(body))
+	if err != nil || n != len(body) {
+		t.Fatalf("write %d %v", n, err)
+	}
+	m, err := tr.SpliceRead(context.Background(), "demo", file.Attr.Ino, 0, 0, 100, pipe)
+	if err != nil || m != 3+len(body) {
+		t.Fatalf("read %d %v", m, err)
+	}
+	got := make([]byte, m)
+	if _, err := unix.Read(pipe.ReadFd(), got); err != nil {
+		t.Fatal(err)
+	}
+	if string(got[3:]) != "hello!!" {
+		t.Fatalf("body %q", got)
+	}
+	_, err = tr.SpliceWrite(context.Background(), "demo", 99, 0, pipe, 1)
+	if errnoOf(t, err) != syscall.EBADF {
+		t.Fatalf("fh %v", err)
+	}
+	if _, err := unix.Write(pipe.WriteFd(), []byte("abc")); err != nil {
+		t.Fatal(err)
+	}
+	if err := pipe.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	if err := unix.SetNonblock(pipe.ReadFd(), true); err != nil {
+		t.Fatal(err)
+	}
+	c, err := unix.Read(pipe.ReadFd(), make([]byte, 8))
+	if c > 0 || !errors.Is(err, syscall.EAGAIN) {
+		t.Fatalf("after reset %d %v", c, err)
+	}
+	if _, err := tr.BlockSize(); err != nil {
+		t.Fatal(err)
+	}
+	if PipeCapacity(1<<20) < 64<<10 {
+		t.Fatal("pipe capacity")
+	}
+}
+
+func TestSpliceMovePipeCapacity(t *testing.T) {
+	pipe, err := NewPipe(1 << 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pipe.Close() })
+	if pipe.Cap() <= wire.RawSpare {
+		t.Fatalf("pipe %d", pipe.Cap())
+	}
+	if err := moveN(t, pipe, pipe.Cap()-wire.RawSpare); err != nil {
+		t.Fatalf("under capacity: %v", err)
+	}
+	if err := pipe.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	err = moveN(t, pipe, pipe.Cap())
+	if err != nil && !strings.Contains(err.Error(), "stalled") {
+		t.Fatal(err)
+	}
+}
+
+func moveN(t *testing.T, pipe *Pipe, n int) error {
+	t.Helper()
+	fds, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fd := range fds {
+		if err := unix.SetNonblock(fd, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer unix.Close(fds[0])
+	defer unix.Close(fds[1])
+	go writeAll(fds[0], bytes.Repeat([]byte("z"), n))
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	ch := make(chan error, 1)
+	go func() {
+		ch <- SpliceMove(ctx, fds[1], pipe.WriteFd(), n, fds[1], unix.POLLIN)
+	}()
+	select {
+	case err := <-ch:
+		return err
+	case <-time.After(4 * time.Second):
+		t.Fatal("splice hung")
+	}
+	return nil
+}
+
+func writeAll(fd int, body []byte) {
+	off := 0
+	for off < len(body) {
+		n, err := unix.Write(fd, body[off:])
+		if err != nil {
+			if errors.Is(err, syscall.EAGAIN) || errors.Is(err, syscall.EINTR) {
+				continue
+			}
+			return
+		}
+		off += n
+	}
+}
+
+func TestSpliceMoveWaits(t *testing.T) {
+	fds, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fd := range fds {
+		if err := unix.SetNonblock(fd, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pipe, err := NewPipe(1 << 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pipe.Close() })
+	body := bytes.Repeat([]byte("q"), 200_000)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		off := 0
+		for off < len(body) {
+			n, err := unix.Write(fds[0], body[off:])
+			if err != nil {
+				if errors.Is(err, syscall.EAGAIN) || errors.Is(err, syscall.EINTR) {
+					continue
+				}
+				return
+			}
+			off += n
+		}
+		unix.Close(fds[0])
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := SpliceMove(ctx, fds[1], pipe.WriteFd(), len(body), fds[1], unix.POLLIN); err != nil {
+		t.Fatal(err)
+	}
+	<-done
+	unix.Close(fds[1])
+	got := make([]byte, len(body))
+	n := 0
+	for n < len(got) {
+		c, err := unix.Read(pipe.ReadFd(), got[n:])
+		if err != nil {
+			t.Fatal(err)
+		}
+		n += c
+	}
+	if !bytes.Equal(got, body) {
+		t.Fatal("mismatch")
+	}
+}
+
+func TestCopyFileRange(t *testing.T) {
+	tr, _ := newTree(t)
+	src := call(t, tr, wire.Create, wire.Params{Inode: 1, Name: "src", Mode: 0o644, Flags: syscall.O_RDWR})
+	call(t, tr, wire.Write, wire.Params{Fh: src.Fh, Data: []byte("abcdef")})
+	dst := call(t, tr, wire.Create, wire.Params{Inode: 1, Name: "dst", Mode: 0o644, Flags: syscall.O_RDWR})
+
+	byFH := call(t, tr, wire.CopyFileRange, wire.Params{Fh: src.Fh, Offset: 1, Size: 3, FhOut: dst.Fh})
+	if byFH.Written != 3 {
+		t.Fatalf("by fh written %d", byFH.Written)
+	}
+	byIno := call(t, tr, wire.CopyFileRange, wire.Params{
+		Inode: src.Attr.Ino, Size: 6, FhOut: dst.Fh, OffsetOut: 3,
+	})
+	if byIno.Written != 6 {
+		t.Fatalf("by inode written %d", byIno.Written)
+	}
+	rd := call(t, tr, wire.Read, wire.Params{Fh: dst.Fh, Size: 16})
+	if string(rd.Data) != "bcdabcdef" {
+		t.Fatalf("dst %q", rd.Data)
+	}
+
+	err := callErr(t, tr, wire.CopyFileRange, wire.Params{Fh: src.Fh, Size: 1, FhOut: dst.Fh, Flags: 1})
+	if errnoOf(t, err) != syscall.EINVAL {
+		t.Fatalf("flags: %v", err)
+	}
+	err = callErr(t, tr, wire.CopyFileRange, wire.Params{Fh: src.Fh, Size: 1, FhOut: 99})
+	if errnoOf(t, err) != syscall.EBADF {
+		t.Fatalf("fh: %v", err)
+	}
+	err = callErr(t, tr, wire.CopyFileRange, wire.Params{Inode: src.Attr.Ino, Size: 1})
+	if !errors.Is(err, wire.ErrParams) {
+		t.Fatalf("missing fh_out: %v", err)
+	}
+
+	past := call(t, tr, wire.CopyFileRange, wire.Params{Inode: src.Attr.Ino, Offset: 4, Size: 100, FhOut: dst.Fh})
+	if past.Written != 2 {
+		t.Fatalf("short %d", past.Written)
+	}
+	got := tr.Changed(wire.CopyFileRange, wire.Params{Namespace: "demo", FhOut: dst.Fh})
+	want := []wire.Change{{Parent: 1, Name: "dst"}}
+	if len(got) != 1 || got[0] != want[0] {
+		t.Fatalf("changed %+v", got)
 	}
 }
 

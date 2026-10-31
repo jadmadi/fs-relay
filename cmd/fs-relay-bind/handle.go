@@ -16,6 +16,7 @@ type handle struct {
 	fh    uint64
 	ino   uint64
 	local bool
+	wb    pending
 }
 
 var (
@@ -50,6 +51,22 @@ func (h *handle) Read(ctx context.Context, dest []byte, off int64) (fuse.ReadRes
 			}
 		}
 	}
+	if h.n != nil {
+		if errno := h.n.drain(ctx); errno != 0 {
+			return nil, errno
+		}
+	}
+	min, max := h.rawWindow()
+	switch route(false, len(dest), min, max, h.spliceMax()) {
+	case viaRawPipe:
+		if res, errno, ok := h.readPipe(ctx, dest, off); ok {
+			return res, errno
+		}
+	case viaRawBuf:
+		if res, errno, ok := h.readBuf(ctx, dest, off); ok {
+			return res, errno
+		}
+	}
 	res, errno := h.call(ctx, wire.Read, wire.Params{Offset: off, Size: uint64(len(dest))})
 	if errno != 0 {
 		return nil, errno
@@ -57,32 +74,39 @@ func (h *handle) Read(ctx context.Context, dest []byte, off int64) (fuse.ReadRes
 	return fuse.ReadResultData(res.Data), 0
 }
 
-func (h *handle) Write(ctx context.Context, data []byte, off int64) (uint32, syscall.Errno) {
-	res, errno := h.call(ctx, wire.Write, wire.Params{Offset: off, Data: data})
+func (h *handle) Flush(ctx context.Context) syscall.Errno {
+	h.wb.mu.Lock()
+	defer h.wb.mu.Unlock()
+	errno := h.flushLocked(ctx)
+	sticky := h.takeErr()
 	if errno != 0 {
-		return 0, errno
+		return errno
 	}
-	if h.n != nil {
-		h.n.forgetAttr()
-		if h.n.k != nil {
-			h.n.k.forgetIno(h.ino)
-		}
-	}
-	return res.Written, 0
+	return sticky
 }
 
-func (h *handle) Flush(context.Context) syscall.Errno { return 0 }
-
 func (h *handle) Fsync(ctx context.Context, _ uint32) syscall.Errno {
-	if h.local {
+	h.wb.mu.Lock()
+	errno := h.flushLocked(ctx)
+	sticky := h.takeErr()
+	h.wb.mu.Unlock()
+	if errno != 0 {
+		return errno
+	}
+	if sticky != 0 {
+		return sticky
+	}
+	if h.local || h.fh == 0 {
 		return 0
 	}
-	_, errno := h.call(ctx, wire.Fsync, wire.Params{})
+	_, errno = h.call(ctx, wire.Fsync, wire.Params{})
 	return errno
 }
 
 func (h *handle) Release(ctx context.Context) syscall.Errno {
-	if h.local {
+	_ = h.drain(ctx)
+	h.releaseBuf()
+	if h.local || h.fh == 0 {
 		return 0
 	}
 	_, errno := h.call(ctx, wire.Release, wire.Params{})
@@ -92,7 +116,7 @@ func (h *handle) Release(ctx context.Context) syscall.Errno {
 func (h *handle) getattr(ctx context.Context, out *fuse.AttrOut) syscall.Errno {
 	if h.n != nil {
 		if a, ok := h.n.cached(); ok {
-			fillAttr(&out.Attr, a)
+			h.n.fill(&out.Attr, a)
 			return 0
 		}
 	}
@@ -102,6 +126,8 @@ func (h *handle) getattr(ctx context.Context, out *fuse.AttrOut) syscall.Errno {
 	}
 	if h.n != nil {
 		h.n.remember(*res.Attr)
+		h.n.fill(&out.Attr, *res.Attr)
+		return 0
 	}
 	fillAttr(&out.Attr, *res.Attr)
 	return 0
@@ -112,6 +138,11 @@ func (h *handle) Getattr(ctx context.Context, out *fuse.AttrOut) syscall.Errno {
 }
 
 func (h *handle) setattr(ctx context.Context, in *fuse.SetAttrIn, out *fuse.AttrOut) syscall.Errno {
+	if h.n != nil {
+		if errno := h.n.drain(ctx); errno != 0 {
+			return errno
+		}
+	}
 	p := setattrParams(in)
 	res, errno := h.call(ctx, wire.Setattr, p)
 	if errno != 0 {
@@ -119,6 +150,8 @@ func (h *handle) setattr(ctx context.Context, in *fuse.SetAttrIn, out *fuse.Attr
 	}
 	if h.n != nil {
 		h.n.remember(*res.Attr)
+		h.n.fill(&out.Attr, *res.Attr)
+		return 0
 	}
 	fillAttr(&out.Attr, *res.Attr)
 	return 0
@@ -184,9 +217,11 @@ func (d *dirHandle) Lookup(ctx context.Context, name string, out *fuse.EntryOut)
 		return d.parent.Lookup(ctx, name, out)
 	}
 	if child := d.parent.GetChild(name); child != nil {
-		fillAttr(&out.Attr, a)
 		if cn, ok := child.Operations().(*node); ok {
 			cn.remember(a)
+			cn.fill(&out.Attr, a)
+		} else {
+			fillAttr(&out.Attr, a)
 		}
 		return child, 0
 	}

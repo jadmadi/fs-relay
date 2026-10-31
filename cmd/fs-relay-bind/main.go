@@ -30,6 +30,7 @@ func run() error {
 	post := flag.Bool("post", false, "send each operation as its own POST")
 	useWS := flag.Bool("ws", false, "one connection for the mount (the default)")
 	allowOther := flag.Bool("allow-other", false, "allow other users to access the mount")
+	useRaw := flag.Bool("raw", true, "carry large reads and writes on a separate connection")
 	debug := flag.Bool("debug", false, "enable FUSE debug logging")
 	flag.Parse()
 	if flag.NArg() != 1 {
@@ -59,6 +60,7 @@ func run() error {
 	defer cancel()
 	go k.loop(ctx, events)
 	root := &node{c: c, k: k, ino: 1}
+	defer attachRaw(root, *url, *ns, *useRaw)()
 	server, err := fs.Mount(flag.Arg(0), root, mountOptions(*allowOther, *debug))
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)
@@ -67,6 +69,21 @@ func run() error {
 	go unmountOnSignal(server)
 	server.Wait()
 	return nil
+}
+
+func attachRaw(root *node, url, ns string, on bool) func() {
+	if !on {
+		return func() {}
+	}
+	raw, err := client.DialRaw(context.Background(), url, ns)
+	if err != nil {
+		log.Printf("large transfers stay on the main connection: %v", err)
+		return func() {}
+	}
+	root.r = raw
+	root.rawMin = raw.Min()
+	root.spliceMax = spliceCeiling()
+	return func() { _ = raw.Close() }
 }
 
 func mountOptions(allowOther, debug bool) *fs.Options {

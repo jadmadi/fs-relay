@@ -4,11 +4,13 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"syscall"
 
 	"fs-relay/internal/wire"
+	"golang.org/x/sys/unix"
 )
 
 // Tree is one data directory. Inodes and open files live only as long as the process.
@@ -45,6 +47,18 @@ func New(root string) *Tree {
 		files:  map[uint64]*openFile{},
 		nextFH: 1,
 	}
+}
+
+// BlockSize is the data directory's preferred I/O size, read once at startup.
+func (t *Tree) BlockSize() (int, error) {
+	var st unix.Stat_t
+	if err := unix.Stat(t.root, &st); err != nil {
+		return 0, fmt.Errorf("stat %s: %w", t.root, err)
+	}
+	if st.Blksize <= 0 {
+		return 0, fmt.Errorf("stat %s: block size", t.root)
+	}
+	return int(st.Blksize), nil
 }
 
 // Close closes every open file.

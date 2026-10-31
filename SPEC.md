@@ -13,6 +13,8 @@ Two processes:
 - `fs-relay` is an HTTP server. It applies one filesystem call to the directory `data/<namespace>/`.
 - `fs-relay-bind` is a FUSE3 mount (`github.com/hanwen/go-fuse/v2`, as in kvfs). It is one of the two clients below.
 
+A third connection, described under Large transfers, carries only large reads and writes. Metadata stays on the websocket or on POST.
+
 The path segment after `/fs/` is the namespace: `[A-Za-z0-9_-]+`, non-empty, at most 64 bytes. It selects the directory under `data/` and nothing else. There is no shard level, because there is one directory tree. Anything outside the grammar is refused before any file is touched.
 
 ## Clients
@@ -51,6 +53,99 @@ sequenceDiagram
     Server-->>Mount: chunk, event
 ```
 
+## Large transfers
+
+A read or write at or above a threshold moves its file bytes on a separate TCP connection, so the kernel can splice them. The mount keeps up to eight of these connections. Each one handles one transfer at a time.
+
+The threshold is computed once, when the server starts, from the data directory:
+
+```
+Min = clamp(32 × st_blksize, 64 KiB, Max)
+Max = min(1 MiB, the pipe size the kernel grants), minus 64 KiB when that still leaves at least 64 KiB
+```
+
+`st_blksize` comes from `stat` of the data directory. The server sends `Min` and `Max` on the handshake. The mount uses the raw path when the byte count is inside that window. Anything smaller, or a server that does not offer the path, stays on the FlatBuffers envelope. `-raw=false` on the mount does not dial it.
+
+```mermaid
+sequenceDiagram
+    participant Mount
+    participant Server
+    Mount->>Server: GET /raw/ns, Upgrade fs-relay-raw/1
+    Server-->>Mount: 101, Fsr-Raw-Min, Fsr-Raw-Max
+    Note over Mount,Server: plain TCP from here, one transfer at a time
+    Mount->>Server: read header, 40 bytes
+    Server->>Server: splice file to pipe
+    Server-->>Mount: reply header, 16 bytes, then splice pipe to socket
+    Mount->>Mount: splice socket to pipe, then pipe to /dev/fuse
+    Mount->>Server: write header, 40 bytes, plus the bytes
+    Server->>Server: splice socket to pipe, then pipe to file at offset
+    Server-->>Mount: reply header, written count
+```
+
+Handshake, written by the mount on a new TCP connection:
+
+```
+GET /raw/<namespace> HTTP/1.1
+Host: <host>
+Connection: Upgrade
+Upgrade: fs-relay-raw/1
+```
+
+The server checks the namespace, hijacks, and refuses the connection if any body bytes were already buffered. It answers:
+
+```
+HTTP/1.1 101 Switching Protocols
+Connection: Upgrade
+Upgrade: fs-relay-raw/1
+Fsr-Raw-Min: <min>
+Fsr-Raw-Max: <max>
+```
+
+After that the socket is not HTTP. A missing `Upgrade` header is HTTP 400.
+
+Request header, 40 bytes, little-endian:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | 4 bytes | magic `FSRQ` |
+| 4 | u16 | op: 1 read, 2 write |
+| 6 | u16 | reserved, 0 |
+| 8 | u64 | inode, for a read without a handle |
+| 16 | u64 | fh, always for a write, and for a read when set |
+| 24 | i64 | offset |
+| 32 | u32 | length, at most Max |
+| 36 | u32 | reserved, 0 |
+
+A write request is that header plus exactly `length` file bytes.
+
+Reply header, 16 bytes, little-endian:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | 4 bytes | magic `FSRP` |
+| 4 | u32 | errno, 0 on success |
+| 8 | u32 | length: bytes that follow for a read, bytes written for a write |
+| 12 | u32 | reserved, 0 |
+
+A successful read is followed by exactly `length` bytes. An errno reply has length 0 and no body. A bad magic, an unknown op, a nonzero reserved field, a length of 0, or a length above Max closes the connection. A filesystem error does not.
+
+The server moves a read into a pipe before it writes the reply, so a short read at end of file is the length in the header. It then splices that pipe to the socket. A write is spliced from the socket into a pipe and from the pipe into the file at `offset`. A host filesystem that refuses the splice into the file is copied from the pipe instead. A successful write publishes the same eviction as `write`.
+
+The mount splices a read reply into a pipe and hands that pipe to FUSE, which splices it on into `/dev/fuse`, when the pipe can hold the reply. Otherwise it reads the reply into the FUSE buffer. A write the mount sends is one `writev` of the header and the bytes FUSE already delivered. A transport error is retried once on the envelope. A read or write at an offset is safe to repeat.
+
+```mermaid
+flowchart TD
+    start["read or write of n bytes"] --> rawOn{"raw dialed?"}
+    rawOn -->|no| env[envelope call]
+    rawOn -->|yes| win{"Min <= n <= Max?"}
+    win -->|no| env
+    win -->|yes| kind{write?}
+    kind -->|yes| rw["raw write"]
+    kind -->|no| fits{"n fits in a pipe?"}
+    fits -->|yes| rp["raw read into a pipe"]
+    fits -->|no| rb["raw read into the buffer"]
+```
+
 ## Envelope
 
 FlatBuffers is the only filesystem wire. The content type is `application/x-flatbuffers`. The file identifier is `FSR1`. The schema is `internal/wire/fsrelay.fbs`. One buffer is one envelope.
@@ -78,6 +173,7 @@ Under `FSR1`, field identity is declaration order. A table only grows by a field
 - The server keeps a process-local map between paths and inodes. The host `st_ino` is not the protocol inode: the namespace directory is not inode 1, and a copy would change it.
 - Any other inode is assigned on first `lookup`, `readdir`, `create`, `mkdir` or `symlink` and returned in the result. `readdir` assigns one so a directory entry never carries inode 0. It survives a rename inside the process.
 - `create` and a writable `open` return an `fh`. `write`, `fsync`, `release`, `lseek` and the lock calls name that `fh`. A read-only `read` names the inode instead.
+- The server opens host files without `O_APPEND`. The kernel resolves the append offset and sends it with the write.
 - The map and the open files die with the process. A transport error or a restart means the client must remount.
 - `..` and absolute paths never leave `data/<namespace>/`. A name containing `/` or equal to `.` or `..` is refused with `EINVAL`.
 
@@ -87,13 +183,17 @@ Names are the go-fuse methods, lowercased. Arguments are the kernel's, plus `nam
 
 M1 surface, which is also what `tar` needs: `lookup`, `getattr`, `setattr`, `access`, `statfs`, `mkdir`, `create`, `open`, `read`, `reads`, `write`, `flush`, `fsync`, `release`, `opendir`, `readdir`, `releasedir`, `unlink`, `rmdir`, `rename`, `symlink`, `readlink`. `reads` returns the whole body of each named inode that is a regular file of at most 64 KiB, at most 32 inodes and 1 MiB of bytes. A larger file, an empty file, or a missing inode is omitted from that result.
 
+`copyfilerange` copies up to `size` bytes from `fh` or, when `fh` is absent, from `inode`, at `offset`, into `fh_out` at `offset_out`. `fh_out` and `offset_out` are appended fields of `params`. A `flags` value other than zero is `EINVAL`. The server calls `copy_file_range(2)` and returns a short count as success. The destination name is evicted.
+
 `rename` follows `rename(2)`: a file replaces a file, a directory replaces an empty directory, and the other pairings fail with `EISDIR`, `ENOTDIR` or `ENOTEMPTY`. `RENAME_NOREPLACE` is honored. `RENAME_EXCHANGE` and `RENAME_WHITEOUT` fail with `EINVAL`.
 
 ## Coherence
 
 Attribute and entry timeouts are 1s. The negative timeout is 500ms. A read-only open keeps the kernel page cache (`FOPEN_KEEP_CACHE`). A create, and any writable open, bypasses it (`FOPEN_DIRECT_IO`).
 
-A read-only open does not take a server file handle. `read` names the inode, and that open's `flush` and `release` stay on the mount. `flush` does not sync; `fsync` does. `readdir` carries each name's attributes. The mount answers the lookup and getattr that follow from those, until an eviction drops them. Opening a directory does not take a server handle either.
+A write is acknowledged by the mount and sent when contiguous bytes reach 1 MiB, when a write is not contiguous, or on `flush`, `fsync`, `release`, a read, a setattr or a `copyfilerange` of that file. Other mounts see the bytes once they are sent. A failed send is reported by the next write, and by `close` or `fsync`.
+
+A read-only open does not take a server file handle. `read` names the inode, and that open's `flush` and `release` stay on the mount. `flush` sends bytes the mount is holding; `fsync` sends them and then syncs. `readdir` carries each name's attributes. The mount answers the lookup and getattr that follow from those, until an eviction drops them. Opening a directory does not take a server handle either.
 
 After that listing, the mount calls `reads` for the regular files in it that are at most 64 KiB. One call carries at most 32 names and 1 MiB of bytes. A larger file stays a normal `read`. The mount keeps those bodies until an eviction for that name, and stops storing them once 64 MiB is held. A read the cache cannot answer uses `read`.
 
@@ -119,11 +219,11 @@ This is what SQLite's rollback journal needs (SHARED, RESERVED and EXCLUSIVE byt
 
 ## Packages
 
-- `cmd/fs-relay`: flags, HTTP decode and encode, calls `internal/local`.
+- `cmd/fs-relay`: flags, HTTP decode and encode, the raw connection, calls `internal/local`.
 - `cmd/fs-relay-bind`: flags, FUSE nodes and the errno mapping, calls `internal/client`.
-- `internal/wire`: FlatBuffers types, the schema, and the generated file. No HTTP, no FUSE, no `os`.
-- `internal/local`: the directory, the inode map, handles, locks. Owns every `os` call and the error sentinels.
-- `internal/client`: the POST, the websocket, and the `join` stream.
+- `internal/wire`: FlatBuffers types, the schema, the generated file, and the raw header codec. No HTTP, no FUSE, no `os`.
+- `internal/local`: the directory, the inode map, handles, locks, and the pipe used by splice. Owns every `os` call and the error sentinels.
+- `internal/client`: the POST, the websocket, the `join` stream, and the raw connection.
 
 ## Testing
 
@@ -131,7 +231,7 @@ This is what SQLite's rollback journal needs (SHARED, RESERVED and EXCLUSIVE byt
 - `internal/wire`: a round trip of one request and both response shapes. The buffer carries the `FSR1` file identifier.
 - Lock grant, conflict, release fan-out and rejoin are tested with the lock table.
 - A real mount is not a unit test. It belongs in the README smoke checklist.
-- Cost: one POST per FUSE call, or one websocket frame per FUSE call on a shared socket, except `reads`, which carries up to 32 small files from one listing. Each POST mount also holds one `join` stream. `setlkw` does not hold a stream of its own.
+- Cost: one POST per FUSE call, or one websocket frame per FUSE call on a shared socket, except `reads`, which carries up to 32 small files from one listing, and except a write, which is one call per contiguous 1 MiB or per flush. A read or write inside the raw window is one frame on a raw connection instead. Each POST mount also holds one `join` stream. `setlkw` does not hold a stream of its own.
 
 ## Benchmarks
 
