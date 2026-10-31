@@ -77,12 +77,7 @@ func (h *handle) Read(ctx context.Context, dest []byte, off int64) (fuse.ReadRes
 func (h *handle) Flush(ctx context.Context) syscall.Errno {
 	h.wb.mu.Lock()
 	defer h.wb.mu.Unlock()
-	errno := h.flushLocked(ctx)
-	sticky := h.takeErr()
-	if errno != 0 {
-		return errno
-	}
-	return sticky
+	return h.takeErr()
 }
 
 func (h *handle) Fsync(ctx context.Context, _ uint32) syscall.Errno {
@@ -104,12 +99,34 @@ func (h *handle) Fsync(ctx context.Context, _ uint32) syscall.Errno {
 }
 
 func (h *handle) Release(ctx context.Context) syscall.Errno {
-	_ = h.drain(ctx)
+	h.wb.mu.Lock()
+	sticky := h.takeErr()
+	off := h.wb.off
+	var data []byte
+	if len(h.wb.buf) > 0 {
+		data = append([]byte(nil), h.wb.buf...)
+		h.wb.buf = h.wb.buf[:0]
+	}
+	h.clearDirty()
+	h.wb.mu.Unlock()
 	h.releaseBuf()
 	if h.local || h.fh == 0 {
+		if sticky != 0 {
+			return sticky
+		}
 		return 0
 	}
-	_, errno := h.call(ctx, wire.Release, wire.Params{})
+	parent, name := uint64(0), ""
+	if len(data) > 0 && h.n != nil {
+		parent, name = h.n.ownPlace()
+	}
+	_, errno := h.call(ctx, wire.Release, wire.Params{Inode: h.ino, Offset: off, Data: data})
+	if errno != 0 && h.n != nil {
+		h.n.disownPlace(parent, name)
+	}
+	if sticky != 0 {
+		return sticky
+	}
 	return errno
 }
 
@@ -144,8 +161,15 @@ func (h *handle) setattr(ctx context.Context, in *fuse.SetAttrIn, out *fuse.Attr
 		}
 	}
 	p := setattrParams(in)
+	parent, name := uint64(0), ""
+	if h.n != nil {
+		parent, name = h.n.ownPlace()
+	}
 	res, errno := h.call(ctx, wire.Setattr, p)
 	if errno != 0 {
+		if h.n != nil {
+			h.n.disownPlace(parent, name)
+		}
 		return errno
 	}
 	if h.n != nil {
@@ -196,19 +220,32 @@ func (d *dirHandle) Readdirent(ctx context.Context) (*fuse.DirEntry, syscall.Err
 }
 
 func (d *dirHandle) load(ctx context.Context) syscall.Errno {
+	if d.parent != nil && d.parent.k != nil {
+		if ents, ok := d.parent.k.dir(d.ino); ok {
+			d.store(ents)
+			d.prefetch(ctx, ents)
+			d.prefetchDirs(ctx, ents)
+			return 0
+		}
+	}
 	res, err := d.c.Call(ctx, wire.Readdir, wire.Params{Inode: d.ino})
 	if err != nil {
 		return toErrno(err)
 	}
-	d.ents = make([]fuse.DirEntry, len(res.Entries))
-	d.attrs = make(map[string]wire.Attr, len(res.Entries))
-	for i, e := range res.Entries {
+	d.store(res.Entries)
+	d.prefetch(ctx, res.Entries)
+	d.prefetchDirs(ctx, res.Entries)
+	return 0
+}
+
+func (d *dirHandle) store(entries []wire.Dirent) {
+	d.ents = make([]fuse.DirEntry, len(entries))
+	d.attrs = make(map[string]wire.Attr, len(entries))
+	for i, e := range entries {
 		d.ents[i] = fuse.DirEntry{Mode: e.Mode, Name: e.Name, Ino: e.Ino}
 		d.attrs[e.Name] = e.Attr
 	}
 	d.loaded = true
-	d.prefetch(ctx, res.Entries)
-	return 0
 }
 
 func (d *dirHandle) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fs.Inode, syscall.Errno) {

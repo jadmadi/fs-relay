@@ -630,6 +630,89 @@ func FbBlobEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }
 
+type FbListing struct {
+	_tab flatbuffers.Table
+}
+
+func GetRootAsFbListing(buf []byte, offset flatbuffers.UOffsetT) *FbListing {
+	n := flatbuffers.GetUOffsetT(buf[offset:])
+	x := &FbListing{}
+	x.Init(buf, n+offset)
+	return x
+}
+
+func FinishFbListingBuffer(builder *flatbuffers.Builder, offset flatbuffers.UOffsetT) {
+	builder.Finish(offset)
+}
+
+func GetSizePrefixedRootAsFbListing(buf []byte, offset flatbuffers.UOffsetT) *FbListing {
+	n := flatbuffers.GetUOffsetT(buf[offset+flatbuffers.SizeUint32:])
+	x := &FbListing{}
+	x.Init(buf, n+offset+flatbuffers.SizeUint32)
+	return x
+}
+
+func FinishSizePrefixedFbListingBuffer(builder *flatbuffers.Builder, offset flatbuffers.UOffsetT) {
+	builder.FinishSizePrefixed(offset)
+}
+
+func (rcv *FbListing) Init(buf []byte, i flatbuffers.UOffsetT) {
+	rcv._tab.Bytes = buf
+	rcv._tab.Pos = i
+}
+
+func (rcv *FbListing) Table() flatbuffers.Table {
+	return rcv._tab
+}
+
+func (rcv *FbListing) Ino() uint64 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
+	if o != 0 {
+		return rcv._tab.GetUint64(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FbListing) MutateIno(n uint64) bool {
+	return rcv._tab.MutateUint64Slot(4, n)
+}
+
+func (rcv *FbListing) Entries(obj *FbDirent, j int) bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		x := rcv._tab.Vector(o)
+		x += flatbuffers.UOffsetT(j) * 4
+		x = rcv._tab.Indirect(x)
+		obj.Init(rcv._tab.Bytes, x)
+		return true
+	}
+	return false
+}
+
+func (rcv *FbListing) EntriesLength() int {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.VectorLen(o)
+	}
+	return 0
+}
+
+func FbListingStart(builder *flatbuffers.Builder) {
+	builder.StartObject(2)
+}
+func FbListingAddIno(builder *flatbuffers.Builder, ino uint64) {
+	builder.PrependUint64Slot(0, ino, 0)
+}
+func FbListingAddEntries(builder *flatbuffers.Builder, entries flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(entries), 0)
+}
+func FbListingStartEntriesVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+	return builder.StartVector(4, numElems, 4)
+}
+func FbListingEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+	return builder.EndObject()
+}
+
 type FbParams struct {
 	_tab flatbuffers.Table
 }
@@ -1191,8 +1274,28 @@ func (rcv *FbResult) BlobsLength() int {
 	return 0
 }
 
+func (rcv *FbResult) Listings(obj *FbListing, j int) bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(20))
+	if o != 0 {
+		x := rcv._tab.Vector(o)
+		x += flatbuffers.UOffsetT(j) * 4
+		x = rcv._tab.Indirect(x)
+		obj.Init(rcv._tab.Bytes, x)
+		return true
+	}
+	return false
+}
+
+func (rcv *FbResult) ListingsLength() int {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(20))
+	if o != 0 {
+		return rcv._tab.VectorLen(o)
+	}
+	return 0
+}
+
 func FbResultStart(builder *flatbuffers.Builder) {
-	builder.StartObject(8)
+	builder.StartObject(9)
 }
 func FbResultAddAttr(builder *flatbuffers.Builder, attr flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(attr), 0)
@@ -1225,6 +1328,12 @@ func FbResultAddBlobs(builder *flatbuffers.Builder, blobs flatbuffers.UOffsetT) 
 	builder.PrependUOffsetTSlot(7, flatbuffers.UOffsetT(blobs), 0)
 }
 func FbResultStartBlobsVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+	return builder.StartVector(4, numElems, 4)
+}
+func FbResultAddListings(builder *flatbuffers.Builder, listings flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(8, flatbuffers.UOffsetT(listings), 0)
+}
+func FbResultStartListingsVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
 }
 func FbResultEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {

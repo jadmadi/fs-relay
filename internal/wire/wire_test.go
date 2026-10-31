@@ -100,6 +100,24 @@ func TestCheckNS(t *testing.T) {
 	}
 }
 
+func TestReaddirsRoundTrip(t *testing.T) {
+	res := Result{Listings: []Listing{{
+		Inode:   3,
+		Entries: []Dirent{{Name: "a", Attr: Attr{Ino: 4, Mode: 0100644, Size: 2}}},
+	}}}
+	b, err := MarshalResult(res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := DecodeResponse(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Listings) != 1 || got.Listings[0].Inode != 3 || got.Listings[0].Entries[0].Name != "a" || got.Listings[0].Entries[0].Ino != 4 {
+		t.Fatalf("listings %+v", got.Listings)
+	}
+}
+
 func TestCopyFileRangeRoundTrip(t *testing.T) {
 	p := Params{Namespace: "demo", Inode: 4, Fh: 0, Offset: 0, Size: 0, FhOut: 9, OffsetOut: 0}
 	b, err := MarshalRequest(CopyFileRange, p)

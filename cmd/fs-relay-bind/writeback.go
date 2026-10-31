@@ -56,6 +56,15 @@ func planWrite(held int, heldEnd, off int64, n, min int) wbAction {
 func takeBuf() []byte { return bufPool.Get().([]byte)[:0] }
 
 func (h *handle) sendWrite(ctx context.Context, off int64, data []byte) (uint32, syscall.Errno) {
+	parent, name := uint64(0), ""
+	if h.n != nil {
+		parent, name = h.n.ownPlace()
+	}
+	undo := func() {
+		if h.n != nil {
+			h.n.disownPlace(parent, name)
+		}
+	}
 	min, max := h.rawWindow()
 	if route(true, len(data), min, max, h.spliceMax()) == viaRawWrite {
 		n, err := h.n.r.Write(ctx, h.fh, off, data)
@@ -66,11 +75,13 @@ func (h *handle) sendWrite(ctx context.Context, off int64, data []byte) (uint32,
 			return uint32(n), 0
 		}
 		if !isTransport(err) {
+			undo()
 			return 0, toErrno(err)
 		}
 	}
 	res, errno := h.call(ctx, wire.Write, wire.Params{Offset: off, Data: data})
 	if errno != 0 {
+		undo()
 		return 0, errno
 	}
 	if int(res.Written) < len(data) {

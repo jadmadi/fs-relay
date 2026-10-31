@@ -41,6 +41,11 @@ table FbBlob {
   data:[ubyte];
 }
 
+table FbListing {
+  ino:ulong;
+  entries:[FbDirent];
+}
+
 table FbParams {
   namespace:string;
   inode:ulong;
@@ -75,6 +80,7 @@ table FbResult {
   statfs:FbFSStat;
   written:uint;
   blobs:[FbBlob];
+  listings:[FbListing];
 }
 
 table FbFailure {

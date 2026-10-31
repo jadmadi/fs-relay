@@ -17,6 +17,11 @@ func (t *Tree) Changed(method string, p wire.Params) []wire.Change {
 		return append(old, oneChange(p.NewInode, p.NewName)...)
 	case wire.Write, wire.Setattr:
 		return t.fileChange(p)
+	case wire.Release:
+		if len(p.Data) == 0 {
+			return nil
+		}
+		return t.fileChange(p)
 	case wire.CopyFileRange:
 		return t.fileChange(wire.Params{Namespace: p.Namespace, Fh: p.FhOut})
 	default:
@@ -34,11 +39,12 @@ func oneChange(parent uint64, name string) []wire.Change {
 func (t *Tree) fileChange(p wire.Params) []wire.Change {
 	ino := p.Inode
 	if p.Fh != 0 {
-		id, ok := t.inoOf(p.Fh)
-		if !ok {
-			return nil
+		if id, ok := t.inoOf(p.Fh); ok {
+			ino = id
 		}
-		ino = id
+	}
+	if ino == 0 {
+		return nil
 	}
 	parent, name, ok := t.parentOf(p.Namespace, ino)
 	if !ok {

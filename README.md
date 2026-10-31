@@ -20,12 +20,12 @@ On each filesystem we unpacked an archive, packed the tree again, copied the arc
 
 | | local directory | kvfs | fs-relay | fs-relay `-post` | s3fs on rustfs | fuse-nfs |
 |---|---:|---:|---:|---:|---:|---:|
-| unpack | 0.14 s | 25.76 s | 17.72 s | 20.47 s | 203.56 s | 107.89 s |
-| pack | 0.10 s | 12.58 s | 5.64 s | 6.09 s | 57.53 s | 39.68 s |
-| copy the archive | 0.02 s | 0.48 s | 0.11 s | 0.12 s | 0.38 s | 0.45 s |
-| list the archive | 0.03 s | 0.82 s | 0.22 s | 0.24 s | 0.16 s | 0.48 s |
+| unpack | 0.14 s | 25.76 s | 15.47 s | 18.11 s | 203.56 s | 107.89 s |
+| pack | 0.10 s | 12.58 s | 3.76 s | 4.18 s | 57.53 s | 39.68 s |
+| copy the archive | 0.02 s | 0.48 s | 0.12 s | 0.11 s | 0.38 s | 0.45 s |
+| list the archive | 0.03 s | 0.82 s | 0.16 s | 0.19 s | 0.16 s | 0.48 s |
 
-The default mount unpacks about eleven and a half times faster than s3fs (17.72 s against 203.56 s) and about six times faster than fuse-nfs (17.72 s against 107.89 s). Packing is about ten times faster than s3fs (5.64 s against 57.53 s) and about seven times faster than fuse-nfs (5.64 s against 39.68 s).
+The default mount unpacks about thirteen times faster than s3fs (15.47 s against 203.56 s) and about seven times faster than fuse-nfs (15.47 s against 107.89 s). Packing is about fifteen times faster than s3fs (3.76 s against 57.53 s) and about ten and a half times faster than fuse-nfs (3.76 s against 39.68 s).
 
 `Antigravity.tar.gz` is mostly a few large files, about 500 MiB unpacked.
 

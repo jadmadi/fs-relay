@@ -35,6 +35,7 @@ const (
 	Open          = "open"
 	Read          = "read"
 	Reads         = "reads"
+	Readdirs      = "readdirs"
 	Write         = "write"
 	Flush         = "flush"
 	Fsync         = "fsync"
@@ -120,14 +121,21 @@ type Change struct {
 // Result is the success body. Empty strings and empty byte vectors are absent.
 // Numeric fields are present, including zero.
 type Result struct {
-	Attr    *Attr
+	Attr     *Attr
+	Entries  []Dirent
+	Fh       uint64
+	Data     []byte
+	Target   string
+	Stat     *FSStat
+	Written  uint32
+	Blobs    []Blob
+	Listings []Listing
+}
+
+// Listing is one directory returned by readdirs.
+type Listing struct {
+	Inode   uint64
 	Entries []Dirent
-	Fh      uint64
-	Data    []byte
-	Target  string
-	Stat    *FSStat
-	Written uint32
-	Blobs   []Blob
 }
 
 // Attr is the protocol inode's attributes. Ino is the server's number, not st_ino.

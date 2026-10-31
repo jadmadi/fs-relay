@@ -379,17 +379,9 @@ func write(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 	if err := ctx.Err(); err != nil {
 		return wire.Result{}, err
 	}
-	if len(p.Data) > wire.MaxWrite {
-		return wire.Result{}, wire.ErrParams
-	}
-	h, err := t.use(p.Fh)
+	n, err := writeAt(t, p, "write")
 	if err != nil {
-		return wire.Result{}, wrap("write", err)
-	}
-	defer t.done(h)
-	n, err := h.f.WriteAt(p.Data, p.Offset)
-	if err != nil {
-		return wire.Result{}, wrap("write", err)
+		return wire.Result{}, err
 	}
 	return wire.Result{Written: uint32(n)}, nil
 }
@@ -429,10 +421,36 @@ func release(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 	if err := ctx.Err(); err != nil {
 		return wire.Result{}, err
 	}
+	if len(p.Data) > 0 {
+		n, err := writeAt(t, p, "release")
+		if err != nil || n != len(p.Data) {
+			_ = t.dropFH(p.Fh)
+			if err != nil {
+				return wire.Result{}, err
+			}
+			return wire.Result{}, wrap("release", io.ErrShortWrite)
+		}
+	}
 	if err := t.dropFH(p.Fh); err != nil {
 		return wire.Result{}, wrap("release", err)
 	}
 	return wire.Result{}, nil
+}
+
+func writeAt(t *Tree, p wire.Params, op string) (int, error) {
+	if len(p.Data) > wire.MaxWrite {
+		return 0, wire.ErrParams
+	}
+	h, err := t.use(p.Fh)
+	if err != nil {
+		return 0, wrap(op, err)
+	}
+	n, err := h.f.WriteAt(p.Data, p.Offset)
+	t.done(h)
+	if err != nil {
+		return n, wrap(op, err)
+	}
+	return n, nil
 }
 
 func (t *Tree) add(f *os.File, ino uint64) uint64 {

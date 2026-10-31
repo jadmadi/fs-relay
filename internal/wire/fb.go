@@ -143,6 +143,7 @@ func putResult(b *flatbuffers.Builder, res *Result) flatbuffers.UOffsetT {
 	target := putStr(b, res.Target)
 	stat := putStat(b, res.Stat)
 	blobs := putBlobs(b, res.Blobs)
+	listings := putListings(b, res.Listings)
 	FbResultStart(b)
 	addOffset(b, attr, FbResultAddAttr)
 	addOffset(b, entries, FbResultAddEntries)
@@ -152,6 +153,7 @@ func putResult(b *flatbuffers.Builder, res *Result) flatbuffers.UOffsetT {
 	addOffset(b, stat, FbResultAddStatfs)
 	FbResultAddWritten(b, res.Written)
 	addOffset(b, blobs, FbResultAddBlobs)
+	addOffset(b, listings, FbResultAddListings)
 	return FbResultEnd(b)
 }
 
@@ -228,6 +230,44 @@ func putBlobs(b *flatbuffers.Builder, blobs []Blob) flatbuffers.UOffsetT {
 		offs[i] = putBlob(b, blobs[i])
 	}
 	FbResultStartBlobsVector(b, len(offs))
+	for i := len(offs) - 1; i >= 0; i-- {
+		b.PrependUOffsetT(offs[i])
+	}
+	return b.EndVector(len(offs))
+}
+
+func putListings(b *flatbuffers.Builder, listings []Listing) flatbuffers.UOffsetT {
+	if len(listings) == 0 {
+		return 0
+	}
+	offs := make([]flatbuffers.UOffsetT, len(listings))
+	for i := range listings {
+		offs[i] = putListing(b, listings[i])
+	}
+	FbResultStartListingsVector(b, len(offs))
+	for i := len(offs) - 1; i >= 0; i-- {
+		b.PrependUOffsetT(offs[i])
+	}
+	return b.EndVector(len(offs))
+}
+
+func putListing(b *flatbuffers.Builder, listing Listing) flatbuffers.UOffsetT {
+	ents := putListingEntries(b, listing.Entries)
+	FbListingStart(b)
+	FbListingAddIno(b, listing.Inode)
+	addOffset(b, ents, FbListingAddEntries)
+	return FbListingEnd(b)
+}
+
+func putListingEntries(b *flatbuffers.Builder, entries []Dirent) flatbuffers.UOffsetT {
+	if len(entries) == 0 {
+		return 0
+	}
+	offs := make([]flatbuffers.UOffsetT, len(entries))
+	for i := range entries {
+		offs[i] = putDirent(b, entries[i])
+	}
+	FbListingStartEntriesVector(b, len(offs))
 	for i := len(offs) - 1; i >= 0; i-- {
 		b.PrependUOffsetT(offs[i])
 	}
@@ -343,12 +383,13 @@ func decodeFBReply(buf []byte) (Reply, error) {
 
 func resultFrom(res *FbResult) Result {
 	out := Result{
-		Fh:      res.Fh(),
-		Data:    res.DataBytes(),
-		Target:  string(res.Target()),
-		Written: res.Written(),
-		Entries: direntsFrom(res),
-		Blobs:   blobsFrom(res),
+		Fh:       res.Fh(),
+		Data:     res.DataBytes(),
+		Target:   string(res.Target()),
+		Written:  res.Written(),
+		Entries:  direntsFrom(res),
+		Blobs:    blobsFrom(res),
+		Listings: listingsFrom(res),
 	}
 	if a := res.Attr(new(FbAttr)); a != nil {
 		attr := attrFrom(a)
@@ -383,6 +424,38 @@ func direntsFrom(res *FbResult) []Dirent {
 
 func attrFromDir(d *FbDirent) Attr {
 	return Attr{Ino: d.Ino(), Mode: d.Mode(), Size: d.Size(), Nlink: d.Nlink(), Uid: d.Uid(), Gid: d.Gid(), Atime: d.Atime(), Mtime: d.Mtime(), Ctime: d.Ctime()}
+}
+
+func listingsFrom(res *FbResult) []Listing {
+	n := res.ListingsLength()
+	if n == 0 {
+		return nil
+	}
+	out := make([]Listing, n)
+	for i := 0; i < n; i++ {
+		var listing FbListing
+		if !res.Listings(&listing, i) {
+			continue
+		}
+		out[i] = Listing{Inode: listing.Ino(), Entries: listingEntries(&listing)}
+	}
+	return out
+}
+
+func listingEntries(listing *FbListing) []Dirent {
+	n := listing.EntriesLength()
+	if n == 0 {
+		return nil
+	}
+	out := make([]Dirent, n)
+	for i := 0; i < n; i++ {
+		var d FbDirent
+		if !listing.Entries(&d, i) {
+			continue
+		}
+		out[i] = Dirent{Name: string(d.Name()), Attr: attrFromDir(&d)}
+	}
+	return out
 }
 
 func blobsFrom(res *FbResult) []Blob {

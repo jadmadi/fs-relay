@@ -19,6 +19,7 @@ var operations = map[string]op{
 	wire.Open:          open,
 	wire.Read:          read,
 	wire.Reads:         reads,
+	wire.Readdirs:      readdirs,
 	wire.Write:         write,
 	wire.Flush:         flush,
 	wire.Fsync:         fsync,

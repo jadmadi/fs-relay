@@ -39,28 +39,74 @@ func readdir(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 		return wire.Result{}, err
 	}
 	return t.withR(func() (wire.Result, error) {
-		rel, err := t.relOf(p.Namespace, p.Inode)
-		if err != nil {
-			return wire.Result{}, wrap("readdir", err)
-		}
-		abs, err := t.abs(p.Namespace, rel)
-		if err != nil {
-			return wire.Result{}, wrap("readdir", err)
-		}
-		ents, err := os.ReadDir(abs)
-		if err != nil {
-			return wire.Result{}, wrap("readdir", err)
-		}
-		out := make([]wire.Dirent, 0, len(ents))
-		for _, ent := range ents {
-			a, err := statAttr(abs+"/"+ent.Name(), t.assign(p.Namespace, childRel(rel, ent.Name())))
-			if err != nil {
-				return wire.Result{}, wrap("readdir", err)
-			}
-			out = append(out, wire.Dirent{Name: ent.Name(), Attr: a})
-		}
-		return wire.Result{Entries: out}, nil
+		return listDir(t, p)
 	})
+}
+
+func readdirs(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
+	if err := ctx.Err(); err != nil {
+		return wire.Result{}, err
+	}
+	if len(p.Inodes) == 0 || len(p.Inodes) > wire.MaxReads {
+		return wire.Result{}, wire.ErrParams
+	}
+	return t.withR(func() (wire.Result, error) {
+		listings := make([]wire.Listing, 0, len(p.Inodes))
+		for _, ino := range p.Inodes {
+			if err := ctx.Err(); err != nil {
+				return wire.Result{}, err
+			}
+			res, err := listDir(t, wire.Params{Namespace: p.Namespace, Inode: ino})
+			if err != nil {
+				continue
+			}
+			listings = append(listings, wire.Listing{Inode: ino, Entries: res.Entries})
+		}
+		return wire.Result{Listings: listings}, nil
+	})
+}
+
+func listDir(t *Tree, p wire.Params) (wire.Result, error) {
+	rel, err := t.relOf(p.Namespace, p.Inode)
+	if err != nil {
+		return wire.Result{}, wrap("readdir", err)
+	}
+	abs, err := t.abs(p.Namespace, rel)
+	if err != nil {
+		return wire.Result{}, wrap("readdir", err)
+	}
+	f, err := os.Open(abs)
+	if err != nil {
+		return wire.Result{}, wrap("readdir", err)
+	}
+	defer f.Close()
+	infos, err := f.Readdir(-1)
+	if err != nil {
+		return wire.Result{}, wrap("readdir", err)
+	}
+	out := make([]wire.Dirent, 0, len(infos))
+	for _, info := range infos {
+		st, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			return wire.Result{}, wrap("readdir", wire.ErrParams)
+		}
+		ino := t.assign(p.Namespace, childRel(rel, info.Name()))
+		out = append(out, wire.Dirent{Name: info.Name(), Attr: attrFrom(unixStat(st), ino)})
+	}
+	return wire.Result{Entries: out}, nil
+}
+
+func unixStat(st *syscall.Stat_t) unix.Stat_t {
+	return unix.Stat_t{
+		Mode:  st.Mode,
+		Size:  st.Size,
+		Nlink: st.Nlink,
+		Uid:   st.Uid,
+		Gid:   st.Gid,
+		Atim:  unix.Timespec{Sec: st.Atim.Sec, Nsec: st.Atim.Nsec},
+		Mtim:  unix.Timespec{Sec: st.Mtim.Sec, Nsec: st.Mtim.Nsec},
+		Ctim:  unix.Timespec{Sec: st.Ctim.Sec, Nsec: st.Ctim.Nsec},
+	}
 }
 
 func childRel(parent, name string) string {

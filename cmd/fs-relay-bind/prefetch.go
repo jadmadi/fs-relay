@@ -35,6 +35,40 @@ func smallFile(e wire.Dirent) bool {
 	return e.Size > 0 && e.Size <= uint64(wire.MaxPrefetch)
 }
 
+func (d *dirHandle) prefetchDirs(ctx context.Context, entries []wire.Dirent) {
+	if d.parent == nil || d.parent.k == nil {
+		return
+	}
+	var inos []uint64
+	for _, e := range entries {
+		if e.Mode&syscall.S_IFMT != syscall.S_IFDIR {
+			continue
+		}
+		if _, ok := d.parent.k.dir(e.Ino); ok {
+			continue
+		}
+		inos = append(inos, e.Ino)
+		if len(inos) == wire.MaxReads {
+			d.fetchDirs(ctx, inos)
+			inos = nil
+		}
+	}
+	d.fetchDirs(ctx, inos)
+}
+
+func (d *dirHandle) fetchDirs(ctx context.Context, inos []uint64) {
+	if len(inos) == 0 || d.parent == nil || d.parent.k == nil {
+		return
+	}
+	res, err := d.c.Call(ctx, wire.Readdirs, wire.Params{Inodes: inos})
+	if err != nil {
+		return
+	}
+	for _, listing := range res.Listings {
+		d.parent.k.rememberDir(listing.Inode, listing.Entries)
+	}
+}
+
 func (d *dirHandle) fetch(ctx context.Context, batch []wire.Dirent) {
 	if len(batch) == 0 {
 		return

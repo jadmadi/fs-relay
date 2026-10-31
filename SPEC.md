@@ -157,13 +157,13 @@ FlatBuffers is the only filesystem wire. The content type is `application/x-flat
 - HTTP 400: bad body, unknown method, namespace mismatch, params that do not match the method.
 - HTTP 500: a fault that is not an errno.
 - No request id on a POST. The HTTP exchange is the correlation.
-- File bytes are a byte vector. One FUSE write is one call, at most 1 MiB, which is also the mount's maximum write.
+- File bytes are a byte vector. One call carries at most 1 MiB, which is also the mount's maximum write. The mount may hold several kernel writes and send them together.
 
 `GET /ws/<namespace>` is the same envelope, one binary websocket message per call. The client sets `id` (a nonzero integer) on the request and the server copies it onto every message for that call. Calls overlap. A filesystem failure carries that `id` and the error. A fault that is not an errno carries that `id` and a fault string, and the socket stays up. A body that is not a call, an `id` of 0, a repeated `id`, or a namespace that does not match the URL closes the socket.
 
 `setlkw` is an ordinary call. It does not hold a response open. The grant and the release arrive on the mount's one pubsub, described under Locks.
 
-`namespace` is required and must match the URL. The other fields are the kernel arguments the method needs: `inode`, `inodes`, `name`, `new_inode`, `new_name`, `fh`, `mode`, `flags`, `offset`, `size`, `data`, `target`, `valid`, `atime`, `mtime`, `uid`, `gid`, `mask`. `inodes` is the list for `reads`. `valid` uses the Linux FUSE `FATTR_*` bits. Empty strings and empty byte vectors are absent. A numeric zero is present. `valid` still says which setattr fields count, so a size or owner of zero is applied. A missing required field is HTTP 400. A name of `.`, `..`, or one that contains `/` or NUL is `EINVAL`.
+`namespace` is required and must match the URL. The other fields are the kernel arguments the method needs: `inode`, `inodes`, `name`, `new_inode`, `new_name`, `fh`, `mode`, `flags`, `offset`, `size`, `data`, `target`, `valid`, `atime`, `mtime`, `uid`, `gid`, `mask`. `inodes` is the list for `reads` and `readdirs`. `valid` uses the Linux FUSE `FATTR_*` bits. Empty strings and empty byte vectors are absent. A numeric zero is present. `valid` still says which setattr fields count, so a size or owner of zero is applied. A missing required field is HTTP 400. A name of `.`, `..`, or one that contains `/` or NUL is `EINVAL`.
 
 Under `FSR1`, field identity is declaration order. A table only grows by a field appended at the end. Reordering, inserting, deleting, or changing a type needs a new file identifier.
 
@@ -181,7 +181,7 @@ Under `FSR1`, field identity is declaration order. A table only grows by a field
 
 Names are the go-fuse methods, lowercased. Arguments are the kernel's, plus `namespace` and, where a call is about a name, the parent `inode`. The signatures mirror FUSE so that a relay is a thin translation.
 
-M1 surface, which is also what `tar` needs: `lookup`, `getattr`, `setattr`, `access`, `statfs`, `mkdir`, `create`, `open`, `read`, `reads`, `write`, `flush`, `fsync`, `release`, `opendir`, `readdir`, `releasedir`, `unlink`, `rmdir`, `rename`, `symlink`, `readlink`. `reads` returns the whole body of each named inode that is a regular file of at most 64 KiB, at most 32 inodes and 1 MiB of bytes. A larger file, an empty file, or a missing inode is omitted from that result.
+M1 surface, which is also what `tar` needs: `lookup`, `getattr`, `setattr`, `access`, `statfs`, `mkdir`, `create`, `open`, `read`, `reads`, `readdirs`, `write`, `flush`, `fsync`, `release`, `opendir`, `readdir`, `releasedir`, `unlink`, `rmdir`, `rename`, `symlink`, `readlink`. `reads` returns the whole body of each named inode that is a regular file of at most 64 KiB, at most 32 inodes and 1 MiB of bytes. A larger file, an empty file, or a missing inode is omitted from that result. `readdirs` lists up to 32 directories in one call. A missing inode or a name that is not a directory is omitted. `readdir` stats each child once.
 
 `copyfilerange` copies up to `size` bytes from `fh` or, when `fh` is absent, from `inode`, at `offset`, into `fh_out` at `offset_out`. `fh_out` and `offset_out` are appended fields of `params`. A `flags` value other than zero is `EINVAL`. The server calls `copy_file_range(2)` and returns a short count as success. The destination name is evicted.
 
@@ -191,18 +191,18 @@ M1 surface, which is also what `tar` needs: `lookup`, `getattr`, `setattr`, `acc
 
 Attribute and entry timeouts are 1s. The negative timeout is 500ms. A read-only open keeps the kernel page cache (`FOPEN_KEEP_CACHE`). A create, and any writable open, bypasses it (`FOPEN_DIRECT_IO`).
 
-A write is acknowledged by the mount and sent when contiguous bytes reach 1 MiB, when a write is not contiguous, or on `flush`, `fsync`, `release`, a read, a setattr or a `copyfilerange` of that file. Other mounts see the bytes once they are sent. A failed send is reported by the next write, and by `close` or `fsync`.
+A write is acknowledged by the mount and sent when contiguous bytes reach 1 MiB, when a write is not contiguous, or on `fsync`, `release`, a read, a setattr or a `copyfilerange` of that file. `flush` reports an earlier send error and does not itself send. `release` sends any bytes still held and closes the server handle in that one call. A `close` of one descriptor, while another descriptor of the same file remains, leaves those bytes on the mount until the last `release`, or until one of the sends above. Other mounts see the bytes once they are sent. A failed send is reported by the next write, and by `close` or `fsync`.
 
-A read-only open does not take a server file handle. `read` names the inode, and that open's `flush` and `release` stay on the mount. `flush` sends bytes the mount is holding; `fsync` sends them and then syncs. `readdir` carries each name's attributes. The mount answers the lookup and getattr that follow from those, until an eviction drops them. Opening a directory does not take a server handle either.
+A read-only open does not take a server file handle. `read` names the inode, and that open's `flush` and `release` stay on the mount. `fsync` sends bytes the mount is holding and then syncs. `readdir` carries each name's attributes. The mount answers the lookup and getattr that follow from those, until an eviction drops them. Opening a directory does not take a server handle either.
 
-After that listing, the mount calls `reads` for the regular files in it that are at most 64 KiB. One call carries at most 32 names and 1 MiB of bytes. A larger file stays a normal `read`. The mount keeps those bodies until an eviction for that name, and stops storing them once 64 MiB is held. A read the cache cannot answer uses `read`.
+After that listing, the mount calls `reads` for the regular files in it that are at most 64 KiB. One call carries at most 32 names and 1 MiB of bytes. A larger file stays a normal `read`. The mount keeps those bodies until an eviction for that name, and stops storing them once 64 MiB is held. A read the cache cannot answer uses `read`. The same listing's child directories are fetched with `readdirs`, at most 32 per call, and a later `readdir` of one of those directories is answered from that until an eviction drops it. The mount keeps at most 8192 of those listings.
 
 A mount is one subscriber for its namespace. There is no per-file socket and no per-lock socket.
 
 - If the chunked `join` response drops, the POST client joins again at once with the same uuid. If that join drops too, it waits 100ms and tries again with the same uuid. The server treats the uuid as the same mount and repeats any lock release still owed to it. A uuid the server has never seen is a new mount. Inodes still die with the server process.
 - A websocket client does not call `join`. The same events are envelopes on the call socket, with no call id. The websocket frame is the framing, so those events have no length prefix. The connection is the client. A dropped socket abandons that mount's waits.
 
-The server sends an eviction after a successful `create`, `mkdir`, `symlink`, `write`, `setattr`, `unlink`, or `rmdir`, and after a rename it sends the old name and then the new name. A refused call sends nothing. The mount reads those events on a background loop, never on a FUSE handler, and calls `NotifyEntry` and `NotifyContent`. A missed eviction leaves cached file bytes stale until the kernel drops the pages. Names and attributes recover within the 1s timeout.
+The server sends an eviction after a successful `create`, `mkdir`, `symlink`, `write`, `setattr`, `unlink`, or `rmdir`, after a `release` that carried file bytes, and after a rename it sends the old name and then the new name. A refused call sends nothing. The mount reads those events on a background loop, never on a FUSE handler, and calls `NotifyEntry` and `NotifyContent`. A name this mount itself just created, wrote, or changed is left in place: the saved file body is dropped and page cache is invalidated, and the directory listing is dropped, but the name stays so the next lookup is local. Another mount still drops the name. A missed eviction leaves cached file bytes stale until the kernel drops the pages. Names and attributes recover within the 1s timeout.
 
 ## Locks
 
@@ -231,7 +231,7 @@ This is what SQLite's rollback journal needs (SHARED, RESERVED and EXCLUSIVE byt
 - `internal/wire`: a round trip of one request and both response shapes. The buffer carries the `FSR1` file identifier.
 - Lock grant, conflict, release fan-out and rejoin are tested with the lock table.
 - A real mount is not a unit test. It belongs in the README smoke checklist.
-- Cost: one POST per FUSE call, or one websocket frame per FUSE call on a shared socket, except `reads`, which carries up to 32 small files from one listing, and except a write, which is one call per contiguous 1 MiB or per flush. A read or write inside the raw window is one frame on a raw connection instead. Each POST mount also holds one `join` stream. `setlkw` does not hold a stream of its own.
+- Cost: one POST per FUSE call, or one websocket frame per FUSE call on a shared socket, except `reads`, which carries up to 32 small files from one listing, except `readdirs`, which carries up to 32 child directories from one listing, and except a write, which is one call per contiguous 1 MiB or per `release`. A read or write inside the raw window is one frame on a raw connection instead. Each POST mount also holds one `join` stream. `setlkw` does not hold a stream of its own.
 
 ## Benchmarks
 

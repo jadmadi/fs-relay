@@ -40,6 +40,9 @@ func TestChangedAddresses(t *testing.T) {
 	if got := publish(t, tree, ctx, wire.Write, wire.Params{Namespace: ns, Fh: fh, Data: []byte("x")}); !reflect.DeepEqual(got, []wire.Change{{Parent: 1, Name: "a b"}}) {
 		t.Fatalf("write %+v", got)
 	}
+	if got := publish(t, tree, ctx, wire.Release, wire.Params{Namespace: ns, Inode: created.Attr.Ino, Fh: fh, Data: []byte("y")}); !reflect.DeepEqual(got, []wire.Change{{Parent: 1, Name: "a b"}}) {
+		t.Fatalf("release %+v", got)
+	}
 	if got := publish(t, tree, ctx, wire.Setattr, wire.Params{Namespace: ns, Inode: created.Attr.Ino, Valid: wire.SetMode, Mode: 0o600}); !reflect.DeepEqual(got, []wire.Change{{Parent: 1, Name: "a b"}}) {
 		t.Fatalf("setattr %+v", got)
 	}

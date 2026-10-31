@@ -73,6 +73,42 @@ func (n *node) call(ctx context.Context, method string, p wire.Params) (wire.Res
 	return res, toErrno(err)
 }
 
+// callName marks name as this mount's before the call. A failure clears the mark.
+// The matching eviction then leaves the name in place on this mount.
+func (n *node) callName(ctx context.Context, method, name string, p wire.Params) (wire.Result, syscall.Errno) {
+	if n.k != nil {
+		n.k.own(n.ino, name)
+	}
+	res, errno := n.call(ctx, method, p)
+	if errno != 0 && n.k != nil {
+		n.k.disown(n.ino, name)
+	}
+	return res, errno
+}
+
+func (n *node) ownPlace() (uint64, string) {
+	if n == nil || n.k == nil {
+		return 0, ""
+	}
+	name, parent := n.Parent()
+	if parent == nil || name == "" {
+		return 0, ""
+	}
+	pn, ok := parent.Operations().(*node)
+	if !ok {
+		return 0, ""
+	}
+	n.k.own(pn.ino, name)
+	return pn.ino, name
+}
+
+func (n *node) disownPlace(parent uint64, name string) {
+	if n == nil || n.k == nil {
+		return
+	}
+	n.k.disown(parent, name)
+}
+
 func (n *node) spawn(ctx context.Context, a wire.Attr, out *fuse.EntryOut) (*node, *fs.Inode) {
 	ch := &node{c: n.c, k: n.k, r: n.r, ino: a.Ino, rawMin: n.rawMin, spliceMax: n.spliceMax}
 	mode := a.Mode & syscall.S_IFMT
@@ -133,8 +169,10 @@ func (n *node) setattr(ctx context.Context, in *fuse.SetAttrIn, out *fuse.AttrOu
 	if errno := n.drain(ctx); errno != 0 {
 		return errno
 	}
+	parent, name := n.ownPlace()
 	res, errno := n.call(ctx, wire.Setattr, setattrParams(in))
 	if errno != 0 {
+		n.disownPlace(parent, name)
 		return errno
 	}
 	n.remember(*res.Attr)
@@ -164,7 +202,7 @@ func (n *node) OpendirHandle(context.Context, uint32) (fs.FileHandle, uint32, sy
 }
 
 func (n *node) Mkdir(ctx context.Context, name string, mode uint32, out *fuse.EntryOut) (*fs.Inode, syscall.Errno) {
-	res, errno := n.call(ctx, wire.Mkdir, wire.Params{Name: name, Mode: mode})
+	res, errno := n.callName(ctx, wire.Mkdir, name, wire.Params{Name: name, Mode: mode})
 	if errno != 0 {
 		return nil, errno
 	}
@@ -173,7 +211,7 @@ func (n *node) Mkdir(ctx context.Context, name string, mode uint32, out *fuse.En
 }
 
 func (n *node) Create(ctx context.Context, name string, flags, mode uint32, out *fuse.EntryOut) (*fs.Inode, fs.FileHandle, uint32, syscall.Errno) {
-	res, errno := n.call(ctx, wire.Create, wire.Params{Name: name, Mode: mode, Flags: flags})
+	res, errno := n.callName(ctx, wire.Create, name, wire.Params{Name: name, Mode: mode, Flags: flags})
 	if errno != 0 {
 		return nil, nil, 0, errno
 	}
@@ -204,7 +242,7 @@ func (n *node) Rename(ctx context.Context, name string, newParent fs.InodeEmbedd
 }
 
 func (n *node) Symlink(ctx context.Context, target, name string, out *fuse.EntryOut) (*fs.Inode, syscall.Errno) {
-	res, errno := n.call(ctx, wire.Symlink, wire.Params{Name: name, Target: target})
+	res, errno := n.callName(ctx, wire.Symlink, name, wire.Params{Name: name, Target: target})
 	if errno != 0 {
 		return nil, errno
 	}
@@ -248,11 +286,13 @@ func (n *node) CopyFileRange(ctx context.Context, fhIn fs.FileHandle, offIn uint
 	if errno := dst.drain(ctx); errno != 0 {
 		return 0, errno
 	}
+	parent, place := dst.ownPlace()
 	res, errno := n.call(ctx, wire.CopyFileRange, wire.Params{
 		Inode: hin.ino, Fh: hin.fh, Offset: int64(offIn), Size: length,
 		Flags: uint32(flags), FhOut: hout.fh, OffsetOut: int64(offOut),
 	})
 	if errno != 0 {
+		dst.disownPlace(parent, place)
 		return 0, errno
 	}
 	dst.forgetAttr()

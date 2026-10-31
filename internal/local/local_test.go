@@ -299,6 +299,40 @@ func TestCopyFileRange(t *testing.T) {
 	}
 }
 
+func TestReleaseWritesThenCloses(t *testing.T) {
+	tr, _ := newTree(t)
+	file := call(t, tr, wire.Create, wire.Params{Inode: 1, Name: "a", Mode: 0o644, Flags: syscall.O_RDWR})
+	call(t, tr, wire.Release, wire.Params{Fh: file.Fh, Data: []byte("hi")})
+	rd := call(t, tr, wire.Read, wire.Params{Inode: file.Attr.Ino, Size: 8})
+	if string(rd.Data) != "hi" {
+		t.Fatalf("read %q", rd.Data)
+	}
+	err := callErr(t, tr, wire.Release, wire.Params{Fh: file.Fh})
+	if errnoOf(t, err) != syscall.EBADF {
+		t.Fatalf("second release %v", err)
+	}
+}
+
+func TestReaddirsBatchesChildDirectories(t *testing.T) {
+	tr, _ := newTree(t)
+	sub := call(t, tr, wire.Mkdir, wire.Params{Inode: 1, Name: "sub", Mode: 0o755})
+	call(t, tr, wire.Create, wire.Params{Inode: sub.Attr.Ino, Name: "a", Mode: 0o644, Flags: syscall.O_RDWR})
+	got := call(t, tr, wire.Readdirs, wire.Params{Inodes: []uint64{1, sub.Attr.Ino, 99}})
+	if len(got.Listings) != 2 {
+		t.Fatalf("listings %d", len(got.Listings))
+	}
+	if got.Listings[0].Inode != 1 || len(got.Listings[0].Entries) != 1 || got.Listings[0].Entries[0].Name != "sub" {
+		t.Fatalf("root %+v", got.Listings[0])
+	}
+	if got.Listings[1].Entries[0].Name != "a" || got.Listings[1].Entries[0].Mode&syscall.S_IFMT != syscall.S_IFREG {
+		t.Fatalf("child %+v", got.Listings[1].Entries)
+	}
+	err := callErr(t, tr, wire.Readdirs, wire.Params{Inodes: make([]uint64, wire.MaxReads+1)})
+	if !errors.Is(err, wire.ErrParams) {
+		t.Fatalf("bound %v", err)
+	}
+}
+
 func TestReadByInode(t *testing.T) {
 	tr, _ := newTree(t)
 	file := call(t, tr, wire.Create, wire.Params{Inode: 1, Name: "a", Mode: 0o644, Flags: syscall.O_RDWR})
