@@ -2,11 +2,15 @@
 
 Working notes for agents in this repo. `SPEC.md` holds the design; this file holds how the code is written.
 
-`fs-relay` is an HTTP-plus-MsgPack relay of FUSE calls to a local directory, in Go. Five packages, on purpose; do not add a sixth: `cmd/fs-relay`, `cmd/fs-relay-bind`, `internal/wire` (codec), `internal/local` (every `os` call, inode map, handles, locks, error sentinels), `internal/client` (the POST and the websocket).
+`fs-relay` is an HTTP relay of FUSE calls to a local directory, in Go. The wire is FlatBuffers. Five packages, on purpose; do not add a sixth: `cmd/fs-relay`, `cmd/fs-relay-bind`, `internal/wire` (codec), `internal/local` (every `os` call, inode map, handles, locks, error sentinels), `internal/client` (the POST and the websocket).
 
 ## Who the words are for
 
-The person reading the welcome page, the README, a flag, or an error is a sysadmin. They are the driver. A driver does not need to be an engineer to drive. Tell them what it is and what to run: a fast network filesystem, mounted with `fs-relay-bind`. Do not tell them how it was written. Encodings, package names, key layouts, and which call answered the request belong in `SPEC.md` and in this file.
+The person reading the welcome page, the README, a flag, or an error is a sysadmin. They are the driver. A driver does not need to be a mechanical engineer to drive the car. They need to know what the car offers, how to start it, and how it compares with the other cars. They do not need the workshop notes.
+
+Write the README, the welcome page, flags, and errors that way. Say what fs-relay is, what a mount can do, how to run it, and how the timings compare with the other filesystems. Leave out encodings, package names, which function answered the call, the clock time of a benchmark run, and a tool's exit status. Those facts do not help someone decide to mount it or operate it.
+
+The README section on earlier designs is the exception. It speaks to developers, and its job is to stop a retry: say what was already measured and that it stays out. The run that produced a published number is recorded in `ROADMAP.md`, not in the README.
 
 ## Commands
 
@@ -65,11 +69,13 @@ go build -o fs-relay-bind ./cmd/fs-relay-bind
 
 ## Dependencies
 
-Standard library first. Expected: `go-fuse`, one msgpack library, and `golang.org/x/sys/unix` for the syscalls the standard library does not wrap. UUIDv7 is a small local function. Ask before adding another.
+Standard library first. Expected: `go-fuse`, `github.com/google/flatbuffers`, and `golang.org/x/sys/unix` for the syscalls the standard library does not wrap. UUIDv7 is a small local function. Ask before adding another.
+
+`internal/wire/fsrelay_generated.go` is generated. Regenerate it with `flatc --go --gen-onefile --go-namespace wire -o internal/wire internal/wire/fsrelay.fbs`. Do not hand-edit it.
 
 ## Done means
 
 - `gofmt -l .` is empty; `go vet ./...` and `go test ./...` are clean.
 - New exported identifiers have doc comments; a new operation has a `local` test and a golden case in `wire`.
-- Any benchmark number in a doc says which run produced it.
+- The run that produced a published benchmark number is recorded in `ROADMAP.md`. The README states the comparison.
 - A behavior change updates `SPEC.md` and `ROADMAP.md` in the same change.

@@ -32,7 +32,7 @@ func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad namespace", http.StatusBadRequest)
 		return
 	}
-	if !msgpackType(r.Header.Get("Content-Type")) {
+	if !flatbufferType(r.Header.Get("Content-Type")) {
 		http.Error(w, "content type", http.StatusBadRequest)
 		return
 	}
@@ -58,7 +58,7 @@ func publishCall(h *hub, tree *local.Tree, ns, method string, p wire.Params, err
 	h.evict(ns, tree.Changed(method, p))
 }
 
-func msgpackType(ct string) bool {
+func flatbufferType(ct string) bool {
 	return ct == wire.ContentType || strings.HasPrefix(ct, wire.ContentType+";")
 }
 
@@ -78,7 +78,7 @@ func writeCall(w http.ResponseWriter, res wire.Result, err error) {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
-		writeMsgpack(w, http.StatusOK, b)
+		writeBody(w, http.StatusOK, b)
 		return
 	}
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -90,10 +90,10 @@ func writeResult(w http.ResponseWriter, res wire.Result) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	writeMsgpack(w, http.StatusOK, b)
+	writeBody(w, http.StatusOK, b)
 }
 
-func writeMsgpack(w http.ResponseWriter, status int, b []byte) {
+func writeBody(w http.ResponseWriter, status int, b []byte) {
 	w.Header().Set("Content-Type", wire.ContentType)
 	w.WriteHeader(status)
 	_, _ = w.Write(b)

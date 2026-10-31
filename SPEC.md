@@ -11,34 +11,66 @@ A directory on one host should be usable as a filesystem on another, over plain 
 Two processes:
 
 - `fs-relay` is an HTTP server. It applies one filesystem call to the directory `data/<namespace>/`.
-- `fs-relay-bind` is a FUSE3 mount (`github.com/hanwen/go-fuse/v2`, as in kvfs). By default it turns each kernel call into one POST. `-ws` uses one websocket instead, and many calls share that socket.
+- `fs-relay-bind` is a FUSE3 mount (`github.com/hanwen/go-fuse/v2`, as in kvfs). It is one of the two clients below.
 
 The path segment after `/fs/` is the namespace: `[A-Za-z0-9_-]+`, non-empty, at most 64 bytes. It selects the directory under `data/` and nothing else. There is no shard level, because there is one directory tree. Anything outside the grammar is refused before any file is touched.
 
+## Clients
+
+A mount is one of two clients. Both speak the same envelope. They differ in how calls and events travel. The mount defaults to the websocket. `-post` selects the other. `-ws` is the same as the default. Passing both flags is an error.
+
+**Websocket.** One `GET /ws/<namespace>` stays open. The socket is bidirectional. Every call and every event is one binary message on it. There is no second stream, and there is no `Transfer-Encoding` header. The websocket frame is the framing, so an event has no length prefix.
+
+```mermaid
+sequenceDiagram
+    participant Mount
+    participant Server
+    Mount->>Server: GET /ws/namespace
+    Note over Mount,Server: one socket, both directions
+    Mount->>Server: call
+    Server-->>Mount: result for that call
+    Server-->>Mount: event
+```
+
+**POST.** `-post` uses two directions on purpose.
+
+- Client to server: each call is its own `POST /fs/<namespace>`. The response to that POST is the result of that call, one envelope, with a `Content-Length`. A POST has no request id. The HTTP exchange is the correlation.
+- Server to client: at start the client sends `POST /fs/<namespace>` with method `join`. This is not a filesystem call. The response stays open for the life of the mount. Its headers are `Content-Type: application/x-flatbuffers` and `Transfer-Encoding: chunked`. The server does not write that transfer header itself: it sets no `Content-Length` and flushes after every event, and the HTTP server adds `Transfer-Encoding: chunked`. The body is one way, server to client. Each event is one chunk holding a little-endian uint32 length and then one envelope, not a text line. A length above the body limit closes the stream. The first event carries the client uuid. Later events are evictions or a lock release.
+
+Calls never travel on the chunked response, and events never travel as the response of a filesystem POST.
+
+```mermaid
+sequenceDiagram
+    participant Mount
+    participant Server
+    Mount->>Server: POST /fs/namespace join
+    Note over Server,Mount: response stays open, Transfer-Encoding chunked
+    Server-->>Mount: chunk, client uuid
+    Mount->>Server: POST /fs/namespace call
+    Server-->>Mount: result of that POST
+    Server-->>Mount: chunk, event
+```
+
 ## Envelope
 
-- `POST /fs/<namespace>`, body `application/msgpack`, a map `{method, params}`.
+FlatBuffers is the only filesystem wire. The content type is `application/x-flatbuffers`. The file identifier is `FSR1`. The schema is `internal/wire/fsrelay.fbs`. One buffer is one envelope.
+
+- `POST /fs/<namespace>`. The body is one buffer.
 - `params.namespace` must equal the URL segment.
-- Success: HTTP 200 and `{result: {...}}`.
-- A filesystem failure: HTTP 200 and `{error: {code, message}}`, where `code` is a Linux errno.
+- Success: HTTP 200 and a result.
+- A filesystem failure: HTTP 200 and an error whose `code` is a Linux errno.
 - HTTP 400: bad body, unknown method, namespace mismatch, params that do not match the method.
 - HTTP 500: a fault that is not an errno.
 - No request id on a POST. The HTTP exchange is the correlation.
-- File bytes are msgpack `bin`. One FUSE write is one call, at most 1 MiB, which is also the mount's maximum write.
+- File bytes are a byte vector. One FUSE write is one call, at most 1 MiB, which is also the mount's maximum write.
 
-`GET /ws/<namespace>` is the same envelope on one websocket. The client sets `id` (a nonzero integer) on the request and the server copies it onto every message for that call. Calls overlap. A filesystem failure is `{id, error}`. A fault that is not an errno is `{id, fault}` and the socket stays up. A body that is not a call, an `id` of 0, a repeated `id`, or a namespace that does not match the URL closes the socket.
+`GET /ws/<namespace>` is the same envelope, one binary websocket message per call. The client sets `id` (a nonzero integer) on the request and the server copies it onto every message for that call. Calls overlap. A filesystem failure carries that `id` and the error. A fault that is not an errno carries that `id` and a fault string, and the socket stays up. A body that is not a call, an `id` of 0, a repeated `id`, or a namespace that does not match the URL closes the socket.
 
 `setlkw` is an ordinary call. It does not hold a response open. The grant and the release arrive on the mount's one pubsub, described under Locks.
 
-```
-{"method": "readdir", "params": {"namespace": "mydir", "inode": 1}}
-{"result": {...}}
-{"error": {"code": 2, "message": "no such file or directory"}}
-```
+`namespace` is required and must match the URL. The other fields are the kernel arguments the method needs: `inode`, `inodes`, `name`, `new_inode`, `new_name`, `fh`, `mode`, `flags`, `offset`, `size`, `data`, `target`, `valid`, `atime`, `mtime`, `uid`, `gid`, `mask`. `inodes` is the list for `reads`. `valid` uses the Linux FUSE `FATTR_*` bits. Empty strings and empty byte vectors are absent. A numeric zero is present. `valid` still says which setattr fields count, so a size or owner of zero is applied. A missing required field is HTTP 400. A name of `.`, `..`, or one that contains `/` or NUL is `EINVAL`.
 
-MsgPack replaces JSON because JSON cannot carry a binary body.
-
-`namespace` is required and must match the URL. The other fields are the kernel arguments the method needs: `inode`, `inodes`, `name`, `new_inode`, `new_name`, `fh`, `mode`, `flags`, `offset`, `size`, `data`, `target`, `valid`, `atime`, `mtime`, `uid`, `gid`, `mask`. `inodes` is the list for `reads`. `valid` uses the Linux FUSE `FATTR_*` bits. A zero is omitted on the wire; `valid` still says which setattr fields count, so a size or owner of zero is applied. A missing required field is HTTP 400. A name of `.`, `..`, or one that contains `/` or NUL is `EINVAL`.
+Under `FSR1`, field identity is declaration order. A table only grows by a field appended at the end. Reordering, inserting, deleting, or changing a type needs a new file identifier.
 
 ## Inodes and handles
 
@@ -67,9 +99,8 @@ After that listing, the mount calls `reads` for the regular files in it that are
 
 A mount is one subscriber for its namespace. There is no per-file socket and no per-lock socket.
 
-- A POST mount, at start, sends `POST /fs/<namespace>` with method `join`. This is not a filesystem call. The response is chunked. The first line is `{"client":"<uuid>"}`. Later lines are JSON objects, one event each. A cache line is `{"evict":{"parent":1,"name":"a"}}`. The parent is the protocol inode and the name is the basename.
-- If that response drops, the mount joins again at once with the same uuid. If that join drops too, it waits 100ms and tries again with the same uuid. The server treats the uuid as the same mount and repeats any lock release still owed to it. A uuid the server has never seen is a new mount. Inodes still die with the server process.
-- A `-ws` mount does not call `join`. The same events are msgpack messages on the call socket, with no call id. The connection is the client. A dropped socket abandons that mount's waits.
+- If the chunked `join` response drops, the POST client joins again at once with the same uuid. If that join drops too, it waits 100ms and tries again with the same uuid. The server treats the uuid as the same mount and repeats any lock release still owed to it. A uuid the server has never seen is a new mount. Inodes still die with the server process.
+- A websocket client does not call `join`. The same events are envelopes on the call socket, with no call id. The websocket frame is the framing, so those events have no length prefix. The connection is the client. A dropped socket abandons that mount's waits.
 
 The server sends an eviction after a successful `create`, `mkdir`, `symlink`, `write`, `setattr`, `unlink`, or `rmdir`, and after a rename it sends the old name and then the new name. A refused call sends nothing. The mount reads those events on a background loop, never on a FUSE handler, and calls `NotifyEntry` and `NotifyContent`. A missed eviction leaves cached file bytes stale until the kernel drops the pages. Names and attributes recover within the 1s timeout.
 
@@ -80,8 +111,8 @@ Specified now, implemented for M3.
 - POSIX record locks: `getlk`, `setlk`, `setlkw`. The owner is the FUSE owner plus a per-mount client id, so two mounts never share an owner number.
 - The server's lock table is the authority. `setlk` is an ordinary envelope and returns `EAGAIN` on a conflict.
 - `setlkw` is an ordinary call. The FUSE handler waits on the pubsub reader. It does not hold its own response.
-- A release is a line on that pubsub, `{"release":"<id>"}`, sent to every subscriber of the namespace. On `/ws/` it is a msgpack message with no call id. The waiting mount wakes and acquires. If two waiters wake together, one `setlk` wins and the other waits again.
-- A dropped `join` is the rejoin above. The server repeats a release that this client has not seen, so a missed line cannot leave `setlkw` blocked.
+- A release is an envelope on that pubsub whose release field is the lock id, sent to every subscriber of the namespace. On `/ws/` it is one binary message with no call id. The waiting mount wakes and acquires. If two waiters wake together, one `setlk` wins and the other waits again.
+- A dropped `join` is the rejoin above. The server repeats a release that this client has not seen, so a missed event cannot leave `setlkw` blocked.
 - The server is the only writer under `data/`. A process that opens those files directly is outside the lock table.
 
 This is what SQLite's rollback journal needs (SHARED, RESERVED and EXCLUSIVE byte ranges). WAL needs shared memory between processes and is not a goal.
@@ -90,14 +121,14 @@ This is what SQLite's rollback journal needs (SHARED, RESERVED and EXCLUSIVE byt
 
 - `cmd/fs-relay`: flags, HTTP decode and encode, calls `internal/local`.
 - `cmd/fs-relay-bind`: flags, FUSE nodes and the errno mapping, calls `internal/client`.
-- `internal/wire`: msgpack types and method names. No HTTP, no FUSE, no `os`.
+- `internal/wire`: FlatBuffers types, the schema, and the generated file. No HTTP, no FUSE, no `os`.
 - `internal/local`: the directory, the inode map, handles, locks. Owns every `os` call and the error sentinels.
 - `internal/client`: the POST, the websocket, and the `join` stream.
 
 ## Testing
 
 - `internal/local` against `t.TempDir()`: every M1 operation, path escape, errno, inode stability across rename.
-- `internal/wire`: golden bytes for one request and both response shapes.
+- `internal/wire`: a round trip of one request and both response shapes. The buffer carries the `FSR1` file identifier.
 - Lock grant, conflict, release fan-out and rejoin are tested with the lock table.
 - A real mount is not a unit test. It belongs in the README smoke checklist.
 - Cost: one POST per FUSE call, or one websocket frame per FUSE call on a shared socket, except `reads`, which carries up to 32 small files from one listing. Each POST mount also holds one `join` stream. `setlkw` does not hold a stream of its own.

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"net/http"
@@ -120,20 +119,24 @@ func dialJoin(t *testing.T, httpClient *http.Client, base, id string) *joined {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("join http %d", resp.StatusCode)
 	}
-	sc := bufio.NewScanner(resp.Body)
-	if !sc.Scan() {
-		t.Fatalf("join header: %v", sc.Err())
+	frame, err := wire.ReadFrame(resp.Body)
+	if err != nil {
+		t.Fatal(err)
 	}
-	first, err := wire.DecodePub(sc.Bytes())
+	first, err := wire.DecodePub(frame)
 	if err != nil || first.Client == "" {
-		t.Fatalf("client line %+v %v", first, err)
+		t.Fatalf("client frame %+v %v", first, err)
 	}
 	lines := make(chan wire.Pub, 8)
 	go func() {
 		defer close(lines)
 		defer resp.Body.Close()
-		for sc.Scan() {
-			p, err := wire.DecodePub(sc.Bytes())
+		for {
+			frame, err := wire.ReadFrame(resp.Body)
+			if err != nil {
+				return
+			}
+			p, err := wire.DecodePub(frame)
 			if err != nil {
 				return
 			}

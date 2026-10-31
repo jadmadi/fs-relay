@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -45,7 +44,13 @@ func runWS(h *hub, ctx context.Context, tree *local.Tree, conn *websocket.Conn, 
 	var mu sync.Mutex
 	lanes := map[uint64]struct{}{}
 	wr := &wsWriter{conn: conn}
-	go forwardWS(ctx, m, wr)
+	go pump(ctx, h, ns, m, func(p wire.Pub) error {
+		b, err := pushBytes(p)
+		if err != nil || b == nil {
+			return nil
+		}
+		return wr.send(ctx, b)
+	})
 	for {
 		req, ok := readWS(ctx, conn)
 		if !ok || req.Params.Namespace != ns || !claim(lanes, &mu, req.ID) {
@@ -71,7 +76,7 @@ func readWS(ctx context.Context, conn *websocket.Conn) (wire.Request, bool) {
 	if err != nil {
 		return wire.Request{}, false
 	}
-	req, err := wire.DecodeRequest(bytes.NewReader(data))
+	req, err := wire.DecodeRequestBuffer(data)
 	if err != nil || req.ID == 0 {
 		return wire.Request{}, false
 	}
@@ -111,21 +116,6 @@ func wsBody(id uint64, res wire.Result, err error) ([]byte, error) {
 type wsWriter struct {
 	mu   sync.Mutex
 	conn *websocket.Conn
-}
-
-func forwardWS(ctx context.Context, m *member, wr *wsWriter) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case p := <-m.ch:
-			b, err := pushBytes(p)
-			if err != nil || b == nil {
-				continue
-			}
-			_ = wr.send(ctx, b)
-		}
-	}
 }
 
 func pushBytes(p wire.Pub) ([]byte, error) {

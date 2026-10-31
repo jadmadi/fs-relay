@@ -25,24 +25,39 @@ func serveJoin(h *hub, ns string, w http.ResponseWriter, r *http.Request, client
 		return
 	}
 	defer h.detach(ns, m)
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", wire.ContentType)
 	w.WriteHeader(http.StatusOK)
 	if writePub(w, flusher, wire.Pub{Client: m.id}) != nil {
 		return
 	}
-	readJoin(ctx, w, flusher, m)
+	pump(ctx, h, ns, m, func(p wire.Pub) error {
+		return writePub(w, flusher, p)
+	})
 }
 
-func readJoin(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, m *member) {
+// pump writes events from the member. A release stays owed until a later
+// event is written, so a stream that dies on this write is replayed on rejoin.
+func pump(ctx context.Context, h *hub, ns string, m *member, send func(wire.Pub) error) {
+	var sent string
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case p := <-m.ch:
-			if writePub(w, flusher, p) != nil {
+			if ctx.Err() != nil || send(p) != nil {
+				putBack(m, p)
 				return
 			}
+			h.ackRelease(ns, m.id, sent)
+			sent = p.Release
 		}
+	}
+}
+
+func putBack(m *member, p wire.Pub) {
+	select {
+	case m.ch <- p:
+	default:
 	}
 }
 
@@ -51,7 +66,7 @@ func writePub(w http.ResponseWriter, flusher http.Flusher, p wire.Pub) error {
 	if err != nil {
 		return err
 	}
-	if _, err := w.Write(b); err != nil {
+	if err := wire.WriteFrame(w, b); err != nil {
 		return err
 	}
 	flusher.Flush()

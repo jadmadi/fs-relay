@@ -2,7 +2,6 @@ package wire
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"testing"
 )
@@ -12,10 +11,8 @@ func TestGoldenReaddir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := hex.EncodeToString(b)
-	const want = "82a66d6574686f64a772656164646972a6706172616d7382a96e616d657370616365a56d79646972a5696e6f6465cf0000000000000001"
-	if got != want {
-		t.Fatalf("golden %s", got)
+	if !bytes.Contains(b, []byte("FSR1")) {
+		t.Fatal("missing file identifier")
 	}
 	req, err := DecodeRequest(bytes.NewReader(b))
 	if err != nil {
@@ -100,5 +97,30 @@ func TestCheckNS(t *testing.T) {
 		if err := CheckNS(ns); err == nil {
 			t.Fatalf("%q accepted", ns)
 		}
+	}
+}
+
+func TestClientAndReleaseRoundTrip(t *testing.T) {
+	b, err := MarshalRequest(Join, Params{Namespace: "demo", Client: "01a18f33-1f73-7000-b869-6772b604713a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := DecodeRequest(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.Params.Client != "01a18f33-1f73-7000-b869-6772b604713a" {
+		t.Fatalf("client %q", req.Params.Client)
+	}
+	p, err := MarshalPub(Pub{Release: "lock-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := DecodePub(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pub.Release != "lock-1" {
+		t.Fatalf("release %q", pub.Release)
 	}
 }

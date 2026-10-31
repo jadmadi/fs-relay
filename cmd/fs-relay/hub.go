@@ -86,7 +86,7 @@ func (h *hub) keepOwed(r *room, m *member) {
 	for {
 		select {
 		case p := <-m.ch:
-			if p.Release != "" {
+			if p.Release != "" && !owedHas(r.owed[m.id], p.Release) {
 				r.owed[m.id] = append(r.owed[m.id], p)
 			}
 		default:
@@ -108,19 +108,56 @@ func (h *hub) evict(ns string, changes []wire.Change) {
 	}
 }
 
-// oweRelease remembers a lock release for one client. A live stream gets it
-// now. A later join of the same uuid receives it if this one did not.
+// oweRelease remembers a lock release for one client. The owed copy is what a
+// rejoin replays. A live stream is also notified, and that copy is dropped
+// from the owed list only after a later event shows the stream is still up.
 func (h *hub) oweRelease(ns, client, id string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	r := h.room(ns)
 	p := wire.Pub{Release: id}
+	r.owed[client] = append(r.owed[client], p)
 	m := r.live[client]
 	if m == nil {
-		r.owed[client] = append(r.owed[client], p)
 		return
 	}
-	h.give(r, m, p, true)
+	select {
+	case m.ch <- p:
+	default:
+		m.cancel()
+	}
+}
+
+func (h *hub) ackRelease(ns, client, id string) {
+	if id == "" {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	r := h.rooms[ns]
+	if r == nil {
+		return
+	}
+	owed := r.owed[client]
+	for i, p := range owed {
+		if p.Release != id {
+			continue
+		}
+		r.owed[client] = append(owed[:i], owed[i+1:]...)
+		if len(r.owed[client]) == 0 {
+			delete(r.owed, client)
+		}
+		return
+	}
+}
+
+func owedHas(owed []wire.Pub, id string) bool {
+	for _, p := range owed {
+		if p.Release == id {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *hub) fan(r *room, p wire.Pub, owe bool) {

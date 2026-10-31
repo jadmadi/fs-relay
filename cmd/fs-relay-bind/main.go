@@ -27,7 +27,8 @@ func main() {
 func run() error {
 	url := flag.String("url", "http://127.0.0.1:8080", "fs-relay base URL")
 	ns := flag.String("ns", "default", "namespace")
-	useWS := flag.Bool("ws", false, "use one /ws/ socket instead of one POST per call")
+	post := flag.Bool("post", false, "send each operation as its own POST")
+	useWS := flag.Bool("ws", false, "one connection for the mount (the default)")
 	allowOther := flag.Bool("allow-other", false, "allow other users to access the mount")
 	debug := flag.Bool("debug", false, "enable FUSE debug logging")
 	flag.Parse()
@@ -36,13 +37,19 @@ func run() error {
 		flag.PrintDefaults()
 		os.Exit(2)
 	}
+	if *post && *useWS {
+		return fmt.Errorf("pass -post or -ws, not both")
+	}
 	if err := wire.CheckNS(*ns); err != nil {
 		return fmt.Errorf("namespace: %w", err)
 	}
-	c, events, stop, err := openHTTP(*url, *ns)
-	if *useWS {
-		c, events, stop, err = openSocket(*url, *ns)
+	open := openSocket
+	mode := "websocket"
+	if *post {
+		open = openHTTP
+		mode = "post"
 	}
+	c, events, stop, err := open(*url, *ns)
 	if err != nil {
 		return err
 	}
@@ -56,7 +63,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)
 	}
-	log.Printf("fs-relay-bind mounted on %s (ns=%s url=%s ws=%t)", flag.Arg(0), *ns, *url, *useWS)
+	log.Printf("fs-relay-bind mounted on %s (ns=%s url=%s %s)", flag.Arg(0), *ns, *url, mode)
 	go unmountOnSignal(server)
 	server.Wait()
 	return nil

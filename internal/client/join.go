@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -68,21 +67,17 @@ func (c *Client) joinOnce(ctx context.Context, id string) (string, error) {
 }
 
 func (c *Client) readJoin(ctx context.Context, body io.Reader, id string) (string, error) {
-	sc := bufio.NewScanner(body)
-	if !sc.Scan() {
-		return id, joinErr(sc.Err())
-	}
-	first, err := wire.DecodePub(sc.Bytes())
-	if err != nil {
-		return id, err
-	}
-	if first.Client != "" {
-		id = first.Client
-	}
-	for sc.Scan() {
-		line, err := wire.DecodePub(sc.Bytes())
+	for {
+		frame, err := wire.ReadFrame(body)
+		if err != nil {
+			return id, joinErr(err)
+		}
+		line, err := wire.DecodePub(frame)
 		if err != nil {
 			return id, err
+		}
+		if line.Client != "" {
+			id = line.Client
 		}
 		if line.Evict == nil {
 			continue
@@ -93,7 +88,6 @@ func (c *Client) readJoin(ctx context.Context, body io.Reader, id string) (strin
 		case c.evicts <- *line.Evict:
 		}
 	}
-	return id, joinErr(sc.Err())
 }
 
 func joinErr(err error) error {

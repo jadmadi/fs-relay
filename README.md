@@ -1,56 +1,65 @@
 # fs-relay
 
-A fast network filesystem. Run the server on the host that holds the files, and mount it with `fs-relay-bind`.
+Share a directory over HTTP and mount it like a local filesystem.
 
-Two binaries:
+The server runs on the machine that holds the files. Mount it from as many hosts as you need, at the same time. Each mount host needs fuse3 (`fusermount3`).
 
-- `fs-relay`: the server.
-- `fs-relay-bind`: the mount.
+## What you get
 
-The design is in [`SPEC.md`](./SPEC.md). Progress, and what was tried and dismissed, is in [`ROADMAP.md`](./ROADMAP.md). Code conventions are in [`AGENTS.md`](./AGENTS.md).
+- A normal directory: create, read, write, rename, symlink, and delete.
+- One connection for the mount, which is the faster way to run it. `-post` sends each operation as its own request instead.
+- Several hosts can mount the same name at once and see the same files.
+- SQLite works with its default rollback journal. `PRAGMA journal_mode=WAL` fails, because WAL needs a shared-memory file this filesystem cannot provide.
 
-Requires `fusermount3` (fuse3) for the mount.
+## How it compares
 
-## Build
+On each filesystem we unpacked an archive, packed the tree again, copied the archive onto the mount, and listed that copy with `tar -tf`. A local directory is the floor. [kvfs](https://github.com/muayyad-alsadi/kvfs) is our other filesystem. [s3fs](https://github.com/s3fs-fuse/s3fs-fuse) is mounted on [rustfs](https://github.com/rustfs/rustfs). [fuse-nfs](https://github.com/sahlberg/fuse-nfs) is NFS through FUSE.
 
-```bash
-go build -o fs-relay ./cmd/fs-relay
-go build -o fs-relay-bind ./cmd/fs-relay-bind
-```
+`ansible.tar` is 27 MiB and 5,868 files.
+
+| | local directory | kvfs | fs-relay | fs-relay `-post` | s3fs on rustfs | fuse-nfs |
+|---|---:|---:|---:|---:|---:|---:|
+| unpack | 0.14 s | 25.76 s | 16.56 s | 20.04 s | 203.56 s | 107.89 s |
+| pack | 0.10 s | 12.58 s | 4.82 s | 5.78 s | 57.53 s | 39.68 s |
+| copy the archive | 0.02 s | 0.48 s | 0.34 s | 0.26 s | 0.38 s | 0.45 s |
+| list the archive | 0.03 s | 0.82 s | 0.26 s | 0.29 s | 0.16 s | 0.48 s |
+
+The default mount unpacks about twelve times faster than s3fs (16.56 s against 203.56 s) and about six and a half times faster than fuse-nfs (16.56 s against 107.89 s). Packing is about twelve times faster than s3fs (4.82 s against 57.53 s) and about eight times faster than fuse-nfs (4.82 s against 39.68 s).
+
+`Antigravity.tar.gz` is mostly a few large files, about 500 MiB unpacked.
+
+| | local directory | kvfs | fs-relay | fs-relay `-post` | s3fs on rustfs | fuse-nfs |
+|---|---:|---:|---:|---:|---:|---:|
+| unpack | 5.60 s | 30.71 s | 26.19 s | 30.26 s | 21.01 s | 36.13 s |
+| pack | 0.49 s | 19.77 s | 4.85 s | 4.19 s | 5.31 s | 10.37 s |
+| copy the archive | 0.13 s | 3.12 s | 1.88 s | 1.54 s | 1.14 s | 2.65 s |
+| list the archive | 5.62 s | 7.21 s | 7.22 s | 7.30 s | 6.74 s | 10.30 s |
+
+On this archive s3fs unpacks ahead of the default mount (21.01 s against 26.19 s). Packing is close: 4.85 s on the default mount, 5.31 s on s3fs, and 10.37 s on fuse-nfs.
 
 ## Run
 
 ```bash
+go build -o fs-relay ./cmd/fs-relay
+go build -o fs-relay-bind ./cmd/fs-relay-bind
+
 mkdir -p data /mnt/fs-relay
 ./fs-relay -listen 127.0.0.1:8080 -data data
 ./fs-relay-bind -url http://127.0.0.1:8080 -ns demo /mnt/fs-relay
 ```
 
-`-listen` defaults to `127.0.0.1:8080`, `-data` to `data`, `-url` to `http://127.0.0.1:8080`, `-ns` to `default`. `-ws` makes the mount use one websocket at `/ws/<namespace>` instead of one POST per call. `-allow-other` and `-debug` are mount flags.
+`-listen` defaults to `127.0.0.1:8080` and `-data` to `data`. Each name under `data` is one independent tree. `-url` defaults to `http://127.0.0.1:8080` and `-ns` to `default`. Add `-post` to send each operation as its own request. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
 
-`curl http://127.0.0.1:8080/` returns `status` `ok`, `time_ms` as epoch milliseconds, and `time` as UTC `2026-10-30T20:18:00Z`. A browser gets the welcome page.
+Open the server URL in a browser for a welcome page. `curl` against the same URL returns a short status. Unmount with `fusermount3 -u /mnt/fs-relay`.
 
-## Smoke
+On a new mount, create a directory, write and read a small file, make a symlink, rename, and delete. Mount the same name a second time, write on one, and read on the other.
 
-On one mount: `mkdir`, write and read a small file, `ln -s`, `mv`, `rm`, `rmdir`. On two mounts of one namespace: write a file on the first and read it on the second. Then `fusermount3 -u` each mount. This checklist is not a unit test.
+## Earlier designs
 
-## Benchmark
+This section is for people changing the server. Do not bring these back. They were measured, and they stayed out.
 
-We packed a git clone of Ansible into `ansible.tar` (27 MiB, 5,868 files). On each filesystem we unpacked that archive, packed the tree again, copied the archive onto the mount, and listed it with `tar -tf` without unpacking. We benchmarked against [kvfs](https://github.com/muayyad-alsadi/kvfs), [rustfs](https://github.com/rustfs/rustfs), and [fuse-nfs](https://github.com/sahlberg/fuse-nfs). The fs-relay times are from 2026-10-31 01:42 +03. The other columns are earlier runs of the same archive.
+MessagePack was the first wire format. FlatBuffers replaced it. On the Ansible tree, `-ws` with FlatBuffers was 6% to 15% faster than `-ws` with MessagePack: about 15% unpacking and about 6% packing. On the Antigravity archive it was 11% faster at both.
 
-| | local directory | [kvfs](https://github.com/muayyad-alsadi/kvfs) | fs-relay POST | fs-relay `-ws` | s3fs on [rustfs](https://github.com/rustfs/rustfs) | [fuse-nfs](https://github.com/sahlberg/fuse-nfs) |
-|---|---:|---:|---:|---:|---:|---:|
-| extract | 0.14 s | 23.64 s | 23.38 s | 19.48 s | 211.10 s | 108.04 s |
-| archive | 0.10 s | 14.26 s | 6.26 s | 5.49 s | 58.61 s | 48.12 s |
-| copy the tar | 0.02 s | 0.48 s | 0.22 s | 0.37 s | | 0.40 s |
-| `tar -tf` | 0.03 s | 0.19 s | 0.29 s | 0.27 s | | 0.54 s |
+JSON can carry file bytes as `multipart/form-data`: one `application/json` part for the call, and one `application/octet-stream` part for the bytes. On the Ansible tree that plain-text body kept up with MessagePack and FlatBuffers. It is not in this server. One body shape is the smaller program.
 
-The websocket mount is about ten times faster than s3fs on rustfs, on both extract and archive, and about ten times faster than fuse-nfs on archive (5.49 s against 48.12 s). The fuse-nfs extract is about five times slower. kvfs is ours as well, so it is left out of that comparison.
-
-Local and kvfs were measured 2026-10-30 22:49 +03. s3fs is the 2026-10-30 18:46 +03 run, extract and archive only. fuse-nfs is the 2026-10-31 01:31 +03 run. kvfs is the Go filesystem at namespace level against Valkey 9.0.6, default 1s timeouts. fs-relay uses the same attribute and entry timeout, a 500ms negative timeout, and keeps a read-only file in the page cache. A writable open stays direct I/O. After `readdir`, the mount fetches the regular files in that directory that are at most 64 KiB, up to 32 names and 1 MiB per `reads` call, and serves those bytes from memory until an eviction. A larger file stays a normal `read`. s3fs 1.97 mounts rustfs 1.0.4 at `127.0.0.1:9000` with path-style requests. `diff -rq` of each fs-relay extract against the local tree was empty. s3fs exited 2: `tar` reported `Cannot close: Permission denied` on 29 paths, and the archive has 8,609 members. fuse-nfs mounts unfsd 0.11.0, NFS v3 over TCP on port 12049, with `-p 0` and an 8 KiB read and readahead cap. The server owns new directories, so the kernel permission check is off. That read cap is the size this server answers; the fuse-nfs archive has 8,638 members.
-
-On the 01:42 run both fs-relay archives are about three times faster than the extract on that transport. Copying and listing the 27 MiB tar stay under half a second; those two do not use the small-file prefetch. MessagePack on either transport is the binary encoding only, with no compression.
-
-## SQLite
-
-A database on one mount works with the rollback journal, which is the default (`PRAGMA journal_mode=DELETE`). `PRAGMA journal_mode=WAL` fails with `disk I/O error`. WAL keeps a shared-memory file beside the database and maps it into every connection. This mount does not provide that mapping.
+The protocol is in [`SPEC.md`](./SPEC.md). What was tried and set aside is also in [`ROADMAP.md`](./ROADMAP.md).

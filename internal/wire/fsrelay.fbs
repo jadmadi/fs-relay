@@ -1,0 +1,102 @@
+namespace wire;
+
+table FbAttr {
+  ino:ulong;
+  mode:uint;
+  size:ulong;
+  nlink:uint;
+  uid:uint;
+  gid:uint;
+  atime:long;
+  mtime:long;
+  ctime:long;
+}
+
+table FbDirent {
+  name:string;
+  ino:ulong;
+  mode:uint;
+  size:ulong;
+  nlink:uint;
+  uid:uint;
+  gid:uint;
+  atime:long;
+  mtime:long;
+  ctime:long;
+}
+
+table FbFSStat {
+  blocks:ulong;
+  bfree:ulong;
+  bavail:ulong;
+  files:ulong;
+  ffree:ulong;
+  bsize:uint;
+  namelen:uint;
+  frsize:uint;
+}
+
+table FbBlob {
+  ino:ulong;
+  data:[ubyte];
+}
+
+table FbParams {
+  namespace:string;
+  inode:ulong;
+  new_inode:ulong;
+  name:string;
+  new_name:string;
+  fh:ulong;
+  mode:uint;
+  flags:uint;
+  valid:uint;
+  mask:uint;
+  offset:long;
+  size:ulong;
+  atime:long;
+  mtime:long;
+  uid:uint;
+  gid:uint;
+  target:string;
+  data:[ubyte];
+  inodes:[ulong];
+  client:string;
+}
+
+table FbResult {
+  attr:FbAttr;
+  entries:[FbDirent];
+  fh:ulong;
+  data:[ubyte];
+  target:string;
+  statfs:FbFSStat;
+  written:uint;
+  blobs:[FbBlob];
+}
+
+table FbFailure {
+  code:uint;
+  message:string;
+}
+
+table FbChange {
+  parent:ulong;
+  name:string;
+}
+
+table FbEnvelope {
+  id:ulong;
+  method:string;
+  params:FbParams;
+  result:FbResult;
+  failure:FbFailure;
+  fault:string;
+  pending:string;
+  evict:FbChange;
+  release:string;
+  client:string;
+}
+
+root_type FbEnvelope;
+file_identifier "FSR1";

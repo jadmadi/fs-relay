@@ -1,19 +1,15 @@
-// Package wire is the MsgPack contract shared by the server and the mount.
+// Package wire is the FlatBuffers contract shared by the server and the mount.
 // It does not speak HTTP, FUSE, or the filesystem.
 package wire
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 // ContentType is the only body type the server accepts.
-const ContentType = "application/msgpack"
+const ContentType = "application/x-flatbuffers"
 
 // Limits from SPEC: a namespace is bounded, and one FUSE write is one POST.
 const (
@@ -74,96 +70,97 @@ var (
 // Request is one call. ID is set on the websocket, where many calls share a socket.
 // A POST omits it; the HTTP exchange is the correlation there.
 type Request struct {
-	ID     uint64 `msgpack:"id,omitempty"`
-	Method string `msgpack:"method"`
-	Params Params `msgpack:"params"`
+	ID     uint64
+	Method string
+	Params Params
 }
 
 // Params carries the kernel arguments plus the namespace.
-// Zero values are omitted; a setattr to zero still works because Valid says which fields count.
+// A setattr to zero still works because Valid says which fields count.
 type Params struct {
-	Namespace string   `msgpack:"namespace"`
-	Inode     uint64   `msgpack:"inode,omitempty"`
-	NewInode  uint64   `msgpack:"new_inode,omitempty"`
-	Name      string   `msgpack:"name,omitempty"`
-	NewName   string   `msgpack:"new_name,omitempty"`
-	Fh        uint64   `msgpack:"fh,omitempty"`
-	Mode      uint32   `msgpack:"mode,omitempty"`
-	Flags     uint32   `msgpack:"flags,omitempty"`
-	Valid     uint32   `msgpack:"valid,omitempty"`
-	Mask      uint32   `msgpack:"mask,omitempty"`
-	Offset    int64    `msgpack:"offset,omitempty"`
-	Size      uint64   `msgpack:"size,omitempty"`
-	Atime     int64    `msgpack:"atime,omitempty"`
-	Mtime     int64    `msgpack:"mtime,omitempty"`
-	UID       uint32   `msgpack:"uid,omitempty"`
-	GID       uint32   `msgpack:"gid,omitempty"`
-	Target    string   `msgpack:"target,omitempty"`
-	Data      []byte   `msgpack:"data,omitempty"`
-	Inodes    []uint64 `msgpack:"inodes,omitempty"`
-	Client    string   `msgpack:"client,omitempty"`
+	Namespace string
+	Inode     uint64
+	NewInode  uint64
+	Name      string
+	NewName   string
+	Fh        uint64
+	Mode      uint32
+	Flags     uint32
+	Valid     uint32
+	Mask      uint32
+	Offset    int64
+	Size      uint64
+	Atime     int64
+	Mtime     int64
+	UID       uint32
+	GID       uint32
+	Target    string
+	Data      []byte
+	Inodes    []uint64
+	Client    string
 }
 
 // Blob is one whole small file returned by reads.
 type Blob struct {
-	Inode uint64 `msgpack:"ino"`
-	Data  []byte `msgpack:"data"`
+	Inode uint64
+	Data  []byte
 }
 
 // Change is one name another mount must drop from its kernel cache.
 type Change struct {
-	Parent uint64 `msgpack:"parent" json:"parent"`
-	Name   string `msgpack:"name" json:"name"`
+	Parent uint64
+	Name   string
 }
 
-// Result is the success body. Unused fields are omitted.
+// Result is the success body. Empty strings and empty byte vectors are absent.
+// Numeric fields are present, including zero.
 type Result struct {
-	Attr    *Attr    `msgpack:"attr,omitempty"`
-	Entries []Dirent `msgpack:"entries,omitempty"`
-	Fh      uint64   `msgpack:"fh,omitempty"`
-	Data    []byte   `msgpack:"data,omitempty"`
-	Target  string   `msgpack:"target,omitempty"`
-	Stat    *FSStat  `msgpack:"statfs,omitempty"`
-	Written uint32   `msgpack:"written,omitempty"`
-	Blobs   []Blob   `msgpack:"blobs,omitempty"`
+	Attr    *Attr
+	Entries []Dirent
+	Fh      uint64
+	Data    []byte
+	Target  string
+	Stat    *FSStat
+	Written uint32
+	Blobs   []Blob
 }
 
 // Attr is the protocol inode's attributes. Ino is the server's number, not st_ino.
 type Attr struct {
-	Ino   uint64 `msgpack:"ino"`
-	Mode  uint32 `msgpack:"mode"`
-	Size  uint64 `msgpack:"size"`
-	Nlink uint32 `msgpack:"nlink"`
-	Uid   uint32 `msgpack:"uid"`
-	Gid   uint32 `msgpack:"gid"`
-	Atime int64  `msgpack:"atime"`
-	Mtime int64  `msgpack:"mtime"`
-	Ctime int64  `msgpack:"ctime"`
+	Ino   uint64
+	Mode  uint32
+	Size  uint64
+	Nlink uint32
+	Uid   uint32
+	Gid   uint32
+	Atime int64
+	Mtime int64
+	Ctime int64
 }
 
 // Dirent is one name from readdir, with the attributes a lookup would return.
 // Ino is assigned on this listing if it was new.
 type Dirent struct {
-	Name string `msgpack:"name"`
-	Attr `msgpack:",inline"`
+	Name string
+	Attr
 }
 
 // FSStat is the namespace filesystem.
 type FSStat struct {
-	Blocks  uint64 `msgpack:"blocks"`
-	Bfree   uint64 `msgpack:"bfree"`
-	Bavail  uint64 `msgpack:"bavail"`
-	Files   uint64 `msgpack:"files"`
-	Ffree   uint64 `msgpack:"ffree"`
-	Bsize   uint32 `msgpack:"bsize"`
-	NameLen uint32 `msgpack:"namelen"`
-	Frsize  uint32 `msgpack:"frsize"`
+	Blocks  uint64
+	Bfree   uint64
+	Bavail  uint64
+	Files   uint64
+	Ffree   uint64
+	Bsize   uint32
+	NameLen uint32
+	Frsize  uint32
 }
 
 // Error is the failure body. Code is a Linux errno.
 type Error struct {
-	Code    uint32 `msgpack:"code"`
-	Message string `msgpack:"message"`
+	Code    uint32
+	Message string
 }
 
 func (e *Error) Error() string {
@@ -202,58 +199,54 @@ func MarshalCall(id uint64, method string, p Params) ([]byte, error) {
 }
 
 func marshalCall(id uint64, method string, p Params) ([]byte, error) {
-	b, err := msgpack.Marshal(&Request{ID: id, Method: method, Params: p})
+	b, err := encodeFB(fbMsg{ID: id, Method: method, Params: &p})
 	if err != nil {
 		return nil, fmt.Errorf("marshal %s: %w", method, err)
 	}
 	return b, nil
 }
 
-// DecodeRequest reads one call.
+// DecodeRequest reads one call from a stream.
 func DecodeRequest(r io.Reader) (Request, error) {
-	var req Request
-	if err := msgpack.NewDecoder(r).Decode(&req); err != nil {
+	b, err := io.ReadAll(io.LimitReader(r, MaxBody+1))
+	if err != nil {
 		return Request{}, err
 	}
-	return req, nil
+	return DecodeRequestBuffer(b)
 }
 
-type okBody struct {
-	Result Result `msgpack:"result"`
-}
-
-type errBody struct {
-	Error Error `msgpack:"error"`
+// DecodeRequestBuffer decodes a call that is already in memory.
+// The websocket reader has already copied the frame once.
+func DecodeRequestBuffer(b []byte) (Request, error) {
+	if len(b) > MaxBody {
+		return Request{}, ErrParams
+	}
+	return decodeFBRequest(b)
 }
 
 // MarshalResult encodes a success envelope.
 func MarshalResult(res Result) ([]byte, error) {
-	return msgpack.Marshal(&okBody{Result: res})
+	return encodeFB(fbMsg{Result: &res})
 }
 
 // MarshalCallError encodes a filesystem failure envelope.
 func MarshalCallError(e Error) ([]byte, error) {
-	return msgpack.Marshal(&errBody{Error: e})
-}
-
-type envelope struct {
-	Result *Result `msgpack:"result"`
-	Error  *Error  `msgpack:"error"`
+	return encodeFB(fbMsg{Err: &e})
 }
 
 // DecodeResponse returns the result, or an *Error when the envelope failed.
 func DecodeResponse(b []byte) (Result, error) {
-	var env envelope
-	if err := msgpack.Unmarshal(b, &env); err != nil {
+	rp, err := decodeFBReply(b)
+	if err != nil {
 		return Result{}, fmt.Errorf("response: %w", err)
 	}
-	if env.Error != nil {
-		return Result{}, env.Error
+	if rp.Err != nil {
+		return Result{}, rp.Err
 	}
-	if env.Result == nil {
+	if rp.Result == nil {
 		return Result{}, fmt.Errorf("response: empty")
 	}
-	return *env.Result, nil
+	return *rp.Result, nil
 }
 
 // Reply is one websocket message for a call id.
@@ -268,76 +261,54 @@ type Reply struct {
 	Release string
 }
 
-type replyBody struct {
-	ID      uint64  `msgpack:"id"`
-	Result  *Result `msgpack:"result,omitempty"`
-	Error   *Error  `msgpack:"error,omitempty"`
-	Fault   string  `msgpack:"fault,omitempty"`
-	Pending string  `msgpack:"pending,omitempty"`
-	Evict   *Change `msgpack:"evict,omitempty"`
-	Release string  `msgpack:"release,omitempty"`
-}
-
 // MarshalReply encodes a successful websocket reply.
 func MarshalReply(id uint64, res Result) ([]byte, error) {
-	return msgpack.Marshal(&replyBody{ID: id, Result: &res})
+	return encodeFB(fbMsg{ID: id, Result: &res})
 }
 
 // MarshalReplyError encodes a filesystem failure on the websocket.
 func MarshalReplyError(id uint64, e Error) ([]byte, error) {
-	return msgpack.Marshal(&replyBody{ID: id, Error: &e})
+	return encodeFB(fbMsg{ID: id, Err: &e})
 }
 
 // MarshalFault encodes a failure that is not an errno. The mount treats it as a transport error.
 func MarshalFault(id uint64, message string) ([]byte, error) {
-	return msgpack.Marshal(&replyBody{ID: id, Fault: message})
+	return encodeFB(fbMsg{ID: id, Fault: message})
 }
 
 // MarshalPending encodes the lock-wait notice for a call that has not finished.
 func MarshalPending(id uint64, ticket string) ([]byte, error) {
-	return msgpack.Marshal(&replyBody{ID: id, Pending: ticket})
+	return encodeFB(fbMsg{ID: id, Pending: ticket})
 }
 
 // DecodeReply reads one websocket reply.
 func DecodeReply(b []byte) (Reply, error) {
-	var raw replyBody
-	if err := msgpack.Unmarshal(b, &raw); err != nil {
-		return Reply{}, fmt.Errorf("reply: %w", err)
-	}
-	return Reply{ID: raw.ID, Result: raw.Result, Err: raw.Error, Fault: raw.Fault, Pending: raw.Pending, Evict: raw.Evict, Release: raw.Release}, nil
+	return decodeFBReply(b)
 }
 
-// Pub is one JSON line on a join stream.
+// Pub is one event on the join stream.
 type Pub struct {
-	Client  string  `json:"client,omitempty"`
-	Evict   *Change `json:"evict,omitempty"`
-	Release string  `json:"release,omitempty"`
+	Client  string
+	Evict   *Change
+	Release string
 }
 
-// MarshalPub encodes one join line, including the newline.
+// MarshalPub encodes one join event. The stream frames it with WriteFrame.
 func MarshalPub(p Pub) ([]byte, error) {
-	b, err := json.Marshal(p)
-	if err != nil {
-		return nil, err
-	}
-	return append(b, '\n'), nil
+	return encodeFB(fbMsg{Client: p.Client, Evict: p.Evict, Release: p.Release})
 }
 
-// DecodePub reads one join line. The newline is optional.
-func DecodePub(line []byte) (Pub, error) {
-	var p Pub
-	if err := json.Unmarshal(bytes.TrimSpace(line), &p); err != nil {
-		return Pub{}, fmt.Errorf("pub: %w", err)
-	}
-	return p, nil
+// DecodePub reads one join event.
+func DecodePub(b []byte) (Pub, error) {
+	return decodeFBPub(b)
 }
 
 // MarshalPush encodes one websocket push. It has no call id.
 func MarshalPush(c Change) ([]byte, error) {
-	return msgpack.Marshal(&replyBody{Evict: &c})
+	return encodeFB(fbMsg{Evict: &c})
 }
 
 // MarshalRelease encodes a lock-release push with no call id.
 func MarshalRelease(id string) ([]byte, error) {
-	return msgpack.Marshal(&replyBody{Release: id})
+	return encodeFB(fbMsg{Release: id})
 }
