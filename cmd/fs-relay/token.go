@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -48,11 +50,11 @@ func withToken(token string, next http.Handler) http.Handler {
 		}
 		got, ok := bearer(r.Header.Get(wire.TokenHeader))
 		if !ok {
-			rejectToken(w, "missing token")
+			rejectToken(w, r, "missing token")
 			return
 		}
 		if !hmac.Equal([]byte(got), []byte(token)) {
-			rejectToken(w, "wrong token")
+			rejectToken(w, r, "wrong token")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -67,7 +69,8 @@ func bearer(v string) (string, bool) {
 	return rest, true
 }
 
-func rejectToken(w http.ResponseWriter, why string) {
+func rejectToken(w http.ResponseWriter, r *http.Request, why string) {
+	log.Printf("fs-relay: %s from %s", why, clientIP(r))
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("WWW-Authenticate", wire.TokenScheme)
@@ -75,4 +78,12 @@ func rejectToken(w http.ResponseWriter, why string) {
 	_ = json.NewEncoder(w).Encode(struct {
 		Error wire.Error `json:"error"`
 	}{Error: wire.Error{Code: http.StatusUnauthorized, Message: why}})
+}
+
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }

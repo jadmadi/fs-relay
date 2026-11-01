@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -82,11 +83,26 @@ func authorize(h http.Header, token string) {
 	h.Set(wire.TokenHeader, wire.TokenScheme+" "+token)
 }
 
+// rejected is a token the server will keep refusing. Retrying does not change it.
+type rejected struct{ Why string }
+
+func (e *rejected) Error() string {
+	return fmt.Sprintf("the server refused the token (%s). Stopping. If it restarted without -token, it printed a new one", e.Why)
+}
+
+// Refused reports a token rejection. Another try will get the same answer.
+func Refused(err error) bool {
+	var rej *rejected
+	return errors.As(err, &rej)
+}
+
 func statusErr(op string, status int, body []byte) error {
 	if status == http.StatusUnauthorized {
-		if why := tokenWhy(body); why != "" {
-			return fmt.Errorf("%s: %s", op, why)
+		why := tokenWhy(body)
+		if why == "" {
+			why = "unauthorized"
 		}
+		return &rejected{Why: why}
 	}
 	return fmt.Errorf("%s: http %d", op, status)
 }

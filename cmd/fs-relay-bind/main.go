@@ -83,6 +83,9 @@ func attachRaw(root *node, url, ns, token string, on bool) func() {
 		return func() {}
 	}
 	raw, err := client.DialRaw(context.Background(), url, ns, token)
+	if client.Refused(err) {
+		log.Fatalf("fs-relay-bind: %v", err)
+	}
 	if err != nil {
 		log.Printf("fs-relay-bind: large transfers remain on the main connection: %v", err)
 		return func() {}
@@ -116,7 +119,11 @@ func mountOptions(allowOther, debug bool) *fs.Options {
 func openHTTP(url, ns, token string) (caller, <-chan wire.Change, func(), error) {
 	c := &client.Client{URL: url, NS: ns, Token: token}
 	ctx, cancel := context.WithCancel(context.Background())
-	go c.Listen(ctx)
+	go func() {
+		if err := c.Listen(ctx); err != nil {
+			log.Fatalf("fs-relay-bind: %v", err)
+		}
+	}()
 	return c, c.Events(), func() { cancel() }, nil
 }
 

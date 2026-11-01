@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 
 	"fs-relay/internal/local"
@@ -58,6 +61,7 @@ func TestRejectToken(t *testing.T) {
 }
 
 func TestTokenGate(t *testing.T) {
+	logs := captureLog(t)
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
 	srv := httptest.NewServer(newHandler(tree, testToken))
@@ -82,9 +86,14 @@ func TestTokenGate(t *testing.T) {
 	if ok.code != http.StatusOK {
 		t.Fatalf("ok %d %s", ok.code, ok.why)
 	}
+	got := logs.String()
+	if !strings.Contains(got, "missing token from 127.0.0.1") || !strings.Contains(got, "wrong token from 127.0.0.1") {
+		t.Fatalf("log %q", got)
+	}
 }
 
 func TestForgedClient(t *testing.T) {
+	logs := captureLog(t)
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
 	srv := httptest.NewServer(newHandler(tree, testToken))
@@ -101,6 +110,17 @@ func TestForgedClient(t *testing.T) {
 	if code := joinStatus(t, srv.URL, signed); code != http.StatusOK {
 		t.Fatalf("signed %d", code)
 	}
+	if !strings.Contains(logs.String(), "bad client from 127.0.0.1") {
+		t.Fatalf("log %q", logs.String())
+	}
+}
+
+func captureLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	return &buf
 }
 
 func freshID(t *testing.T) string {

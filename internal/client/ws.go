@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -195,6 +196,9 @@ func (s *Socket) serve() {
 		}
 		if s.current() == nil {
 			conn, err := dialConn(context.Background(), s.endpoint, s.token)
+			if Refused(err) {
+				log.Fatalf("fs-relay-bind: %v", err)
+			}
 			if err != nil {
 				drops = nextDrops(drops, false, 0)
 				continue
@@ -232,12 +236,12 @@ func dialConn(ctx context.Context, endpoint, token string) (*websocket.Conn, err
 }
 
 func dialErr(endpoint string, resp *http.Response, err error) error {
-	if resp == nil || resp.Body == nil || resp.StatusCode != http.StatusUnauthorized {
+	if resp == nil || resp.Body == nil {
 		return fmt.Errorf("dial %s: %w", endpoint, err)
 	}
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-	if why := tokenWhy(raw); why != "" {
-		return fmt.Errorf("dial %s: %s", endpoint, why)
+	if resp.StatusCode == http.StatusUnauthorized {
+		return statusErr("dial", resp.StatusCode, raw)
 	}
 	return fmt.Errorf("dial %s: %w", endpoint, err)
 }

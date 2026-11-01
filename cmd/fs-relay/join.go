@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -19,7 +20,7 @@ func serveJoin(h *hub, ns string, w http.ResponseWriter, r *http.Request, client
 	defer cancel()
 	m, err := h.attach(ns, client, false, cancel)
 	if err != nil {
-		writeJoinErr(w, err)
+		writeJoinErr(w, r, err)
 		return
 	}
 	defer h.detach(ns, m)
@@ -33,8 +34,9 @@ func serveJoin(h *hub, ns string, w http.ResponseWriter, r *http.Request, client
 	})
 }
 
-func writeJoinErr(w http.ResponseWriter, err error) {
+func writeJoinErr(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, errClient) {
+		log.Printf("fs-relay: bad client from %s", clientIP(r))
 		http.Error(w, "bad client", http.StatusBadRequest)
 		return
 	}

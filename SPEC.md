@@ -23,7 +23,7 @@ Every connection except `GET /` carries one shared secret. The header is `Author
 
 Omit `-token` and the server prints a secret on its standard error, then uses it. Pass `-token` and that value is the secret when it meets the rule. A value that is too short, or that uses another character, stops the process before it listens. `fs-relay-bind` takes the same flag and sends the secret. It does not invent one. An empty flag on the mount stops it with `pass -token`.
 
-A request with no secret is `401` and `{"error":{"code":401,"message":"missing token"}}`. A secret that is not the server's is `401` and `{"error":{"code":401,"message":"wrong token"}}`. `GET /` stays open: it is the welcome page and the health check.
+A request with no secret is `401` and `{"error":{"code":401,"message":"missing token"}}`. A secret that is not the server's is `401` and `{"error":{"code":401,"message":"wrong token"}}`. The server writes the client's address and that reason to its standard error. A bad client id is `400`, and that refusal is logged with the address too. The mount does not retry a refused token. It stops and says so. A server that was restarted without `-token` printed a new secret. `GET /` stays open: it is the welcome page and the health check.
 
 The server names a mount with a UUIDv7 and returns `<uuid>.<signature>`. The signature is HMAC-SHA256 of the uuid, keyed by the secret, written with the URL-safe base64 alphabet and no padding. A `join` that presents an id must present that whole string. The server signs the uuid again and accepts the id only when the signature matches. Anything else is `400`. A websocket mount is named the same way. The mount keeps the id and sends it back when it joins again.
 

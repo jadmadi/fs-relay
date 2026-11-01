@@ -20,13 +20,14 @@ const (
 
 // Listen holds the join stream until ctx is cancelled. The first try of an
 // outage runs at once. A further try waits. A session that stays up clears that wait.
-func (c *Client) Listen(ctx context.Context) {
+// A refused token is returned and is not retried.
+func (c *Client) Listen(ctx context.Context) error {
 	c.ensure()
 	var id string
 	drops := 0
 	for ctx.Err() == nil {
 		if drops > 0 && !waitRejoin(ctx) {
-			return
+			return nil
 		}
 		started := time.Now()
 		next, up, err := c.joinOnce(ctx, id)
@@ -34,13 +35,17 @@ func (c *Client) Listen(ctx context.Context) {
 			id = next
 		}
 		if ctx.Err() != nil {
-			return
+			return nil
+		}
+		if Refused(err) {
+			return err
 		}
 		if err != nil && up {
 			logLost(c.URL)
 		}
 		drops = nextDrops(drops, up, time.Since(started))
 	}
+	return nil
 }
 
 func waitRejoin(ctx context.Context) bool {

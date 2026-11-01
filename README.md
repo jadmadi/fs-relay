@@ -79,7 +79,7 @@ mkdir -p data /mnt/fs-relay
 ./fs-relay-bind -url http://127.0.0.1:8080 -ns demo -token local-demo /mnt/fs-relay
 ```
 
-`-listen` defaults to `127.0.0.1:8080` and `-data` to `data`. Each name under `data` is one independent tree. `-url` defaults to `http://127.0.0.1:8080` and `-ns` to `default`. Leave `-token` off the server and it prints a secret on its error stream; copy that value onto every mount. A secret you pass yourself must be at least 8 characters, using letters, digits, hyphens, and underscores, and capitals count as different characters. The mount sends it with each connection. A missing or wrong secret is refused. The welcome page does not use the secret, and the server never sends it back.
+`-listen` defaults to `127.0.0.1:8080` and `-data` to `data`. Each name under `data` is one independent tree. `-url` defaults to `http://127.0.0.1:8080` and `-ns` to `default`. Leave `-token` off the server and it prints a secret on its error stream; copy that value onto every mount. A secret you pass yourself must be at least 8 characters, using letters, digits, hyphens, and underscores, and capitals count as different characters. The mount sends it with each connection. A missing or wrong secret is refused, and the mount stops instead of trying again. The server records the machine and the reason. A restarted server that was not given `-token` prints a new secret. The welcome page does not use the secret, and the server never sends it back.
 
 Add `-post` to send each operation as its own request. `-raw=false` sends large reads and writes on the main connection. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
 
