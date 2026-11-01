@@ -17,6 +17,7 @@ type hub struct {
 	mu      sync.Mutex
 	rooms   map[string]*room
 	holdFor time.Duration
+	token   string
 }
 
 type room struct {
@@ -32,20 +33,22 @@ type member struct {
 	cancel func()
 }
 
-func newHub() *hub {
-	return &hub{rooms: map[string]*room{}, holdFor: holdFor}
+func newHub(token string) *hub {
+	return &hub{rooms: map[string]*room{}, holdFor: holdFor, token: token}
 }
 
 func (h *hub) attach(ns, id string, ws bool, cancel func()) (*member, error) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	if id == "" {
-		var err error
-		id, err = newID()
+		raw, err := newID()
 		if err != nil {
 			return nil, err
 		}
+		id = signClient(h.token, raw)
+	} else if !clientSigned(h.token, id) {
+		return nil, errClient
 	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	r := h.room(ns)
 	if old := r.live[id]; old != nil {
 		old.cancel()

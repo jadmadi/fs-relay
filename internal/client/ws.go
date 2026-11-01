@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -21,6 +23,7 @@ type Socket struct {
 	endpoint string
 	url      string
 	ns       string
+	token    string
 	closed   atomic.Bool
 	mu       sync.Mutex
 	wmu      sync.Mutex
@@ -33,23 +36,27 @@ type Socket struct {
 }
 
 // Dial opens the websocket. Close stops the reader.
-func Dial(ctx context.Context, baseURL, ns string) (*Socket, error) {
+func Dial(ctx context.Context, baseURL, ns, token string) (*Socket, error) {
 	if err := wire.CheckNS(ns); err != nil {
+		return nil, err
+	}
+	if err := wire.CheckToken(token); err != nil {
 		return nil, err
 	}
 	endpoint, err := wsEndpoint(baseURL, ns)
 	if err != nil {
 		return nil, err
 	}
-	conn, err := dialConn(ctx, endpoint)
+	conn, err := dialConn(ctx, endpoint, token)
 	if err != nil {
-		return nil, fmt.Errorf("dial %s: %w", endpoint, err)
+		return nil, err
 	}
 	s := &Socket{
 		conn:     conn,
 		endpoint: endpoint,
 		url:      baseURL,
 		ns:       ns,
+		token:    token,
 		waiters:  map[uint64]chan wire.Reply{},
 		evicts:   make(chan wire.Change, 32),
 		dead:     make(chan struct{}),
@@ -187,7 +194,7 @@ func (s *Socket) serve() {
 			return
 		}
 		if s.current() == nil {
-			conn, err := dialConn(context.Background(), s.endpoint)
+			conn, err := dialConn(context.Background(), s.endpoint, s.token)
 			if err != nil {
 				drops = nextDrops(drops, false, 0)
 				continue
@@ -210,15 +217,29 @@ func (s *Socket) serve() {
 	}
 }
 
-func dialConn(ctx context.Context, endpoint string) (*websocket.Conn, error) {
-	conn, _, err := websocket.Dial(ctx, endpoint, &websocket.DialOptions{
+func dialConn(ctx context.Context, endpoint, token string) (*websocket.Conn, error) {
+	conn, resp, err := websocket.Dial(ctx, endpoint, &websocket.DialOptions{
 		CompressionMode: websocket.CompressionDisabled,
+		HTTPHeader: http.Header{
+			wire.TokenHeader: {wire.TokenScheme + " " + token},
+		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, dialErr(endpoint, resp, err)
 	}
 	conn.SetReadLimit(wire.MaxBody)
 	return conn, nil
+}
+
+func dialErr(endpoint string, resp *http.Response, err error) error {
+	if resp == nil || resp.Body == nil || resp.StatusCode != http.StatusUnauthorized {
+		return fmt.Errorf("dial %s: %w", endpoint, err)
+	}
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	if why := tokenWhy(raw); why != "" {
+		return fmt.Errorf("dial %s: %s", endpoint, why)
+	}
+	return fmt.Errorf("dial %s: %w", endpoint, err)
 }
 
 func (s *Socket) loop(again bool) (bool, error) {

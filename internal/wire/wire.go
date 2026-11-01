@@ -12,6 +12,12 @@ import (
 // ContentType is the only body type the server accepts.
 const ContentType = "application/x-flatbuffers"
 
+// TokenHeader carries the shared secret. TokenScheme is the word in front of it.
+const (
+	TokenHeader = "Authorization"
+	TokenScheme = "Bearer"
+)
+
 // Limits from SPEC: a namespace is bounded, and one FUSE write is one POST.
 const (
 	MaxNamespace = 64
@@ -177,10 +183,11 @@ type FSStat struct {
 	Frsize  uint32
 }
 
-// Error is the failure body. Code is a Linux errno.
+// Error is the failure body. Code is a Linux errno on a filesystem call,
+// and the HTTP status when the request is refused before a call.
 type Error struct {
-	Code    uint32
-	Message string
+	Code    uint32 `json:"code"`
+	Message string `json:"message"`
 }
 
 func (e *Error) Error() string {
@@ -190,19 +197,42 @@ func (e *Error) Error() string {
 	return e.Message
 }
 
+// ErrTokenShort is a secret shorter than eight characters.
+var ErrTokenShort = errors.New("token must be at least 8 characters")
+
+// ErrTokenChars is a secret outside the URL-safe alphabet.
+var ErrTokenChars = errors.New("token may contain only letters, digits, hyphens, and underscores")
+
+// CheckToken accepts a secret of at least eight characters. The alphabet is
+// letters, digits, hyphen, and underscore, so the value needs no encoding in
+// a header. The comparison is case-sensitive.
+func CheckToken(token string) error {
+	if len(token) < 8 {
+		return ErrTokenShort
+	}
+	if !urlSafe(token) {
+		return ErrTokenChars
+	}
+	return nil
+}
+
 // CheckNS accepts a namespace of [A-Za-z0-9_-], at most MaxNamespace bytes.
 func CheckNS(ns string) error {
-	if ns == "" || len(ns) > MaxNamespace {
-		return ErrParams
-	}
-	for i := 0; i < len(ns); i++ {
-		c := ns[i]
-		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_' {
-			continue
-		}
+	if ns == "" || len(ns) > MaxNamespace || !urlSafe(ns) {
 		return ErrParams
 	}
 	return nil
+}
+
+func urlSafe(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // MarshalRequest encodes one POST. The body has no id.

@@ -20,9 +20,9 @@ func TestWSMkdir(t *testing.T) {
 	dir := t.TempDir()
 	tree := local.New(dir)
 	t.Cleanup(func() { _ = tree.Close() })
-	srv := httptest.NewServer(newHandler(tree))
+	srv := httptest.NewServer(newHandler(tree, testToken))
 	t.Cleanup(srv.Close)
-	sock, err := client.Dial(context.Background(), srv.URL, "demo")
+	sock, err := client.Dial(context.Background(), srv.URL, "demo", testToken)
 	if err != nil {
 		t.Fatal(err)
 	}

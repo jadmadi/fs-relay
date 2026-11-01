@@ -72,13 +72,15 @@ func (c *Client) joinOnce(ctx context.Context, id string) (string, bool, error) 
 		return id, false, err
 	}
 	req.Header.Set("Content-Type", wire.ContentType)
+	authorize(req.Header, c.Token)
 	resp, err := c.http().Do(req)
 	if err != nil {
 		return id, false, fmt.Errorf("join: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return id, false, fmt.Errorf("join: http %d", resp.StatusCode)
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return id, false, statusErr("join", resp.StatusCode, raw)
 	}
 	return c.readJoin(ctx, resp.Body, id)
 }

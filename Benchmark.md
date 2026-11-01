@@ -62,7 +62,7 @@ AWS_ACCESS_KEY_ID=abc AWS_SECRET_ACCESS_KEY=abc aws --endpoint-url http://127.0.
 run the fs-relay server
 
 ```bash
-fs-relay -data $PWD/storage -listen 0.0.0.0:1300
+fs-relay -data $PWD/storage -listen 0.0.0.0:1300 -token trips-token
 ```
 
 ### DuckDB + RustFS in S3 (no fuse)
@@ -130,7 +130,7 @@ mount the fs-relay to the local machine
 
 ```bash
 mkdir -p ./mnt/trips
-fs-relay-bind -ns trips -url http://storage-ip:1300 ./mnt/trips
+fs-relay-bind -ns trips -url http://storage-ip:1300 -token trips-token ./mnt/trips
 ```
 
 run the query

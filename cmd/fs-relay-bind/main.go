@@ -32,6 +32,7 @@ func run() error {
 	allowOther := flag.Bool("allow-other", false, "allow other users to access the mount")
 	useRaw := flag.Bool("raw", true, "carry large reads and writes on a separate connection")
 	debug := flag.Bool("debug", false, "enable FUSE debug logging")
+	token := flag.String("token", "", "secret printed by fs-relay")
 	flag.Parse()
 	if flag.NArg() != 1 {
 		fmt.Fprintf(os.Stderr, "usage: %s [flags] <mountpoint>\n", os.Args[0])
@@ -44,13 +45,19 @@ func run() error {
 	if err := wire.CheckNS(*ns); err != nil {
 		return fmt.Errorf("namespace: %w", err)
 	}
+	if *token == "" {
+		return fmt.Errorf("pass -token")
+	}
+	if err := wire.CheckToken(*token); err != nil {
+		return err
+	}
 	open := openSocket
 	mode := "websocket"
 	if *post {
 		open = openHTTP
 		mode = "HTTP POST"
 	}
-	c, events, stop, err := open(*url, *ns)
+	c, events, stop, err := open(*url, *ns, *token)
 	if err != nil {
 		return err
 	}
@@ -60,7 +67,7 @@ func run() error {
 	defer cancel()
 	go k.loop(ctx, events)
 	root := &node{c: c, k: k, ino: 1}
-	defer attachRaw(root, *url, *ns, *useRaw)()
+	defer attachRaw(root, *url, *ns, *token, *useRaw)()
 	server, err := fs.Mount(flag.Arg(0), root, mountOptions(*allowOther, *debug))
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)
@@ -71,11 +78,11 @@ func run() error {
 	return nil
 }
 
-func attachRaw(root *node, url, ns string, on bool) func() {
+func attachRaw(root *node, url, ns, token string, on bool) func() {
 	if !on {
 		return func() {}
 	}
-	raw, err := client.DialRaw(context.Background(), url, ns)
+	raw, err := client.DialRaw(context.Background(), url, ns, token)
 	if err != nil {
 		log.Printf("fs-relay-bind: large transfers remain on the main connection: %v", err)
 		return func() {}
@@ -106,15 +113,15 @@ func mountOptions(allowOther, debug bool) *fs.Options {
 	return opts
 }
 
-func openHTTP(url, ns string) (caller, <-chan wire.Change, func(), error) {
-	c := &client.Client{URL: url, NS: ns}
+func openHTTP(url, ns, token string) (caller, <-chan wire.Change, func(), error) {
+	c := &client.Client{URL: url, NS: ns, Token: token}
 	ctx, cancel := context.WithCancel(context.Background())
 	go c.Listen(ctx)
 	return c, c.Events(), func() { cancel() }, nil
 }
 
-func openSocket(url, ns string) (caller, <-chan wire.Change, func(), error) {
-	sock, err := client.Dial(context.Background(), url, ns)
+func openSocket(url, ns, token string) (caller, <-chan wire.Change, func(), error) {
+	sock, err := client.Dial(context.Background(), url, ns, token)
 	if err != nil {
 		return nil, nil, nil, err
 	}

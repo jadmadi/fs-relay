@@ -24,6 +24,7 @@ const rawConns = 8
 type Raw struct {
 	host  string
 	path  string
+	token string
 	min   int
 	max   int
 	idle  chan *net.TCPConn
@@ -33,8 +34,11 @@ type Raw struct {
 }
 
 // DialRaw opens one raw connection and learns the server's size window.
-func DialRaw(ctx context.Context, baseURL, ns string) (*Raw, error) {
+func DialRaw(ctx context.Context, baseURL, ns, token string) (*Raw, error) {
 	if err := wire.CheckNS(ns); err != nil {
+		return nil, err
+	}
+	if err := wire.CheckToken(token); err != nil {
 		return nil, err
 	}
 	host, path, err := rawEndpoint(baseURL, ns)
@@ -44,6 +48,7 @@ func DialRaw(ctx context.Context, baseURL, ns string) (*Raw, error) {
 	r := &Raw{
 		host:  host,
 		path:  path,
+		token: token,
 		idle:  make(chan *net.TCPConn, rawConns),
 		slots: make(chan struct{}, rawConns),
 		done:  make(chan struct{}),
@@ -303,7 +308,7 @@ func (r *Raw) handshake(ctx context.Context) (*net.TCPConn, int, int, error) {
 		return nil, 0, 0, fmt.Errorf("raw dial: %w", err)
 	}
 	tcp := c.(*net.TCPConn)
-	if err := writeUpgrade(tcp, r.host, r.path); err != nil {
+	if err := writeUpgrade(tcp, r.host, r.path, r.token); err != nil {
 		tcp.Close()
 		return nil, 0, 0, err
 	}
@@ -315,8 +320,8 @@ func (r *Raw) handshake(ctx context.Context) (*net.TCPConn, int, int, error) {
 	return tcp, min, max, nil
 }
 
-func writeUpgrade(c net.Conn, host, path string) error {
-	_, err := fmt.Fprintf(c, "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: Upgrade\r\nUpgrade: %s\r\n\r\n", path, host, wire.RawProtocol)
+func writeUpgrade(c net.Conn, host, path, token string) error {
+	_, err := fmt.Fprintf(c, "GET %s HTTP/1.1\r\nHost: %s\r\n%s: %s %s\r\nConnection: Upgrade\r\nUpgrade: %s\r\n\r\n", path, host, wire.TokenHeader, wire.TokenScheme, token, wire.RawProtocol)
 	return err
 }
 
@@ -328,7 +333,8 @@ func readSwitch(c net.Conn) (int, int, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusSwitchingProtocols {
-		return 0, 0, fmt.Errorf("raw upgrade: http %d", resp.StatusCode)
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return 0, 0, statusErr("raw upgrade", resp.StatusCode, raw)
 	}
 	if br.Buffered() != 0 {
 		return 0, 0, fmt.Errorf("raw upgrade: buffered body")

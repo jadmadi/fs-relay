@@ -104,7 +104,7 @@ func TestPendingThenResult(t *testing.T) {
 
 func mustDial(t *testing.T, base string) *Socket {
 	t.Helper()
-	sock, err := Dial(context.Background(), base, "demo")
+	sock, err := Dial(context.Background(), base, "demo", "testtoken")
 	if err != nil {
 		t.Fatal(err)
 	}

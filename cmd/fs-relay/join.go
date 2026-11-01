@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -9,10 +10,6 @@ import (
 )
 
 func serveJoin(h *hub, ns string, w http.ResponseWriter, r *http.Request, client string) {
-	if client != "" && !validID(client) {
-		http.Error(w, "bad client", http.StatusBadRequest)
-		return
-	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -22,7 +19,7 @@ func serveJoin(h *hub, ns string, w http.ResponseWriter, r *http.Request, client
 	defer cancel()
 	m, err := h.attach(ns, client, false, cancel)
 	if err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		writeJoinErr(w, err)
 		return
 	}
 	defer h.detach(ns, m)
@@ -34,6 +31,14 @@ func serveJoin(h *hub, ns string, w http.ResponseWriter, r *http.Request, client
 	pump(ctx, h, ns, m, func(p wire.Pub) error {
 		return writePub(w, flusher, p)
 	})
+}
+
+func writeJoinErr(w http.ResponseWriter, err error) {
+	if errors.Is(err, errClient) {
+		http.Error(w, "bad client", http.StatusBadRequest)
+		return
+	}
+	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
 
 // pump writes events from the member. A release stays owed until a later

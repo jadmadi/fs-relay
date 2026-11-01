@@ -10,8 +10,8 @@ import (
 	"fs-relay/internal/wire"
 )
 
-func newHandler(tree *local.Tree) http.Handler {
-	h, _ := handler(tree, newHub())
+func newHandler(tree *local.Tree, token string) http.Handler {
+	h, _ := handler(tree, newHub(token))
 	return h
 }
 
@@ -29,7 +29,7 @@ func handler(tree *local.Tree, h *hub) (http.Handler, *rawSet) {
 	mux.HandleFunc("GET /raw/{ns}", func(w http.ResponseWriter, r *http.Request) {
 		serveRaw(h, tree, set, min, max, w, r)
 	})
-	return mux, set
+	return withToken(h.token, mux), set
 }
 
 func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {

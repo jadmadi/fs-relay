@@ -15,7 +15,7 @@ import (
 func TestRootNegotiates(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { tree.Close() })
-	srv := httptest.NewServer(newHandler(tree))
+	srv := httptest.NewServer(newHandler(tree, testToken))
 	t.Cleanup(srv.Close)
 
 	cases := []struct {

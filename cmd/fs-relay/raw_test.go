@@ -21,11 +21,11 @@ import (
 func TestRawRoundTrip(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
-	hnd, _ := handler(tree, newHub())
+	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
 	t.Cleanup(srv.Close)
 	ctx := context.Background()
-	raw, err := client.DialRaw(ctx, srv.URL, "demo")
+	raw, err := client.DialRaw(ctx, srv.URL, "demo", testToken)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,12 +61,12 @@ func TestRawRoundTrip(t *testing.T) {
 func TestRawLargeWrite(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
-	hnd, _ := handler(tree, newHub())
+	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
 	t.Cleanup(srv.Close)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	t.Cleanup(cancel)
-	raw, err := client.DialRaw(ctx, srv.URL, "demo")
+	raw, err := client.DialRaw(ctx, srv.URL, "demo", testToken)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestRawLargeWrite(t *testing.T) {
 func TestRawEvict(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
-	hnd, _ := handler(tree, newHub())
+	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
 	t.Cleanup(srv.Close)
 	ctx := context.Background()
@@ -121,7 +121,7 @@ func TestRawEvict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := client.DialRaw(ctx, srv.URL, "demo")
+	raw, err := client.DialRaw(ctx, srv.URL, "demo", testToken)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,10 +137,15 @@ func TestRawEvict(t *testing.T) {
 func TestRawNoUpgrade(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
-	hnd, _ := handler(tree, newHub())
+	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
 	t.Cleanup(srv.Close)
-	resp, err := http.Get(srv.URL + "/raw/demo")
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/raw/demo", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set(wire.TokenHeader, wire.TokenScheme+" "+testToken)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,11 +158,11 @@ func TestRawNoUpgrade(t *testing.T) {
 func TestRawPoolAndCancel(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
-	hnd, _ := handler(tree, newHub())
+	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
 	t.Cleanup(srv.Close)
 	ctx := context.Background()
-	raw, err := client.DialRaw(ctx, srv.URL, "demo")
+	raw, err := client.DialRaw(ctx, srv.URL, "demo", testToken)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -25,8 +25,13 @@ func main() {
 func run() error {
 	listen := flag.String("listen", "127.0.0.1:8080", "address to listen on")
 	data := flag.String("data", "data", "directory that holds one folder per namespace")
+	given := flag.String("token", "", "shared secret; printed when omitted")
 	flag.Parse()
 
+	token, err := chooseToken(*given)
+	if err != nil {
+		return err
+	}
 	tree := local.New(*data)
 	defer tree.Close()
 	ln, err := net.Listen("tcp", *listen)
@@ -34,7 +39,7 @@ func run() error {
 		return fmt.Errorf("listen %s: %w", *listen, err)
 	}
 	log.Printf("fs-relay: listening on %s", listenURL(ln.Addr(), defaultRouteIP))
-	h, raw := handler(tree, newHub())
+	h, raw := handler(tree, newHub(token))
 	srv := &http.Server{
 		Handler:           h,
 		ReadHeaderTimeout: 5 * time.Second,

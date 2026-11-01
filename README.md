@@ -75,11 +75,13 @@ For simplicity, we are running the binaries relative to their build directory.
 
 ```bash
 mkdir -p data /mnt/fs-relay
-./fs-relay -listen 127.0.0.1:8080 -data data
-./fs-relay-bind -url http://127.0.0.1:8080 -ns demo /mnt/fs-relay
+./fs-relay -listen 127.0.0.1:8080 -data data -token local-demo
+./fs-relay-bind -url http://127.0.0.1:8080 -ns demo -token local-demo /mnt/fs-relay
 ```
 
-`-listen` defaults to `127.0.0.1:8080` and `-data` to `data`. Each name under `data` is one independent tree. `-url` defaults to `http://127.0.0.1:8080` and `-ns` to `default`. Add `-post` to send each operation as its own request. `-raw=false` sends large reads and writes on the main connection. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
+`-listen` defaults to `127.0.0.1:8080` and `-data` to `data`. Each name under `data` is one independent tree. `-url` defaults to `http://127.0.0.1:8080` and `-ns` to `default`. Leave `-token` off the server and it prints a secret on its error stream; copy that value onto every mount. A secret you pass yourself must be at least 8 characters, using letters, digits, hyphens, and underscores, and capitals count as different characters. The mount sends it with each connection. A missing or wrong secret is refused. The welcome page does not use the secret, and the server never sends it back.
+
+Add `-post` to send each operation as its own request. `-raw=false` sends large reads and writes on the main connection. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
 
 Open the server URL in a browser for a welcome page. `curl` against the same URL returns a short status. Unmount with `fusermount3 -u /mnt/fs-relay`.
 

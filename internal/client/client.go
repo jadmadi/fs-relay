@@ -4,6 +4,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,9 +17,10 @@ import (
 
 // Client talks to one fs-relay server for one namespace.
 type Client struct {
-	URL  string
-	NS   string
-	HTTP *http.Client
+	URL   string
+	NS    string
+	Token string
+	HTTP  *http.Client
 
 	once   sync.Once
 	evicts chan wire.Change
@@ -49,6 +51,7 @@ func (c *Client) Call(ctx context.Context, method string, p wire.Params) (wire.R
 		return wire.Result{}, fmt.Errorf("request: %w", err)
 	}
 	req.Header.Set("Content-Type", wire.ContentType)
+	authorize(req.Header, c.Token)
 	resp, err := c.http().Do(req)
 	if err != nil {
 		return wire.Result{}, fmt.Errorf("post %s: %w", method, err)
@@ -59,7 +62,7 @@ func (c *Client) Call(ctx context.Context, method string, p wire.Params) (wire.R
 		return wire.Result{}, fmt.Errorf("read %s: %w", method, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return wire.Result{}, fmt.Errorf("post %s: http %d", method, resp.StatusCode)
+		return wire.Result{}, statusErr("post "+method, resp.StatusCode, raw)
 	}
 	res, err := wire.DecodeResponse(raw)
 	if err != nil {
@@ -73,4 +76,27 @@ func (c *Client) http() *http.Client {
 		return c.HTTP
 	}
 	return http.DefaultClient
+}
+
+func authorize(h http.Header, token string) {
+	h.Set(wire.TokenHeader, wire.TokenScheme+" "+token)
+}
+
+func statusErr(op string, status int, body []byte) error {
+	if status == http.StatusUnauthorized {
+		if why := tokenWhy(body); why != "" {
+			return fmt.Errorf("%s: %s", op, why)
+		}
+	}
+	return fmt.Errorf("%s: http %d", op, status)
+}
+
+func tokenWhy(body []byte) string {
+	var msg struct {
+		Error wire.Error `json:"error"`
+	}
+	if json.Unmarshal(body, &msg) != nil || msg.Error.Message == "" {
+		return ""
+	}
+	return msg.Error.Message
 }

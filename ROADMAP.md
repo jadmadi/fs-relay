@@ -15,12 +15,12 @@
 - A listing's child directories are fetched together by `readdirs`. `readdir` stats each child once. An eviction of a name this mount just created, wrote, or changed leaves that name in place on this mount.
 - Large reads and writes travel on `GET /raw/<namespace>`, upgraded to a fixed-header stream the server splices. The size window is `32 × st_blksize` of the data directory, clamped, and the mount flag `-raw` defaults on.
 - A dropped `-post` stream keeps undelivered cache evictions, lock grants, and releases for 8s. A heartbeat every 2s marks the stream stalled after 6s of silence, and the mount joins again. The websocket server pings on that same interval. Both transports retry at once, then every 100ms, and a session up for 1s clears the wait.
+- A shared token. Omit `-token` and the server prints one. The mount sends the same value. A client id whose signature does not match that token is refused.
 
 ## Yet to be done
 
 1. The relay lock table, so two mounts exclude each other. One mount does not need it. A release already travels on the mount's pubsub, and a rejoin repeats one the client has not seen.
 2. Benchmarks against SMB or NFS, with and without FUSE.
-3. Client ids must be tamper-proof. At start the server picks a random key and returns each id as `<id>.<signature>`, an HMAC under that key, so a client cannot present an id the server did not issue.
 
 ## Tried and dismissed
 
@@ -38,7 +38,7 @@ MessagePack was the wire, and it was replaced by FlatBuffers. A JSON body that c
 - Blocking `setlkw` inside one plain request: a dropped connection could not rejoin the wait.
 - WAL for M3: it needs shared memory between processes, which the mount does not provide.
 - A generic `batch` method, including one with `$id.field` references. The mount already knows the inodes a listing will read, and one batch response would wait on its slowest call. `reads` and `readdirs` are the narrow forms that match a listing.
-- Hardlinks, xattrs, ACLs, devices, FUSE 2, Windows, macOS, auth, TLS.
+- Hardlinks, xattrs, ACLs, devices, FUSE 2, Windows, macOS, accounts, TLS.
 - `tee`: nothing fans file bytes out to more than one reader.
 - `vmsplice`: the Go garbage collector may reuse gifted pages, and the FUSE device copies them anyway.
 - `MSG_ZEROCOPY`: go-fuse reuses its request buffer when the handler returns.

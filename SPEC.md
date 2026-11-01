@@ -17,6 +17,16 @@ A third connection, described under Large transfers, carries only large reads an
 
 The path segment after `/fs/` is the namespace: `[A-Za-z0-9_-]+`, non-empty, at most 64 bytes. It selects the directory under `data/` and nothing else. There is no shard level, because there is one directory tree. Anything outside the grammar is refused before any file is touched.
 
+## Token
+
+Every connection except `GET /` carries one shared secret. The header is `Authorization: Bearer <token>`. The secret is at least 8 characters from `[A-Za-z0-9_-]`. Capitals are distinct. That alphabet needs no encoding in a header or a URL. The server does not write the secret into a response, a client id, or a URL.
+
+Omit `-token` and the server prints a secret on its standard error, then uses it. Pass `-token` and that value is the secret when it meets the rule. A value that is too short, or that uses another character, stops the process before it listens. `fs-relay-bind` takes the same flag and sends the secret. It does not invent one. An empty flag on the mount stops it with `pass -token`.
+
+A request with no secret is `401` and `{"error":{"code":401,"message":"missing token"}}`. A secret that is not the server's is `401` and `{"error":{"code":401,"message":"wrong token"}}`. `GET /` stays open: it is the welcome page and the health check.
+
+The server names a mount with a UUIDv7 and returns `<uuid>.<signature>`. The signature is HMAC-SHA256 of the uuid, keyed by the secret, written with the URL-safe base64 alphabet and no padding. A `join` that presents an id must present that whole string. The server signs the uuid again and accepts the id only when the signature matches. Anything else is `400`. A websocket mount is named the same way. The mount keeps the id and sends it back when it joins again.
+
 ## Clients
 
 A mount is one of two clients. Both speak the same envelope. They differ in how calls and events travel. The mount defaults to the websocket. `-post` selects the other. `-ws` is the same as the default. Passing both flags is an error.
@@ -37,7 +47,7 @@ sequenceDiagram
 **POST.** `-post` uses two directions on purpose.
 
 - Client to server: each call is its own `POST /fs/<namespace>`. The response to that POST is the result of that call, one envelope, with a `Content-Length`. A POST has no request id. The HTTP exchange is the correlation.
-- Server to client: at start the client sends `POST /fs/<namespace>` with method `join`. This is not a filesystem call. The response stays open for the life of the mount. Its headers are `Content-Type: application/x-flatbuffers` and `Transfer-Encoding: chunked`. The server does not write that transfer header itself: it sets no `Content-Length` and flushes after every event, and the HTTP server adds `Transfer-Encoding: chunked`. The body is one way, server to client. Each event is one chunk holding a little-endian uint32 length and then one envelope, not a text line. A length above the body limit closes the stream. The first event carries the client uuid. Later events are evictions or a lock release.
+- Server to client: at start the client sends `POST /fs/<namespace>` with method `join`. This is not a filesystem call. The response stays open for the life of the mount. Its headers are `Content-Type: application/x-flatbuffers` and `Transfer-Encoding: chunked`. The server does not write that transfer header itself: it sets no `Content-Length` and flushes after every event, and the HTTP server adds `Transfer-Encoding: chunked`. The body is one way, server to client. Each event is one chunk holding a little-endian uint32 length and then one envelope, not a text line. A length above the body limit closes the stream. The first event carries the signed client id. Later events are evictions or a lock release.
 
 Calls never travel on the chunked response, and events never travel as the response of a filesystem POST.
 
@@ -47,7 +57,7 @@ sequenceDiagram
     participant Server
     Mount->>Server: POST /fs/namespace join
     Note over Server,Mount: response stays open, Transfer-Encoding chunked
-    Server-->>Mount: chunk, client uuid
+    Server-->>Mount: chunk, signed client id
     Mount->>Server: POST /fs/namespace call
     Server-->>Mount: result of that POST
     Server-->>Mount: chunk, event
@@ -199,7 +209,7 @@ After that listing, the mount calls `reads` for the regular files in it that are
 
 A mount is one subscriber for its namespace. There is no per-file socket and no per-lock socket.
 
-- The server writes a heartbeat on the chunked `join` response every 2s. A mount that receives nothing for 6s treats the stream as stalled and joins again. The first try of an outage runs at once. Each try after that waits 100ms. A session that stays up for 1s clears that wait. The server keeps that mount's undelivered cache evictions, lock grants, and releases for 8s, then discards them. A rejoin inside the window receives them. A uuid the server has never seen is a new mount. Inodes still die with the server process.
+- The server writes a heartbeat on the chunked `join` response every 2s. A mount that receives nothing for 6s treats the stream as stalled and joins again. The first try of an outage runs at once. Each try after that waits 100ms. A session that stays up for 1s clears that wait. The server keeps that mount's undelivered cache evictions, lock grants, and releases for 8s, then discards them. A rejoin inside the window receives them. A signed id the server has not seen is a new mount. An id whose signature does not match the token is refused. Inodes still die with the server process.
 - A websocket client does not call `join`. The same events are envelopes on the call socket, with no call id. The websocket frame is the framing, so those events have no length prefix. The server sends a ping every 2s and the mount answers with a pong. The mount also sees the same 2s heartbeat. Six seconds of silence, or a dropped socket, fails the calls in flight and dials again. The mount stays up. The retry wait is the same as for `-post`.
 
 The server sends an eviction after a successful `create`, `mkdir`, `symlink`, `write`, `setattr`, `unlink`, or `rmdir`, after a `release` that carried file bytes, and after a rename it sends the old name and then the new name. A refused call sends nothing. The mount reads those events on a background loop, never on a FUSE handler, and calls `NotifyEntry` and `NotifyContent`. A name this mount itself just created, wrote, or changed is left in place: the saved file body is dropped and page cache is invalidated, and the directory listing is dropped, but the name stays so the next lookup is local. Another mount still drops the name. A missed eviction leaves cached file bytes stale until the kernel drops the pages. Names and attributes recover within the 1s timeout.
@@ -239,7 +249,7 @@ Against the baseline filesystem, the Go kvfs, and SMB or NFS with and without FU
 
 ## Out of scope
 
-Hardlinks (`ansible.tar` has none), extended attributes, ACLs, device nodes, FUSE 2, Windows, macOS, authentication, TLS, a durable inode map, WAL.
+Hardlinks (`ansible.tar` has none), extended attributes, ACLs, device nodes, FUSE 2, Windows, macOS, accounts, TLS, a durable inode map, WAL.
 
 ## Vocabulary
 

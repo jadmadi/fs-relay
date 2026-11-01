@@ -16,7 +16,7 @@ import (
 func TestJoinEvictAndRejoin(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
-	h := newHub()
+	h := newHub(testToken)
 	hnd, _ := handler(tree, h)
 	srv := httptest.NewServer(hnd)
 	t.Cleanup(srv.Close)
@@ -27,7 +27,7 @@ func TestJoinEvictAndRejoin(t *testing.T) {
 	b := dialJoin(t, httpClient, srv.URL, "")
 	defer b.cancel()
 
-	post := &client.Client{URL: srv.URL, NS: "demo", HTTP: httpClient}
+	post := &client.Client{URL: srv.URL, NS: "demo", Token: testToken, HTTP: httpClient}
 	if _, err := post.Call(context.Background(), wire.Mkdir, wire.Params{Inode: 1, Name: "sub", Mode: 0o755}); err != nil {
 		t.Fatal(err)
 	}
@@ -69,14 +69,14 @@ func TestJoinEvictAndRejoin(t *testing.T) {
 }
 
 func TestHeldEvictReplayed(t *testing.T) {
-	h := newHub()
-	m, err := h.attach("demo", "abc", false, func() {})
+	h := newHub(testToken)
+	m, err := h.attach("demo", freshID(t), false, func() {})
 	if err != nil {
 		t.Fatal(err)
 	}
 	h.detach("demo", m)
 	h.evict("demo", []wire.Change{{Parent: 1, Name: "gone"}})
-	back, err := h.attach("demo", "abc", false, func() {})
+	back, err := h.attach("demo", m.id, false, func() {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,15 +91,15 @@ func TestHeldEvictReplayed(t *testing.T) {
 }
 
 func TestHoldExpires(t *testing.T) {
-	h := newHub()
+	h := newHub(testToken)
 	h.holdFor = -time.Second
-	m, err := h.attach("demo", "abc", false, func() {})
+	m, err := h.attach("demo", freshID(t), false, func() {})
 	if err != nil {
 		t.Fatal(err)
 	}
 	h.evict("demo", []wire.Change{{Parent: 1, Name: "gone"}})
 	h.detach("demo", m)
-	back, err := h.attach("demo", "abc", false, func() {})
+	back, err := h.attach("demo", m.id, false, func() {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,16 +113,16 @@ func TestHoldExpires(t *testing.T) {
 func TestWSEvict(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
-	hnd, _ := handler(tree, newHub())
+	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
 	t.Cleanup(srv.Close)
 	ctx := context.Background()
-	one, err := client.Dial(ctx, srv.URL, "demo")
+	one, err := client.Dial(ctx, srv.URL, "demo", testToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = one.Close() })
-	two, err := client.Dial(ctx, srv.URL, "demo")
+	two, err := client.Dial(ctx, srv.URL, "demo", testToken)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,6 +156,7 @@ func dialJoin(t *testing.T, httpClient *http.Client, base, id string) *joined {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", wire.ContentType)
+	req.Header.Set(wire.TokenHeader, wire.TokenScheme+" "+testToken)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		t.Fatal(err)

@@ -85,6 +85,27 @@ func TestCallID(t *testing.T) {
 	}
 }
 
+func TestCheckToken(t *testing.T) {
+	ok := []string{"testtoken", "long-enough", "Ab_12-cd", "AAAAAAAA"}
+	short := []string{"", "short", "1234567"}
+	bad := []string{"bad token", "bad+token", "bad/token", "has=equal", "has.dot.."}
+	for _, token := range ok {
+		if err := CheckToken(token); err != nil {
+			t.Fatalf("%q: %v", token, err)
+		}
+	}
+	for _, token := range short {
+		if !errors.Is(CheckToken(token), ErrTokenShort) {
+			t.Fatalf("%q: %v", token, CheckToken(token))
+		}
+	}
+	for _, token := range bad {
+		if !errors.Is(CheckToken(token), ErrTokenChars) {
+			t.Fatalf("%q: %v", token, CheckToken(token))
+		}
+	}
+}
+
 func TestCheckNS(t *testing.T) {
 	ok := []string{"a", "mydir", "A_b-1"}
 	bad := []string{"", ".", "..", "a/b", "has space", string(make([]byte, MaxNamespace+1))}
