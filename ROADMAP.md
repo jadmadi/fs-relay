@@ -14,14 +14,13 @@
 - The mount holds contiguous writes and sends them at 1 MiB, at a gap, or on fsync, release, read, setattr, or `copyfilerange`. `release` carries the bytes still held and closes the handle. `flush` does not send.
 - A listing's child directories are fetched together by `readdirs`. `readdir` stats each child once. An eviction of a name this mount just created, wrote, or changed leaves that name in place on this mount.
 - Large reads and writes travel on `GET /raw/<namespace>`, upgraded to a fixed-header stream the server splices. The size window is `32 × st_blksize` of the data directory, clamped, and the mount flag `-raw` defaults on.
+- A dropped `-post` stream keeps undelivered cache evictions, lock grants, and releases for 8s. A heartbeat every 2s marks the stream stalled after 6s of silence, and the mount joins again. The websocket server pings on that same interval. Both transports retry at once, then every 100ms, and a session up for 1s clears the wait.
 
 ## Yet to be done
 
 1. The relay lock table, so two mounts exclude each other. One mount does not need it. A release already travels on the mount's pubsub, and a rejoin repeats one the client has not seen.
 2. Benchmarks against SMB or NFS, with and without FUSE.
 3. Client ids must be tamper-proof. At start the server picks a random key and returns each id as `<id>.<signature>`, an HMAC under that key, so a client cannot present an id the server did not issue.
-4. When a `-post` chunked stream drops, hold undelivered events for a few seconds before discarding them. That covers cache evictions, lock grants, and releases, so a rejoin in that window still receives them.
-5. The server sends a periodic heartbeat so a quiet connection is not left to go stale. On `-post`, a mount that misses several intervals treats the chunked stream as stalled and joins again. On the websocket, the server sends a ping and the mount answers with a pong.
 
 ## Tried and dismissed
 

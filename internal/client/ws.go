@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"fs-relay/internal/wire"
 
@@ -16,19 +17,19 @@ import (
 
 // Socket is one websocket to /ws/<namespace>. Calls overlap; the id matches each reply.
 type Socket struct {
-	conn    *websocket.Conn
-	url     string
-	ns      string
-	closed  atomic.Bool
-	mu      sync.Mutex
-	wmu     sync.Mutex
-	once    sync.Once
-	next    uint64
-	waiters map[uint64]chan wire.Reply
-	evicts  chan wire.Change
-	done    chan struct{}
-	stopped chan struct{}
-	err     error
+	conn     *websocket.Conn
+	endpoint string
+	url      string
+	ns       string
+	closed   atomic.Bool
+	mu       sync.Mutex
+	wmu      sync.Mutex
+	next     uint64
+	waiters  map[uint64]chan wire.Reply
+	evicts   chan wire.Change
+	dead     chan struct{}
+	stopped  chan struct{}
+	err      error
 }
 
 // Dial opens the websocket. Close stops the reader.
@@ -40,23 +41,21 @@ func Dial(ctx context.Context, baseURL, ns string) (*Socket, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn, _, err := websocket.Dial(ctx, endpoint, &websocket.DialOptions{
-		CompressionMode: websocket.CompressionDisabled,
-	})
+	conn, err := dialConn(ctx, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("dial %s: %w", endpoint, err)
 	}
-	conn.SetReadLimit(wire.MaxBody)
 	s := &Socket{
-		conn:    conn,
-		url:     baseURL,
-		ns:      ns,
-		waiters: map[uint64]chan wire.Reply{},
-		evicts:  make(chan wire.Change, 32),
-		done:    make(chan struct{}),
-		stopped: make(chan struct{}),
+		conn:     conn,
+		endpoint: endpoint,
+		url:      baseURL,
+		ns:       ns,
+		waiters:  map[uint64]chan wire.Reply{},
+		evicts:   make(chan wire.Change, 32),
+		dead:     make(chan struct{}),
+		stopped:  make(chan struct{}),
 	}
-	go s.read()
+	go s.serve()
 	return s, nil
 }
 
@@ -68,7 +67,12 @@ func (s *Socket) Events() <-chan wire.Change {
 // Close closes the socket and waits for the reader to finish.
 func (s *Socket) Close() error {
 	s.closed.Store(true)
-	err := s.conn.Close(websocket.StatusNormalClosure, "")
+	s.kill()
+	conn := s.takeConn()
+	var err error
+	if conn != nil {
+		err = conn.Close(websocket.StatusNormalClosure, "")
+	}
 	<-s.stopped
 	return err
 }
@@ -78,7 +82,7 @@ func (s *Socket) Call(ctx context.Context, method string, p wire.Params) (wire.R
 	if p.Namespace == "" {
 		p.Namespace = s.ns
 	}
-	id, ch, err := s.begin()
+	id, ch, dead, err := s.begin()
 	if err != nil {
 		return wire.Result{}, err
 	}
@@ -90,7 +94,7 @@ func (s *Socket) Call(ctx context.Context, method string, p wire.Params) (wire.R
 	if err := s.send(ctx, body); err != nil {
 		return wire.Result{}, fmt.Errorf("ws %s: %w", method, err)
 	}
-	return s.wait(ctx, method, ch)
+	return s.wait(ctx, method, ch, dead)
 }
 
 func wsEndpoint(base, ns string) (string, error) {
@@ -110,16 +114,16 @@ func wsEndpoint(base, ns string) (string, error) {
 	return u.String(), nil
 }
 
-func (s *Socket) begin() (uint64, <-chan wire.Reply, error) {
+func (s *Socket) begin() (uint64, <-chan wire.Reply, <-chan struct{}, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.err != nil {
-		return 0, nil, s.err
+		return 0, nil, nil, s.err
 	}
 	s.next++
 	ch := make(chan wire.Reply, 2)
 	s.waiters[s.next] = ch
-	return s.next, ch, nil
+	return s.next, ch, s.dead, nil
 }
 
 func (s *Socket) end(id uint64) {
@@ -129,18 +133,22 @@ func (s *Socket) end(id uint64) {
 }
 
 func (s *Socket) send(ctx context.Context, b []byte) error {
+	conn := s.current()
+	if conn == nil {
+		return errors.New("connection lost")
+	}
 	s.wmu.Lock()
 	defer s.wmu.Unlock()
-	return s.conn.Write(ctx, websocket.MessageBinary, b)
+	return conn.Write(ctx, websocket.MessageBinary, b)
 }
 
-func (s *Socket) wait(ctx context.Context, method string, ch <-chan wire.Reply) (wire.Result, error) {
+func (s *Socket) wait(ctx context.Context, method string, ch <-chan wire.Reply, dead <-chan struct{}) (wire.Result, error) {
 	for {
 		select {
 		case <-ctx.Done():
 			return wire.Result{}, ctx.Err()
-		case <-s.done:
-			return wire.Result{}, fmt.Errorf("ws %s: %w", method, s.cause())
+		case <-dead:
+			return wire.Result{}, fmt.Errorf("ws %s: connection lost", method)
 		case rp := <-ch:
 			res, err, more := finish(rp)
 			if more {
@@ -167,43 +175,94 @@ func finish(rp wire.Reply) (wire.Result, error, bool) {
 	return wire.Result{}, errors.New("empty reply"), false
 }
 
-func (s *Socket) read() {
+func (s *Socket) serve() {
 	defer close(s.stopped)
-	err := s.loop()
-	if err != nil && !s.closed.Load() {
+	drops := 0
+	again := false
+	for !s.closed.Load() {
+		if drops > 0 && !waitRejoin(context.Background()) {
+			return
+		}
+		if s.closed.Load() {
+			return
+		}
+		if s.current() == nil {
+			conn, err := dialConn(context.Background(), s.endpoint)
+			if err != nil {
+				drops = nextDrops(drops, false, 0)
+				continue
+			}
+			s.setConn(conn)
+		}
+		started := time.Now()
+		established, err := s.loop(again)
+		s.dropConn()
+		if s.closed.Load() {
+			return
+		}
 		logLost(s.url)
+		s.kill()
+		again = true
+		drops = nextDrops(drops, established, time.Since(started))
+		if err == nil {
+			return
+		}
 	}
-	s.fail(err)
 }
 
-func (s *Socket) loop() error {
+func dialConn(ctx context.Context, endpoint string) (*websocket.Conn, error) {
+	conn, _, err := websocket.Dial(ctx, endpoint, &websocket.DialOptions{
+		CompressionMode: websocket.CompressionDisabled,
+	})
+	if err != nil {
+		return nil, err
+	}
+	conn.SetReadLimit(wire.MaxBody)
+	return conn, nil
+}
+
+func (s *Socket) loop(again bool) (bool, error) {
 	named := false
 	for {
-		_, data, err := s.conn.Read(context.Background())
+		conn := s.current()
+		if conn == nil {
+			return named, errors.New("connection lost")
+		}
+		readCtx, cancel := context.WithTimeout(context.Background(), wire.Stall)
+		_, data, err := conn.Read(readCtx)
+		cancel()
 		if err != nil {
-			return err
+			return named, err
 		}
 		rp, err := wire.DecodeReply(data)
 		if err != nil {
-			return err
+			return named, err
 		}
 		if id, ok := sessionID(rp); ok {
 			if !named {
 				named = true
-				logConnected(s.url, id)
+				noteSession(s.url, id, again)
 			}
 			continue
 		}
 		if rp.Evict != nil {
 			select {
 			case s.evicts <- *rp.Evict:
-			case <-s.done:
-				return err
+			case <-s.dead:
+				return named, errors.New("connection lost")
 			}
 			continue
 		}
 		s.deliver(rp)
 	}
+}
+
+func noteSession(url, id string, again bool) {
+	if again {
+		logReconnected(url, id)
+		return
+	}
+	logConnected(url, id)
 }
 
 func sessionID(rp wire.Reply) (string, bool) {
@@ -229,17 +288,40 @@ func (s *Socket) deliver(rp wire.Reply) {
 	}
 }
 
-func (s *Socket) fail(err error) {
-	s.once.Do(func() {
-		s.mu.Lock()
-		s.err = err
-		s.mu.Unlock()
-		close(s.done)
-	})
-}
-
-func (s *Socket) cause() error {
+func (s *Socket) current() *websocket.Conn {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.err
+	return s.conn
+}
+
+func (s *Socket) setConn(conn *websocket.Conn) {
+	s.mu.Lock()
+	s.conn = conn
+	s.mu.Unlock()
+}
+
+func (s *Socket) takeConn() *websocket.Conn {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	conn := s.conn
+	s.conn = nil
+	return conn
+}
+
+func (s *Socket) dropConn() {
+	conn := s.takeConn()
+	if conn != nil {
+		_ = conn.Close(websocket.StatusGoingAway, "")
+	}
+}
+
+func (s *Socket) kill() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	select {
+	case <-s.dead:
+	default:
+		close(s.dead)
+	}
+	s.dead = make(chan struct{})
 }

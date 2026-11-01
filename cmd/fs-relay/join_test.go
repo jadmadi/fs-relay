@@ -68,6 +68,48 @@ func TestJoinEvictAndRejoin(t *testing.T) {
 	}
 }
 
+func TestHeldEvictReplayed(t *testing.T) {
+	h := newHub()
+	m, err := h.attach("demo", "abc", false, func() {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.detach("demo", m)
+	h.evict("demo", []wire.Change{{Parent: 1, Name: "gone"}})
+	back, err := h.attach("demo", "abc", false, func() {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case p := <-back.ch:
+		if p.Evict == nil || p.Evict.Name != "gone" {
+			t.Fatalf("replay %+v", p)
+		}
+	default:
+		t.Fatal("evict was not held")
+	}
+}
+
+func TestHoldExpires(t *testing.T) {
+	h := newHub()
+	h.holdFor = -time.Second
+	m, err := h.attach("demo", "abc", false, func() {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.evict("demo", []wire.Change{{Parent: 1, Name: "gone"}})
+	h.detach("demo", m)
+	back, err := h.attach("demo", "abc", false, func() {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case p := <-back.ch:
+		t.Fatalf("expired event %+v", p)
+	default:
+	}
+}
+
 func TestWSEvict(t *testing.T) {
 	tree := local.New(t.TempDir())
 	t.Cleanup(func() { _ = tree.Close() })
@@ -141,6 +183,9 @@ func dialJoin(t *testing.T, httpClient *http.Client, base, id string) *joined {
 			p, err := wire.DecodePub(frame)
 			if err != nil {
 				return
+			}
+			if p.Evict == nil && p.Release == "" && p.Client == "" {
+				continue
 			}
 			lines <- p
 		}

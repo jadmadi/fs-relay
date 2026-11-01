@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"syscall"
+	"time"
 
 	"fs-relay/internal/local"
 	"fs-relay/internal/wire"
@@ -53,7 +54,27 @@ func runWS(h *hub, ctx context.Context, tree *local.Tree, conn *websocket.Conn, 
 		}
 		return wr.send(ctx, b)
 	})
+	go ping(ctx, conn)
 	readCalls(ctx, h, tree, conn, ns, wr, &wg)
+}
+
+func ping(ctx context.Context, conn *websocket.Conn) {
+	tick := time.NewTicker(wire.Heartbeat)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			pctx, cancel := context.WithTimeout(ctx, wire.Heartbeat)
+			err := conn.Ping(pctx)
+			cancel()
+			if err != nil {
+				_ = conn.Close(websocket.StatusGoingAway, "")
+				return
+			}
+		}
+	}
 }
 
 func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Conn, ns string, wr *wsWriter, wg *sync.WaitGroup) {
@@ -133,7 +154,7 @@ func pushBytes(p wire.Pub) ([]byte, error) {
 	if p.Release != "" {
 		return wire.MarshalRelease(p.Release)
 	}
-	return nil, nil
+	return wire.MarshalPub(p)
 }
 
 func (w *wsWriter) send(ctx context.Context, b []byte) error {

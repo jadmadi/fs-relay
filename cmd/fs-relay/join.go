@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"fs-relay/internal/wire"
 )
@@ -39,10 +40,16 @@ func serveJoin(h *hub, ns string, w http.ResponseWriter, r *http.Request, client
 // event is written, so a stream that dies on this write is replayed on rejoin.
 func pump(ctx context.Context, h *hub, ns string, m *member, send func(wire.Pub) error) {
 	var sent string
+	tick := time.NewTicker(wire.Heartbeat)
+	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-tick.C:
+			if send(wire.Pub{}) != nil {
+				return
+			}
 		case p := <-m.ch:
 			if ctx.Err() != nil || send(p) != nil {
 				putBack(m, p)

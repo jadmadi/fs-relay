@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 )
 
 // ContentType is the only body type the server accepts.
@@ -21,6 +22,12 @@ const (
 	// MaxReads and MaxPrefetch bound one reads call: a window of small files.
 	MaxReads    = 32
 	MaxPrefetch = 64 << 10
+	// Heartbeat is how often a live stream is touched so a quiet peer is noticed.
+	Heartbeat = 2 * time.Second
+	// MissedHeartbeats is how many intervals a mount waits before the stream is stalled.
+	MissedHeartbeats = 3
+	// Stall is MissedHeartbeats intervals with nothing received.
+	Stall = Heartbeat * MissedHeartbeats
 )
 
 // Method names are the go-fuse methods, lowercased.

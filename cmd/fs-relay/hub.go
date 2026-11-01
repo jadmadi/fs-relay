@@ -2,21 +2,27 @@ package main
 
 import (
 	"sync"
+	"time"
 
 	"fs-relay/internal/wire"
 )
 
-const pubQueue = 64
+const (
+	pubQueue = 64
+	holdFor  = 8 * time.Second
+)
 
 // hub fans one namespace's events out to its join streams and websockets.
 type hub struct {
-	mu    sync.Mutex
-	rooms map[string]*room
+	mu      sync.Mutex
+	rooms   map[string]*room
+	holdFor time.Duration
 }
 
 type room struct {
 	live map[string]*member
 	owed map[string][]wire.Pub
+	hold map[string]time.Time
 }
 
 type member struct {
@@ -27,7 +33,7 @@ type member struct {
 }
 
 func newHub() *hub {
-	return &hub{rooms: map[string]*room{}}
+	return &hub{rooms: map[string]*room{}, holdFor: holdFor}
 }
 
 func (h *hub) attach(ns, id string, ws bool, cancel func()) (*member, error) {
@@ -52,6 +58,9 @@ func (h *hub) attach(ns, id string, ws bool, cancel func()) (*member, error) {
 }
 
 func (h *hub) replay(r *room, m *member) {
+	if h.holding(r, m.id) {
+		delete(r.hold, m.id)
+	}
 	owed := r.owed[m.id]
 	var rest []wire.Pub
 	for _, p := range owed {
@@ -80,19 +89,49 @@ func (h *hub) detach(ns string, m *member) {
 		return
 	}
 	h.keepOwed(r, m)
+	h.arm(ns, m.id)
 }
 
 func (h *hub) keepOwed(r *room, m *member) {
+	if r.hold == nil {
+		r.hold = map[string]time.Time{}
+	}
+	r.hold[m.id] = time.Now().Add(h.holdFor)
 	for {
 		select {
 		case p := <-m.ch:
-			if p.Release != "" && !owedHas(r.owed[m.id], p.Release) {
-				r.owed[m.id] = append(r.owed[m.id], p)
-			}
+			h.remember(r, m.id, p)
 		default:
 			return
 		}
 	}
+}
+
+func (h *hub) remember(r *room, id string, p wire.Pub) {
+	if p.Evict == nil && p.Release == "" {
+		return
+	}
+	if p.Release != "" && owedHas(r.owed[id], p.Release) {
+		return
+	}
+	r.owed[id] = append(r.owed[id], p)
+}
+
+func (h *hub) arm(ns, id string) {
+	if h.holdFor <= 0 {
+		return
+	}
+	time.AfterFunc(h.holdFor, func() { h.dropHold(ns, id) })
+}
+
+func (h *hub) dropHold(ns, id string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	r := h.rooms[ns]
+	if r == nil || r.live[id] != nil {
+		return
+	}
+	h.holding(r, id)
 }
 
 func (h *hub) evict(ns string, changes []wire.Change) {
@@ -104,7 +143,9 @@ func (h *hub) evict(ns string, changes []wire.Change) {
 	}
 	for _, c := range changes {
 		c := c
-		h.fan(r, wire.Pub{Evict: &c}, false)
+		p := wire.Pub{Evict: &c}
+		h.fan(r, p, false)
+		h.holdAbsent(r, p)
 	}
 }
 
@@ -115,9 +156,12 @@ func (h *hub) oweRelease(ns, client, id string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	r := h.room(ns)
+	m := r.live[client]
+	if m == nil && !h.holding(r, client) {
+		return
+	}
 	p := wire.Pub{Release: id}
 	r.owed[client] = append(r.owed[client], p)
-	m := r.live[client]
 	if m == nil {
 		return
 	}
@@ -172,16 +216,47 @@ func (h *hub) give(r *room, m *member, p wire.Pub, owe bool) {
 		return
 	default:
 	}
+	if !m.ws {
+		h.remember(r, m.id, p)
+		m.cancel()
+		return
+	}
 	if owe || p.Release != "" {
 		r.owed[m.id] = append(r.owed[m.id], p)
 	}
 	m.cancel()
 }
 
+func (h *hub) holdAbsent(r *room, p wire.Pub) {
+	for id := range r.hold {
+		if r.live[id] != nil || !h.holding(r, id) {
+			continue
+		}
+		h.remember(r, id, p)
+	}
+}
+
+func (h *hub) holding(r *room, id string) bool {
+	until, ok := r.hold[id]
+	if !ok {
+		return false
+	}
+	if time.Now().Before(until) {
+		return true
+	}
+	delete(r.hold, id)
+	delete(r.owed, id)
+	return false
+}
+
 func (h *hub) room(ns string) *room {
 	r := h.rooms[ns]
 	if r == nil {
-		r = &room{live: map[string]*member{}, owed: map[string][]wire.Pub{}}
+		r = &room{
+			live: map[string]*member{},
+			owed: map[string][]wire.Pub{},
+			hold: map[string]time.Time{},
+		}
 		h.rooms[ns] = r
 	}
 	return r

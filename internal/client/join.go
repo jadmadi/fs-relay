@@ -13,24 +13,22 @@ import (
 	"fs-relay/internal/wire"
 )
 
-const rejoinWait = 100 * time.Millisecond
+const (
+	rejoinWait  = 100 * time.Millisecond
+	rejoinReset = time.Second
+)
 
-// Listen holds the join stream until ctx is cancelled. The first drop rejoins
-// at once. A further drop waits, then rejoins with the same client uuid.
+// Listen holds the join stream until ctx is cancelled. The first try of an
+// outage runs at once. A further try waits. A session that stays up clears that wait.
 func (c *Client) Listen(ctx context.Context) {
 	c.ensure()
 	var id string
 	drops := 0
 	for ctx.Err() == nil {
-		if drops > 1 {
-			timer := time.NewTimer(rejoinWait)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return
-			case <-timer.C:
-			}
+		if drops > 0 && !waitRejoin(ctx) {
+			return
 		}
+		started := time.Now()
 		next, up, err := c.joinOnce(ctx, id)
 		if next != "" {
 			id = next
@@ -38,13 +36,29 @@ func (c *Client) Listen(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		if err != nil {
-			if up {
-				logLost(c.URL)
-			}
-			drops++
+		if err != nil && up {
+			logLost(c.URL)
 		}
+		drops = nextDrops(drops, up, time.Since(started))
 	}
+}
+
+func waitRejoin(ctx context.Context) bool {
+	timer := time.NewTimer(rejoinWait)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+func nextDrops(drops int, established bool, alive time.Duration) int {
+	if established && alive >= rejoinReset {
+		return 0
+	}
+	return drops + 1
 }
 
 func (c *Client) joinOnce(ctx context.Context, id string) (string, bool, error) {
@@ -69,49 +83,76 @@ func (c *Client) joinOnce(ctx context.Context, id string) (string, bool, error) 
 	return c.readJoin(ctx, resp.Body, id)
 }
 
+type joinFrame struct {
+	line wire.Pub
+	err  error
+}
+
 func (c *Client) readJoin(ctx context.Context, body io.Reader, id string) (string, bool, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	frames := make(chan joinFrame, 1)
+	go readFrames(ctx, body, frames)
+	stall := time.NewTimer(wire.Stall)
+	defer stall.Stop()
 	rejoin := id != ""
 	up := false
 	for {
-		var evict *wire.Change
-		var err error
-		id, up, evict, err = c.nextEvent(body, id, up, rejoin)
-		if err != nil {
-			return id, up, err
-		}
-		if evict == nil {
-			continue
-		}
 		select {
 		case <-ctx.Done():
 			return id, up, ctx.Err()
-		case c.evicts <- *evict:
+		case <-stall.C:
+			return id, up, fmt.Errorf("join: stalled")
+		case fr := <-frames:
+			if fr.err != nil {
+				return id, up, joinErr(fr.err)
+			}
+			stall.Reset(wire.Stall)
+			id, up = c.saw(fr.line, id, up, rejoin)
+			if fr.line.Evict == nil {
+				continue
+			}
+			select {
+			case <-ctx.Done():
+				return id, up, ctx.Err()
+			case c.evicts <- *fr.line.Evict:
+			}
 		}
 	}
 }
 
-func (c *Client) nextEvent(body io.Reader, id string, up, rejoin bool) (string, bool, *wire.Change, error) {
-	frame, err := wire.ReadFrame(body)
-	if err != nil {
-		return id, up, nil, joinErr(err)
+func readFrames(ctx context.Context, body io.Reader, out chan<- joinFrame) {
+	for {
+		frame, err := wire.ReadFrame(body)
+		got := joinFrame{err: err}
+		if err == nil {
+			got.line, got.err = wire.DecodePub(frame)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case out <- got:
+		}
+		if got.err != nil {
+			return
+		}
 	}
-	line, err := wire.DecodePub(frame)
-	if err != nil {
-		return id, up, nil, err
-	}
+}
+
+func (c *Client) saw(line wire.Pub, id string, up, rejoin bool) (string, bool) {
 	if line.Client == "" {
-		return id, up, line.Evict, nil
+		return id, up
 	}
 	id = line.Client
 	if up {
-		return id, true, line.Evict, nil
+		return id, true
 	}
 	if rejoin {
 		logReconnected(c.URL, id)
-		return id, true, line.Evict, nil
+		return id, true
 	}
 	logConnected(c.URL, id)
-	return id, true, line.Evict, nil
+	return id, true
 }
 
 func joinErr(err error) error {
