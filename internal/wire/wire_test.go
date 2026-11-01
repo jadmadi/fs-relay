@@ -157,4 +157,15 @@ func TestClientAndReleaseRoundTrip(t *testing.T) {
 	if pub.Release != "lock-1" {
 		t.Fatalf("release %q", pub.Release)
 	}
+	hello, err := MarshalPub(Pub{Client: "01a18f33-1f73-7000-b869-6772b604713a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rp, err := DecodeReply(hello)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rp.Client != "01a18f33-1f73-7000-b869-6772b604713a" || rp.ID != 0 {
+		t.Fatalf("hello %+v", rp)
+	}
 }

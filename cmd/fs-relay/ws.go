@@ -39,11 +39,13 @@ func runWS(h *hub, ctx context.Context, tree *local.Tree, conn *websocket.Conn, 
 		return
 	}
 	defer h.detach(ns, m)
+	wr := &wsWriter{conn: conn}
+	hello, err := wire.MarshalPub(wire.Pub{Client: m.id})
+	if err != nil || wr.send(ctx, hello) != nil {
+		return
+	}
 	var wg sync.WaitGroup
 	defer wg.Wait()
-	var mu sync.Mutex
-	lanes := map[uint64]struct{}{}
-	wr := &wsWriter{conn: conn}
 	go pump(ctx, h, ns, m, func(p wire.Pub) error {
 		b, err := pushBytes(p)
 		if err != nil || b == nil {
@@ -51,6 +53,12 @@ func runWS(h *hub, ctx context.Context, tree *local.Tree, conn *websocket.Conn, 
 		}
 		return wr.send(ctx, b)
 	})
+	readCalls(ctx, h, tree, conn, ns, wr, &wg)
+}
+
+func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Conn, ns string, wr *wsWriter, wg *sync.WaitGroup) {
+	var mu sync.Mutex
+	lanes := map[uint64]struct{}{}
 	for {
 		req, ok := readWS(ctx, conn)
 		if !ok || req.Params.Namespace != ns || !claim(lanes, &mu, req.ID) {

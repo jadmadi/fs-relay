@@ -367,7 +367,7 @@ func decodeFBReply(buf []byte) (Reply, error) {
 	if err != nil {
 		return Reply{}, err
 	}
-	rp := Reply{ID: env.Id(), Fault: string(env.Fault()), Pending: string(env.Pending()), Release: string(env.Release())}
+	rp := Reply{ID: env.Id(), Client: string(env.Client()), Fault: string(env.Fault()), Pending: string(env.Pending()), Release: string(env.Release())}
 	if res := env.Result(new(FbResult)); res != nil {
 		got := resultFrom(res)
 		rp.Result = &got

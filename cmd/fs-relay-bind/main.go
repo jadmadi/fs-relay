@@ -48,7 +48,7 @@ func run() error {
 	mode := "websocket"
 	if *post {
 		open = openHTTP
-		mode = "post"
+		mode = "HTTP POST"
 	}
 	c, events, stop, err := open(*url, *ns)
 	if err != nil {
@@ -65,7 +65,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)
 	}
-	log.Printf("fs-relay-bind mounted on %s (ns=%s url=%s %s)", flag.Arg(0), *ns, *url, mode)
+	log.Printf("fs-relay-bind: mounted on %s, namespace %s, %s, %s", flag.Arg(0), *ns, mode, *url)
 	go unmountOnSignal(server)
 	server.Wait()
 	return nil
@@ -77,7 +77,7 @@ func attachRaw(root *node, url, ns string, on bool) func() {
 	}
 	raw, err := client.DialRaw(context.Background(), url, ns)
 	if err != nil {
-		log.Printf("large transfers stay on the main connection: %v", err)
+		log.Printf("fs-relay-bind: large transfers remain on the main connection: %v", err)
 		return func() {}
 	}
 	root.r = raw

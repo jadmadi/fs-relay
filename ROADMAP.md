@@ -19,6 +19,9 @@
 
 1. The relay lock table, so two mounts exclude each other. One mount does not need it. A release already travels on the mount's pubsub, and a rejoin repeats one the client has not seen.
 2. Benchmarks against SMB or NFS, with and without FUSE.
+3. Client ids must be tamper-proof. At start the server picks a random key and returns each id as `<id>.<signature>`, an HMAC under that key, so a client cannot present an id the server did not issue.
+4. When a `-post` chunked stream drops, hold undelivered events for a few seconds before discarding them. That covers cache evictions, lock grants, and releases, so a rejoin in that window still receives them.
+5. The server sends a periodic heartbeat so a quiet connection is not left to go stale. On `-post`, a mount that misses several intervals treats the chunked stream as stalled and joins again. On the websocket, the server sends a ping and the mount answers with a pong.
 
 ## Tried and dismissed
 

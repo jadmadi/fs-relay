@@ -264,8 +264,10 @@ func DecodeResponse(b []byte) (Result, error) {
 
 // Reply is one websocket message for a call id.
 // A pending ticket is not the result: the same id is answered again when the call finishes.
+// Client is set on the first message, which has no call id.
 type Reply struct {
 	ID      uint64
+	Client  string
 	Result  *Result
 	Err     *Error
 	Fault   string

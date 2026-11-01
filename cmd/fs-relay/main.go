@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,15 +29,19 @@ func run() error {
 
 	tree := local.New(*data)
 	defer tree.Close()
+	ln, err := net.Listen("tcp", *listen)
+	if err != nil {
+		return fmt.Errorf("listen %s: %w", *listen, err)
+	}
+	log.Printf("fs-relay: listening on %s", listenURL(ln.Addr(), defaultRouteIP))
 	h, raw := handler(tree, newHub())
 	srv := &http.Server{
-		Addr:              *listen,
 		Handler:           h,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	srv.RegisterOnShutdown(raw.closeAll)
 	errc := make(chan error, 1)
-	go func() { errc <- srv.ListenAndServe() }()
+	go func() { errc <- srv.Serve(ln) }()
 
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)

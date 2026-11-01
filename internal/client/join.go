@@ -31,7 +31,7 @@ func (c *Client) Listen(ctx context.Context) {
 			case <-timer.C:
 			}
 		}
-		next, err := c.joinOnce(ctx, id)
+		next, up, err := c.joinOnce(ctx, id)
 		if next != "" {
 			id = next
 		}
@@ -39,55 +39,79 @@ func (c *Client) Listen(ctx context.Context) {
 			return
 		}
 		if err != nil {
+			if up {
+				logLost(c.URL)
+			}
 			drops++
 		}
 	}
 }
 
-func (c *Client) joinOnce(ctx context.Context, id string) (string, error) {
+func (c *Client) joinOnce(ctx context.Context, id string) (string, bool, error) {
 	body, err := wire.MarshalRequest(wire.Join, wire.Params{Namespace: c.NS, Client: id})
 	if err != nil {
-		return id, err
+		return id, false, err
 	}
 	endpoint := strings.TrimRight(c.URL, "/") + "/fs/" + url.PathEscape(c.NS)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return id, err
+		return id, false, err
 	}
 	req.Header.Set("Content-Type", wire.ContentType)
 	resp, err := c.http().Do(req)
 	if err != nil {
-		return id, fmt.Errorf("join: %w", err)
+		return id, false, fmt.Errorf("join: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return id, fmt.Errorf("join: http %d", resp.StatusCode)
+		return id, false, fmt.Errorf("join: http %d", resp.StatusCode)
 	}
 	return c.readJoin(ctx, resp.Body, id)
 }
 
-func (c *Client) readJoin(ctx context.Context, body io.Reader, id string) (string, error) {
+func (c *Client) readJoin(ctx context.Context, body io.Reader, id string) (string, bool, error) {
+	rejoin := id != ""
+	up := false
 	for {
-		frame, err := wire.ReadFrame(body)
+		var evict *wire.Change
+		var err error
+		id, up, evict, err = c.nextEvent(body, id, up, rejoin)
 		if err != nil {
-			return id, joinErr(err)
+			return id, up, err
 		}
-		line, err := wire.DecodePub(frame)
-		if err != nil {
-			return id, err
-		}
-		if line.Client != "" {
-			id = line.Client
-		}
-		if line.Evict == nil {
+		if evict == nil {
 			continue
 		}
 		select {
 		case <-ctx.Done():
-			return id, ctx.Err()
-		case c.evicts <- *line.Evict:
+			return id, up, ctx.Err()
+		case c.evicts <- *evict:
 		}
 	}
+}
+
+func (c *Client) nextEvent(body io.Reader, id string, up, rejoin bool) (string, bool, *wire.Change, error) {
+	frame, err := wire.ReadFrame(body)
+	if err != nil {
+		return id, up, nil, joinErr(err)
+	}
+	line, err := wire.DecodePub(frame)
+	if err != nil {
+		return id, up, nil, err
+	}
+	if line.Client == "" {
+		return id, up, line.Evict, nil
+	}
+	id = line.Client
+	if up {
+		return id, true, line.Evict, nil
+	}
+	if rejoin {
+		logReconnected(c.URL, id)
+		return id, true, line.Evict, nil
+	}
+	logConnected(c.URL, id)
+	return id, true, line.Evict, nil
 }
 
 func joinErr(err error) error {

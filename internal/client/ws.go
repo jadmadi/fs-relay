@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"fs-relay/internal/wire"
 
@@ -16,7 +17,9 @@ import (
 // Socket is one websocket to /ws/<namespace>. Calls overlap; the id matches each reply.
 type Socket struct {
 	conn    *websocket.Conn
+	url     string
 	ns      string
+	closed  atomic.Bool
 	mu      sync.Mutex
 	wmu     sync.Mutex
 	once    sync.Once
@@ -46,6 +49,7 @@ func Dial(ctx context.Context, baseURL, ns string) (*Socket, error) {
 	conn.SetReadLimit(wire.MaxBody)
 	s := &Socket{
 		conn:    conn,
+		url:     baseURL,
 		ns:      ns,
 		waiters: map[uint64]chan wire.Reply{},
 		evicts:  make(chan wire.Change, 32),
@@ -63,6 +67,7 @@ func (s *Socket) Events() <-chan wire.Change {
 
 // Close closes the socket and waits for the reader to finish.
 func (s *Socket) Close() error {
+	s.closed.Store(true)
 	err := s.conn.Close(websocket.StatusNormalClosure, "")
 	<-s.stopped
 	return err
@@ -164,10 +169,15 @@ func finish(rp wire.Reply) (wire.Result, error, bool) {
 
 func (s *Socket) read() {
 	defer close(s.stopped)
-	s.fail(s.loop())
+	err := s.loop()
+	if err != nil && !s.closed.Load() {
+		logLost(s.url)
+	}
+	s.fail(err)
 }
 
 func (s *Socket) loop() error {
+	named := false
 	for {
 		_, data, err := s.conn.Read(context.Background())
 		if err != nil {
@@ -176,6 +186,13 @@ func (s *Socket) loop() error {
 		rp, err := wire.DecodeReply(data)
 		if err != nil {
 			return err
+		}
+		if id, ok := sessionID(rp); ok {
+			if !named {
+				named = true
+				logConnected(s.url, id)
+			}
+			continue
 		}
 		if rp.Evict != nil {
 			select {
@@ -187,6 +204,16 @@ func (s *Socket) loop() error {
 		}
 		s.deliver(rp)
 	}
+}
+
+func sessionID(rp wire.Reply) (string, bool) {
+	if rp.Client == "" || rp.ID != 0 || rp.Evict != nil || rp.Result != nil || rp.Err != nil {
+		return "", false
+	}
+	if rp.Fault != "" || rp.Pending != "" || rp.Release != "" {
+		return "", false
+	}
+	return rp.Client, true
 }
 
 func (s *Socket) deliver(rp wire.Reply) {
