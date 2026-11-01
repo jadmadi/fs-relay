@@ -1,8 +1,18 @@
 # fs-relay
 
-Share a directory over HTTP and mount it like a local filesystem.
+Share a directory over HTTP and mount it to as many machines as you like, treating it like a local filesystem on remote machines.
 
-The server runs on the machine that holds the files. Mount it from as many hosts as you need, at the same time. Each mount host needs fuse3 (`fusermount3`).
+- It's ~10x faster than the alternatives.
+- It's written in `golang`, has no runtime dependencies except fuse v3 (fusermount3).
+- Runs as HTTP service on any port.
+- No special privileges. It needs no root, and it skips the exposure of root-run NFS or SMB and of firewall rules that are hard to lock down.
+
+Can be used for:
+
+- shared folders (eg. heavily used by content creators and media producers as an alternative to SMB/Samba)
+- shared code space by coding agents
+- decoupling **Data engine** from **SQL execution engine**, as in our [DuckDB Parquet benchmark](Benchmark.md)
+
 
 ## What you get
 
@@ -14,7 +24,7 @@ The server runs on the machine that holds the files. Mount it from as many hosts
 
 ## How it compares
 
-On each filesystem we unpacked an archive, packed the tree again, copied the archive onto the mount, and listed that copy with `tar -tf`. A local directory is the floor. [kvfs](https://github.com/muayyad-alsadi/kvfs) is our other filesystem. [s3fs](https://github.com/s3fs-fuse/s3fs-fuse) is mounted on [rustfs](https://github.com/rustfs/rustfs). [fuse-nfs](https://github.com/sahlberg/fuse-nfs) is NFS through FUSE.
+On each filesystem we unpacked an archive, packed the tree again, copied the archive onto the mount, and listed that copy with `tar -tf`. A local directory is the floor. [kvfs](https://github.com/muayyad-alsadi/kvfs) is our ancestor in-memory filesystem (backed by Redis/Valkey). [s3fs](https://github.com/s3fs-fuse/s3fs-fuse) is mounted on [rustfs](https://github.com/rustfs/rustfs). [fuse-nfs](https://github.com/sahlberg/fuse-nfs) is NFS through FUSE.
 
 `ansible.tar` is 27 MiB and 5,868 files.
 
@@ -40,11 +50,30 @@ The tables above have fs-relay ahead of rustfs through s3fs, and both of those m
 
 On this archive the default mount unpacks ahead of s3fs (9.78 s against 21.01 s) and ahead of fuse-nfs (9.78 s against 36.13 s). Packing is 2.38 s on the default mount, 5.31 s on s3fs, and 10.37 s on fuse-nfs.
 
-## Run
+## Building
+
+You can build it using
+
+```bash
+go build -o fs-relay ./cmd/fs-relay
+go build -o fs-relay-bind ./cmd/fs-relay-bind
+```
+
+Even better, we have a [justfile](https://just.systems/man/en/) to help you do **production build** like this
 
 ```bash
 just build
+```
 
+You can place the binaries in `~/.local/bin/` or `/usr/local/bin`.
+The binary `fs-relay` goes on the storage machine, and `fs-relay-bind` to as many client machines as you want.
+There is no cross dependency between the two and there is no problem if you put both on every machine.
+
+## Run
+
+For simplicity, we are running the binaries relative to their build directory.
+
+```bash
 mkdir -p data /mnt/fs-relay
 ./fs-relay -listen 127.0.0.1:8080 -data data
 ./fs-relay-bind -url http://127.0.0.1:8080 -ns demo /mnt/fs-relay
@@ -56,6 +85,16 @@ Open the server URL in a browser for a welcome page. `curl` against the same URL
 
 On a new mount, create a directory, write and read a small file, make a symlink, rename, and delete. Mount the same name a second time, write on one, and read on the other. Copy a file from one path on the mount to another. Append with `>>`. Write about 10 MiB with `dd bs=10k` and read it back. Repeat that write with `-raw=false` and compare the bytes.
 
+## How such performance is even possible?
+
+We used zero-copy Linux kernel features similar to [sendfile(2)](https://linux.die.net/man/2/sendfile) as in [my article](https://medium.com/@alsadi/secret-sauce-is-zero-copy-single-context-switching-b749bd614dca). Those features are:
+
+- [splice(2)](https://linux.die.net/man/2/splice)
+- [copy_file_range(2)](https://linux.die.net/man/2/copy_file_range)
+
+Where these calls are used, the bytes skip the allocate, read, copy, write, and free cycle.
+On a large file they also skip a context switch for every block.
+
 ## Earlier designs
 
 This section is for people changing the server. Do not bring these back. They were measured, and they stayed out.
@@ -65,3 +104,6 @@ MessagePack was the first wire format. FlatBuffers replaced it. On the Ansible t
 JSON can carry file bytes as `multipart/form-data`: one `application/json` part for the call, and one `application/octet-stream` part for the bytes. On the Ansible tree that plain-text body kept up with MessagePack and FlatBuffers. It is not in this server. One body shape is the smaller program.
 
 The protocol is in [`SPEC.md`](./SPEC.md). What was tried and set aside is also in [`ROADMAP.md`](./ROADMAP.md).
+
+We have implemented a filesystem on top of Redis/Valkey and name it [KVFS](https://github.com/muayyad-alsadi/kvfs).
+KVFS is in-memory and that's a positive and a negative at the same time (faster because it's in-memory but it limits how large the files can be). Also KVFS can't use the special kernel features we talked about.
