@@ -152,18 +152,37 @@ func (s *Socket) send(ctx context.Context, b []byte) error {
 
 func (s *Socket) wait(ctx context.Context, method string, ch <-chan wire.Reply, dead <-chan struct{}) (wire.Result, error) {
 	for {
-		select {
-		case <-ctx.Done():
-			return wire.Result{}, ctx.Err()
-		case <-dead:
-			return wire.Result{}, fmt.Errorf("ws %s: connection lost", method)
-		case rp := <-ch:
-			res, err, more := finish(rp)
-			if more {
-				continue
-			}
+		rp, err := nextReply(ctx, method, ch, dead)
+		if err != nil {
+			return wire.Result{}, err
+		}
+		res, err, more := finish(rp)
+		if !more {
 			return res, err
 		}
+	}
+}
+
+// nextReply prefers a reply already queued. The socket closes as soon as the
+// server has written the result, so dead and the reply are ready together and
+// a plain select would drop the result.
+func nextReply(ctx context.Context, method string, ch <-chan wire.Reply, dead <-chan struct{}) (wire.Reply, error) {
+	select {
+	case rp := <-ch:
+		return rp, nil
+	case <-ctx.Done():
+		return queuedOr(ch, ctx.Err())
+	case <-dead:
+		return queuedOr(ch, fmt.Errorf("ws %s: connection lost", method))
+	}
+}
+
+func queuedOr(ch <-chan wire.Reply, err error) (wire.Reply, error) {
+	select {
+	case rp := <-ch:
+		return rp, nil
+	default:
+		return wire.Reply{}, err
 	}
 }
 
