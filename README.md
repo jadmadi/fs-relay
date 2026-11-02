@@ -109,3 +109,13 @@ The protocol is in [`SPEC.md`](./SPEC.md). What was tried and set aside is also 
 
 We have implemented a filesystem on top of Redis/Valkey and name it [KVFS](https://github.com/muayyad-alsadi/kvfs).
 KVFS is in-memory and that's a positive and a negative at the same time (faster because it's in-memory but it limits how large the files can be). Also KVFS can't use the special kernel features we talked about.
+
+## License
+
+This project is dual-licensed under either:
+
+- [MIT License](LICENSE-MIT.txt)
+- [Waqf Digital Public License v1.0](LICENSE-WaqfDPL-1.0.md)
+
+See [LICENSE.md](LICENSE.md) for details.
+
