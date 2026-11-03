@@ -4,7 +4,8 @@
   "reopened_by": "agent",
   "reason": "Qodo low findings: bare 500 and unreachable not-a-directory message",
   "original_commit": "6bade08",
-  "resolved_at": "0001-01-01T00:00:00Z",
-  "active": true,
+  "resolved_commit": "4d54ee3",
+  "resolved_at": "2026-11-03T16:10:53.342003571Z",
+  "active": false,
   "reopen_epoch": 2
 }
