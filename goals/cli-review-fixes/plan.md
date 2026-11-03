@@ -4,7 +4,7 @@ Read `facts.md` first. Work on `feat/cli-ergonomics`; the PR is open.
 
 ## Execution Steps
 
-- [ ] **T1 - Parse help with a FlagSet**
+- [x] **T1 - Parse help with a FlagSet**
   - Goal: `-token -h` is a token value, not a help request.
   - Files: `cmd/fs-relay/main.go`, `cmd/fs-relay-bind/main.go`,
     `cmd/fs-relay/cli.go`, `cmd/fs-relay-bind/cli.go`.
@@ -21,7 +21,7 @@ Read `facts.md` first. Work on `feat/cli-ergonomics`; the PR is open.
     - AC-1.3: `fs-relay -bogus` exits 2 with usage on stderr.
     - AC-1.4: the same three for `fs-relay-bind`.
 
-- [ ] **T2 - Put the version in help**
+- [x] **T2 - Put the version in help**
   - Goal: both help screens show the build version.
   - Files: the `cli.go` files, tests.
   - Requirements: add one `Version: <line>` line after the purpose.
@@ -29,7 +29,7 @@ Read `facts.md` first. Work on `feat/cli-ergonomics`; the PR is open.
     - AC-2.1: `fs-relay -h` contains `Version: fs-relay`.
     - AC-2.2: `fs-relay-bind -h` contains `Version: fs-relay-bind`.
 
-- [ ] **T3 - Put the version in health**
+- [x] **T3 - Put the version in health**
   - Goal: the deployed version is visible over HTTP.
   - Files: `cmd/fs-relay/root.go`, `cmd/fs-relay/root_test.go`.
   - Requirements:
@@ -41,7 +41,7 @@ Read `facts.md` first. Work on `feat/cli-ergonomics`; the PR is open.
     - AC-3.1: `GET /` with `Accept: application/json` has all four keys.
     - AC-3.2: `version` is non-empty in a normal build.
 
-- [ ] **T4 - Stamp the release version**
+- [x] **T4 - Stamp the release version**
   - Goal: a tagged build does not report `(devel)`.
   - Files: `justfile`, both `cli.go` files (a `var version string`).
   - Requirements:
@@ -55,7 +55,7 @@ Read `facts.md` first. Work on `feat/cli-ergonomics`; the PR is open.
     - AC-4.2: checking out a tag and building prints the tag.
     - AC-4.3: a local change appends `-dirty`.
 
-- [ ] **T5 - Tests, docs and evidence**
+- [x] **T5 - Tests, docs and evidence**
   - Files: `cmd/fs-relay/cli_test.go`, `cmd/fs-relay-bind/cli_test.go`,
     `cmd/fs-relay/root_test.go`, `README.md`, `SPEC.md` only if the health
     shape changes, `goals/cli-review-fixes/evidence.md`.

@@ -1,0 +1,7 @@
+{
+  "goal_slug": "cli-review-fixes",
+  "patch_id": "4cfa53ff5bf5a43af78fce73019c555fa3570c50",
+  "base_ref": "main",
+  "recorded_at": "2026-11-03T15:50:44.525732992Z",
+  "certified_by": "re-test-certified"
+}

@@ -76,6 +76,9 @@ func assertHealth(t *testing.T, body []byte) {
 	if got.Status != "ok" {
 		t.Fatalf("status %q", got.Status)
 	}
+	if got.Version == "" {
+		t.Fatal("health has no version")
+	}
 	parsed, err := time.Parse(time.RFC3339, got.Time)
 	if err != nil || !strings.HasSuffix(got.Time, "Z") {
 		t.Fatalf("time %q", got.Time)
