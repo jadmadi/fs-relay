@@ -1,7 +1,7 @@
 {
   "goal_slug": "startup-validation",
-  "patch_id": "ebc3f7cb209968f13f2f2e7a7b9ed6febde8431b",
+  "patch_id": "de822c4e31a2bc4543ab30d2e277167864e3f0b6",
   "base_ref": "main",
-  "recorded_at": "2026-11-03T15:50:36.715383997Z",
-  "certified_by": "initial-certification"
+  "recorded_at": "2026-11-03T15:57:20.673171375Z",
+  "certified_by": "re-test-certified"
 }
