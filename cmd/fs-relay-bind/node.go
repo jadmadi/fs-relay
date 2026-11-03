@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"syscall"
 
 	"fs-relay/internal/client"
@@ -16,6 +15,7 @@ import (
 // caller is the mount's transport. HTTP posts and the websocket both implement it.
 type caller interface {
 	Call(ctx context.Context, method string, p wire.Params) (wire.Result, error)
+	Releases() <-chan string
 }
 
 // node is one protocol inode. Every method is one call.
@@ -28,11 +28,10 @@ type node struct {
 	rawMin    int
 	spliceMax int
 
-	mu     sync.Mutex
-	attr   wire.Attr
-	known  bool
-	dirty  map[*handle]int64
-	locked atomic.Bool
+	mu    sync.Mutex
+	attr  wire.Attr
+	known bool
+	dirty map[*handle]int64
 }
 
 var (

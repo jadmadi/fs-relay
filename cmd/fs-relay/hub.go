@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strconv"
 	"sync"
 	"time"
 
@@ -21,14 +22,10 @@ type hub struct {
 	token   string
 	tree    *local.Tree
 
-	wmu     sync.Mutex
-	waiters map[string]map[*waiter]struct{}
-}
-
-// waiter is one parked setlkw on a namespace. Its channel is a one-slot
-// wake-up, so a release that lands before the wait still leaves a token.
-type waiter struct {
-	ch chan struct{}
+	// waiting is ns -> inode -> client. A release sends an event only when
+	// a client is waiting on that inode.
+	waiting map[string]map[uint64]map[string]struct{}
+	events  uint64
 }
 
 type room struct {
@@ -49,56 +46,67 @@ func newHub(token string) *hub {
 		rooms:   map[string]*room{},
 		holdFor: holdFor,
 		token:   token,
-		waiters: map[string]map[*waiter]struct{}{},
+		waiting: map[string]map[uint64]map[string]struct{}{},
 	}
 }
 
-// park registers a waiter before the first grant attempt. A release after
-// this point always leaves a wake-up, so the wait cannot be lost.
-func (h *hub) park(ns string) *waiter {
-	w := &waiter{ch: make(chan struct{}, 1)}
-	h.wmu.Lock()
-	if h.waiters[ns] == nil {
-		h.waiters[ns] = map[*waiter]struct{}{}
+// markWaiting records that a client is about to wait on an inode.
+func (h *hub) markWaiting(ns string, ino uint64, client string) {
+	if ino == 0 {
+		return
 	}
-	h.waiters[ns][w] = struct{}{}
-	h.wmu.Unlock()
-	return w
+	h.mu.Lock()
+	if h.waiting[ns] == nil {
+		h.waiting[ns] = map[uint64]map[string]struct{}{}
+	}
+	if h.waiting[ns][ino] == nil {
+		h.waiting[ns][ino] = map[string]struct{}{}
+	}
+	h.waiting[ns][ino][client] = struct{}{}
+	h.mu.Unlock()
 }
 
-func (h *hub) unpark(ns string, w *waiter) {
-	h.wmu.Lock()
-	if set := h.waiters[ns]; set != nil {
-		delete(set, w)
-		if len(set) == 0 {
-			delete(h.waiters, ns)
-		}
+// clearWaiting reports whether anyone waited on the inode, and forgets them.
+func (h *hub) clearWaiting(ns string, ino uint64) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	set := h.waiting[ns][ino]
+	if len(set) == 0 {
+		return false
 	}
-	h.wmu.Unlock()
+	delete(h.waiting[ns], ino)
+	if len(h.waiting[ns]) == 0 {
+		delete(h.waiting, ns)
+	}
+	return true
 }
 
-// wake releases every parked call in the namespace. It is a no-op when
-// nobody waits, which keeps an uncontended commit free of events.
-func (h *hub) wake(ns string) {
-	h.wmu.Lock()
-	set := h.waiters[ns]
-	out := make([]*waiter, 0, len(set))
-	for w := range set {
-		out = append(out, w)
+func (h *hub) anyWaiting(ns string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.waiting[ns]) > 0
+}
+
+// releaseAll sends one release event to every subscriber and keeps it owed
+// until the stream proves it delivered a later event.
+func (h *hub) releaseAll(ns string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	r := h.rooms[ns]
+	if r == nil {
+		return
 	}
-	h.wmu.Unlock()
-	for _, w := range out {
+	h.events++
+	p := wire.Pub{Release: "lock-" + strconv.FormatUint(h.events, 10)}
+	for _, m := range r.live {
+		r.owed[m.id] = append(r.owed[m.id], p)
 		select {
-		case w.ch <- struct{}{}:
+		case m.ch <- p:
 		default:
+			m.cancel()
 		}
 	}
-}
-
-func (h *hub) waiting(ns string) bool {
-	h.wmu.Lock()
-	defer h.wmu.Unlock()
-	return len(h.waiters[ns]) > 0
+	h.holdAbsent(r, p)
 }
 
 func (h *hub) attach(ns, id string, ws bool, cancel func()) (*member, error) {
@@ -211,8 +219,8 @@ func (h *hub) dropHold(ns, id string) {
 	delete(r.hold, id)
 	delete(r.owed, id)
 	h.mu.Unlock()
-	if h.tree != nil && h.tree.ReleaseClient(ns, id) {
-		h.wake(ns)
+	if h.tree != nil && h.tree.ReleaseClient(ns, id) && h.anyWaiting(ns) {
+		h.releaseAll(ns)
 	}
 }
 

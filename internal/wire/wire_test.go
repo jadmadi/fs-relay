@@ -61,16 +61,16 @@ func TestCallID(t *testing.T) {
 	if req.ID != 7 || req.Method != Mkdir || req.Params.Name != "a" {
 		t.Fatalf("decoded %+v", req)
 	}
-	pending, err := MarshalPending(7, "ticket")
+	rel, err := MarshalRelease("lock-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	rp, err := DecodeReply(pending)
+	rp, err := DecodeReply(rel)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rp.ID != 7 || rp.Pending != "ticket" || rp.Result != nil || rp.Err != nil {
-		t.Fatalf("pending %+v", rp)
+	if rp.ID != 0 || rp.Release != "lock-1" || rp.Result != nil || rp.Err != nil {
+		t.Fatalf("release %+v", rp)
 	}
 	ok, err := MarshalReply(7, Result{Written: 3})
 	if err != nil {
@@ -80,7 +80,7 @@ func TestCallID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rp.ID != 7 || rp.Result == nil || rp.Result.Written != 3 || rp.Pending != "" {
+	if rp.ID != 7 || rp.Result == nil || rp.Result.Written != 3 {
 		t.Fatalf("reply %+v", rp)
 	}
 }

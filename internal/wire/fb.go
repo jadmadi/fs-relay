@@ -17,7 +17,6 @@ type fbMsg struct {
 	Result  *Result
 	Err     *Error
 	Fault   string
-	Pending string
 	Evict   *Change
 	Release string
 	Client  string
@@ -31,11 +30,10 @@ func encodeFB(msg fbMsg) ([]byte, error) {
 	evict := putChange(b, msg.Evict)
 	method := putStr(b, msg.Method)
 	fault := putStr(b, msg.Fault)
-	pending := putStr(b, msg.Pending)
 	release := putStr(b, msg.Release)
 	client := putStr(b, msg.Client)
 	FbEnvelopeStart(b)
-	addEnvelope(b, msg, method, params, result, failure, evict, fault, pending, release, client)
+	addEnvelope(b, msg, method, params, result, failure, evict, fault, release, client)
 	b.FinishWithFileIdentifier(FbEnvelopeEnd(b), []byte(fbID))
 	return b.FinishedBytes(), nil
 }
@@ -50,7 +48,7 @@ func fileBytes(msg fbMsg) []byte {
 	return nil
 }
 
-func addEnvelope(b *flatbuffers.Builder, msg fbMsg, method, params, result, failure, evict, fault, pending, release, client flatbuffers.UOffsetT) {
+func addEnvelope(b *flatbuffers.Builder, msg fbMsg, method, params, result, failure, evict, fault, release, client flatbuffers.UOffsetT) {
 	if msg.ID != 0 {
 		FbEnvelopeAddId(b, msg.ID)
 	}
@@ -60,7 +58,6 @@ func addEnvelope(b *flatbuffers.Builder, msg fbMsg, method, params, result, fail
 	addOffset(b, failure, FbEnvelopeAddFailure)
 	addOffset(b, evict, FbEnvelopeAddEvict)
 	addOffset(b, fault, FbEnvelopeAddFault)
-	addOffset(b, pending, FbEnvelopeAddPending)
 	addOffset(b, release, FbEnvelopeAddRelease)
 	addOffset(b, client, FbEnvelopeAddClient)
 }
@@ -387,7 +384,7 @@ func decodeFBReply(buf []byte) (Reply, error) {
 	if err != nil {
 		return Reply{}, err
 	}
-	rp := Reply{ID: env.Id(), Client: string(env.Client()), Fault: string(env.Fault()), Pending: string(env.Pending()), Release: string(env.Release())}
+	rp := Reply{ID: env.Id(), Client: string(env.Client()), Fault: string(env.Fault()), Release: string(env.Release())}
 	if res := env.Result(new(FbResult)); res != nil {
 		got := resultFrom(res)
 		rp.Result = &got

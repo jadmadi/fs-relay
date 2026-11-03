@@ -199,7 +199,17 @@ func (r *lockRec) put(key lockKey, fh uint64, start, end uint64, typ uint32, pid
 func (r *lockRec) apply(o *lockOwner, start, end uint64, typ uint32, pid uint32) {
 	switch {
 	case start == pendingByte && typ == wire.LockRead:
-		if _, ok := o.exact(start, end); !ok {
+		t, ok := o.exact(start, end)
+		if ok && t == wire.LockWrite {
+			o.trim(start, end)
+			if r.pending == o.key {
+				r.pending = lockKey{}
+			}
+			o.spans = append(o.spans, lockSpan{start: start, end: end, typ: typ, pid: pid})
+			r.pendingR++
+			return
+		}
+		if !ok {
 			o.spans = append(o.spans, lockSpan{start: start, end: end, typ: typ, pid: pid})
 			r.pendingR++
 		}
@@ -498,14 +508,21 @@ func (t *Tree) DropFH(ns string, ino, fh uint64) bool {
 }
 
 // DropClient drops every lock one mount holds on one inode.
-func (t *Tree) DropClient(ns string, ino uint64, client string) bool {
+func (t *Tree) DropOwner(ns string, ino uint64, client string, owner uint64) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	e, ok := t.entry(ns, ino)
 	if !ok || e.locks == nil {
 		return false
 	}
-	return e.locks.dropClient(client)
+	key := lockKey{client: client, owner: owner}
+	if e.locks.find(key) == nil {
+		return false
+	}
+	e.locks.remove(key)
+	e.locks.recount()
+	e.locks.wake = true
+	return true
 }
 
 // ReleaseClient drops every lock one mount holds in a namespace.
@@ -534,21 +551,22 @@ func (t *Tree) InodeOf(fh uint64) (uint64, bool) {
 	return t.inoOf(fh)
 }
 
-// TookWake consumes a pending release wake for the inode a call named.
-func (t *Tree) TookWake(ns string, p wire.Params) bool {
+// TookWake consumes a pending release wake and returns the inode it
+// happened on.
+func (t *Tree) TookWake(ns string, p wire.Params) (uint64, bool) {
 	ino := p.Inode
 	if ino == 0 && p.Fh != 0 {
 		ino, _ = t.inoOf(p.Fh)
 	}
 	if ino == 0 {
-		return false
+		return 0, false
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	e, ok := t.entry(ns, ino)
 	if !ok || e.locks == nil || !e.locks.wake {
-		return false
+		return 0, false
 	}
 	e.locks.wake = false
-	return true
+	return ino, true
 }

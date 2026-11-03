@@ -216,3 +216,39 @@ func recv(events <-chan wire.Change) <-chan wire.Pub {
 	}()
 	return out
 }
+
+func TestReleaseAllReplayedOnRejoin(t *testing.T) {
+	tree := local.New(t.TempDir())
+	t.Cleanup(func() { _ = tree.Close() })
+	h := newHub(testToken)
+	hnd, _ := handler(tree, h)
+	srv := httptest.NewServer(hnd)
+	t.Cleanup(srv.Close)
+	httpClient := srv.Client()
+
+	a := dialJoin(t, httpClient, srv.URL, "")
+	defer a.cancel()
+	h.releaseAll("demo")
+	select {
+	case p := <-a.lines:
+		if p.Release == "" {
+			t.Fatalf("first line %+v", p)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no release")
+	}
+
+	a.cancel()
+	for range a.lines {
+	}
+	back := dialJoin(t, httpClient, srv.URL, a.id)
+	defer back.cancel()
+	select {
+	case p := <-back.lines:
+		if p.Release == "" {
+			t.Fatalf("rejoin line %+v", p)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("rejoin missed the release")
+	}
+}
