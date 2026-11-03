@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"syscall"
 
 	"fs-relay/internal/client"
@@ -28,11 +27,10 @@ type node struct {
 	rawMin    int
 	spliceMax int
 
-	mu     sync.Mutex
-	attr   wire.Attr
-	known  bool
-	dirty  map[*handle]int64
-	locked atomic.Bool
+	mu    sync.Mutex
+	attr  wire.Attr
+	known bool
+	dirty map[*handle]int64
 }
 
 var (

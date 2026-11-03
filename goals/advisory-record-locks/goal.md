@@ -59,7 +59,7 @@ and a `SPEC.md` edit in the same change.
 | POST wait | The response is held until grant | One POST is one exchange, so there is no second reply |
 | Websocket wait | Send `pending` with a ticket, then the final reply with the same id | `wire.MarshalPending` and `Reply.Pending` already define this |
 | Owner key | `(client id, kernel owner id)` | The scrambled 64-bit owner is not unique across machines |
-| Close semantics | POSIX any-close: a `release` drops that owner's locks on that inode | Closing any descriptor drops the process's locks; "last close" is wrong |
+| Close semantics | A `release` names a handle or an owner. A read-only handle records the owners that locked through it; its close drops only those | Never drop by client: a `cat` must not take a worker's locks |
 | Partial unlock | Split, keep the remainder on the overflow list, decrement the canonical count | Counts stay honest; no silent coverage loss |
 | Overflow storage | Small slice on the record, allocated on first use | Only arbitrary-range clients pay; the Django path never enters it |
 | `flock` | Handle in the same table as a whole-file entry | `EnableLocks` also advertises `CAP_FLOCK_LOCKS`, so refusing would regress single mounts |

@@ -1,0 +1,13 @@
+{
+  "goal_slug": "advisory-record-locks",
+  "reopened_at": "2026-11-03T12:06:11.642971154Z",
+  "reopened_by": "opencode",
+  "reason": "Review found a read-only close dropping every lock of the mount; fix and pending downgrade added",
+  "original_commit": "681826e",
+  "resolved_at": "0001-01-01T00:00:00Z",
+  "active": true,
+  "tainted_goals": [
+    "sqlite-rollback-journal"
+  ],
+  "reopen_epoch": 1
+}

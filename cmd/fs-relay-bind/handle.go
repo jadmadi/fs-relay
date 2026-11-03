@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"sync"
 	"syscall"
 
 	"fs-relay/internal/wire"
@@ -17,6 +18,9 @@ type handle struct {
 	ino   uint64
 	local bool
 	wb    pending
+
+	omu    sync.Mutex
+	owners map[uint64]struct{}
 }
 
 var (
@@ -110,15 +114,11 @@ func (h *handle) Release(ctx context.Context) syscall.Errno {
 	h.clearDirty()
 	h.wb.mu.Unlock()
 	h.releaseBuf()
-	if h.local || h.fh == 0 {
+	if h.fh == 0 {
 		if sticky != 0 {
 			return sticky
 		}
-		if h.n != nil && h.n.locked.Load() {
-			_, errno := h.call(ctx, wire.Release, wire.Params{Inode: h.ino})
-			return errno
-		}
-		return 0
+		return h.releaseOwners(ctx)
 	}
 	parent, name := uint64(0), ""
 	if len(data) > 0 && h.n != nil {
@@ -281,4 +281,39 @@ func (d *dirHandle) Seekdir(_ context.Context, off uint64) syscall.Errno {
 func (d *dirHandle) Releasedir(context.Context, uint32) {
 	// The listing is memory only; there is no server handle to release.
 	return
+}
+
+// addOwner remembers a kernel owner that locked through this handle. A
+// read-only handle has no server fh, so its close drops exactly these owners
+// instead of every lock the mount holds on the inode.
+func (h *handle) addOwner(owner uint64) {
+	h.omu.Lock()
+	if h.owners == nil {
+		h.owners = map[uint64]struct{}{}
+	}
+	h.owners[owner] = struct{}{}
+	h.omu.Unlock()
+}
+
+func (h *handle) takeOwners() []uint64 {
+	h.omu.Lock()
+	owners := make([]uint64, 0, len(h.owners))
+	for owner := range h.owners {
+		owners = append(owners, owner)
+	}
+	h.owners = nil
+	h.omu.Unlock()
+	return owners
+}
+
+func (h *handle) releaseOwners(ctx context.Context) syscall.Errno {
+	owners := h.takeOwners()
+	var first syscall.Errno
+	for _, owner := range owners {
+		_, errno := h.call(ctx, wire.Release, wire.Params{Inode: h.ino, Owner: owner})
+		if errno != 0 && first == 0 {
+			first = errno
+		}
+	}
+	return first
 }

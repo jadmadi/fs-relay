@@ -235,3 +235,36 @@ func TestLockSelfDowngrade(t *testing.T) {
 	_, err := tr.Call(t.Context(), wire.Setlk, lp(ino, fh, "B", 2, wire.LockWrite, sharedStart, 510))
 	wantErrno(t, err, syscall.EAGAIN)
 }
+
+func TestLockDropOwnerIsNarrow(t *testing.T) {
+	tr, _ := newTree(t)
+	ino, fh := lockFile(t, tr, "a")
+	second := call(t, tr, wire.Open, wire.Params{Inode: ino, Flags: syscall.O_RDWR})
+	call(t, tr, wire.Setlk, lp(ino, fh, "A", 1, wire.LockWrite, 100, 1))
+	call(t, tr, wire.Setlk, lp(ino, second.Fh, "A", 2, wire.LockWrite, 200, 1))
+
+	if !tr.DropOwner("demo", ino, "A", 1) {
+		t.Fatal("drop owner reported no change")
+	}
+	call(t, tr, wire.Setlk, lp(ino, 0, "B", 9, wire.LockWrite, 100, 1))
+	_, err := tr.Call(t.Context(), wire.Setlk, lp(ino, 0, "B", 9, wire.LockWrite, 200, 1))
+	wantErrno(t, err, syscall.EAGAIN)
+}
+
+func TestLockPendingDowngrade(t *testing.T) {
+	tr, _ := newTree(t)
+	ino, fh := lockFile(t, tr, "a")
+	call(t, tr, wire.Setlk, lp(ino, fh, "A", 1, wire.LockWrite, pendingByte, 1))
+	call(t, tr, wire.Setlk, lp(ino, fh, "A", 1, wire.LockRead, pendingByte, 1))
+
+	got := call(t, tr, wire.Getlk, lp(ino, fh, "B", 2, wire.LockWrite, pendingByte, 1))
+	if got.Lock == nil || got.Lock.Type != wire.LockRead {
+		t.Fatalf("pending still write: %+v", got.Lock)
+	}
+	call(t, tr, wire.Setlk, lp(ino, fh, "B", 2, wire.LockRead, pendingByte, 1))
+	_, err := tr.Call(t.Context(), wire.Setlk, lp(ino, fh, "B", 2, wire.LockWrite, pendingByte, 1))
+	wantErrno(t, err, syscall.EAGAIN)
+
+	call(t, tr, wire.Setlk, lp(ino, fh, "A", 1, wire.LockUnlock, pendingByte, 1))
+	call(t, tr, wire.Setlk, lp(ino, fh, "B", 2, wire.LockWrite, pendingByte, 1))
+}

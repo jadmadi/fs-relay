@@ -204,6 +204,50 @@ likely to be implemented wrong. Run `sila gate` before each commit.
     - AC-9.2: `go vet ./...`, `go test ./...`, `go test -race ./...` pass.
     - AC-9.3: `sila goals --json` shows all tasks met.
 
+- [x] **T10 - Read-only close drops only its owners**
+  - Goal: a read-only descriptor's close cannot drop another owner's locks
+    on the same mount.
+  - Cause: a read-only open has no server `fh`, and the release fallback
+    dropped every lock the client held on the inode.
+  - Files: `cmd/fs-relay-bind/lock.go`, `cmd/fs-relay-bind/handle.go`,
+    `internal/local/file.go`, `internal/local/lock.go`.
+  - Requirements: the read-only handle records each owner that locks
+    through it; `release` carries the owner and no `fh`; the server drops
+    that one owner. Remove the mount-wide fallback and `node.locked`.
+  - Acceptance:
+    - AC-10.1: `TestLockDropOwnerIsNarrow` keeps the other owner.
+    - AC-10.2: `TestReadOnlyCloseDropsOnlyItsOwners` sends one release per
+      owner and no handle.
+    - AC-10.3: on two mounts, `cat` on the mount holding the writer leaves
+      the other mount at `EAGAIN`.
+    - AC-10.4: a read-only fd's own lock is gone after its close, while the
+      writer's lock remains.
+
+- [x] **T11 - Pending-byte write downgrades to read**
+  - Goal: the same owner asking for a read on the pending byte replaces its
+    write, instead of leaving the write in place.
+  - Files: `internal/local/lock.go`, `internal/local/lock_test.go`.
+  - Acceptance:
+    - AC-11.1: `TestLockPendingDowngrade` reports a read blocker after the
+      downgrade and grants another owner's read.
+    - AC-11.2: another owner's write is still refused until the reader
+      unlocks.
+
+- [ ] **T12 - Client-side setlkw wait with rejoin replay**
+  - Goal: restore the contract on `main`: `setlkw` returns at once, the
+    mount waits on the release stream, and a rejoin replays a release the
+    client has not seen.
+  - Files: `internal/wire`, `internal/local`, `internal/client`,
+    `cmd/fs-relay`, `cmd/fs-relay-bind`, `SPEC.md`.
+  - Requirements: server returns `EAGAIN`; it marks a waiting client and
+    broadcasts a release through `oweRelease`; the mount waits on the event
+    stream with a bounded retry; a dropped stream retries after rejoin.
+  - Acceptance:
+    - AC-12.1: a POST and a websocket `setlkw` wake on a release.
+    - AC-12.2: a release is replayed to a rejoin inside the hold window.
+    - AC-12.3: SQLite across two mounts is unchanged.
+    - AC-12.4: `SPEC.md` matches the implemented wait.
+
 ## Definition of done for the goal
 
 Run these from the repository root and paste the exit codes into

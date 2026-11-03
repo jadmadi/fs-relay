@@ -49,10 +49,13 @@ func (n *node) Setlkw(ctx context.Context, f fs.FileHandle, owner uint64, lk *fu
 }
 
 func (n *node) lock(ctx context.Context, method string, f fs.FileHandle, owner uint64, lk *fuse.FileLock, flags uint32) (wire.Result, syscall.Errno) {
-	n.locked.Store(true)
 	p, errno := lockParams(n, f, owner, lk, flags)
 	if errno != 0 {
 		return wire.Result{}, errno
+	}
+	if h, ok := f.(*handle); ok && h != nil && h.fh == 0 &&
+		method != wire.Getlk && p.Lock != wire.LockUnlock {
+		h.addOwner(owner)
 	}
 	res, err := n.c.Call(ctx, method, p)
 	return res, toErrno(err)
