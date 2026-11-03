@@ -94,6 +94,12 @@ The value is still on the command line while the process runs, so another
 local user can read it from `ps`. On a shared host, restrict who can run `ps`
 on the box, or keep the mount on a single-user machine.
 
+The server creates the `-data` directory if it is missing, but it never
+creates `data/<namespace>`. Create each namespace directory before a mount
+joins it; a missing namespace is refused with HTTP 404. The mount checks its
+mountpoint before connecting, refuses a missing or non-directory path, and
+refuses a non-empty directory unless `-force-existing-mnt` is passed.
+
 Add `-post` to send each operation as its own request. `-raw=false` sends large reads and writes on the main connection. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
 
 Open the server URL in a browser for a welcome page. `curl` against the same URL returns a short status. Unmount with `fusermount3 -u /mnt/fs-relay`.

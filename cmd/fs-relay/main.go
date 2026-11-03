@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -55,10 +56,18 @@ func run() error {
 	}
 	tree := local.New(*data)
 	defer tree.Close()
+	if err := tree.Prepare(); err != nil {
+		return err
+	}
+	abs, err := filepath.Abs(*data)
+	if err != nil {
+		return fmt.Errorf("data directory: %w", err)
+	}
 	ln, err := net.Listen("tcp", *listen)
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", *listen, err)
 	}
+	log.Printf("fs-relay: data %s", abs)
 	log.Printf("fs-relay: listening on %s", listenURL(ln.Addr(), defaultRouteIP))
 	h, raw := handler(tree, newHub(token))
 	srv := &http.Server{

@@ -10,8 +10,7 @@ import (
 )
 
 func TestChangedAddresses(t *testing.T) {
-	tree := New(t.TempDir())
-	t.Cleanup(func() { _ = tree.Close() })
+	tree, _ := newTree(t)
 	ctx := context.Background()
 	ns := "demo"
 	root := wire.Params{Namespace: ns, Inode: 1}

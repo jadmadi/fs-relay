@@ -5,7 +5,7 @@ code, tests and docs only.
 
 ## Execution Steps
 
-- [ ] **T1 - Prepare the data root in local**
+- [x] **T1 - Prepare the data root in local**
   - Goal: create the root once, reject a non-directory, never create a
     namespace.
   - Files: `internal/local/tree.go`, `internal/local/path.go`,
@@ -23,7 +23,7 @@ code, tests and docs only.
     - AC-1.3: `Call` on a missing namespace returns `ENOENT`.
     - AC-1.4: `OpenNamespace` succeeds after the directory is created later.
 
-- [ ] **T2 - Server startup and missing namespace**
+- [x] **T2 - Server startup and missing namespace**
   - Goal: fail early on a bad data root and refuse a missing namespace.
   - Files: `cmd/fs-relay/main.go`, `serve.go`, `join.go`, `ws.go`,
     tests.
@@ -39,7 +39,7 @@ code, tests and docs only.
     - AC-2.3: `join` for a missing namespace is 404.
     - AC-2.4: an existing namespace still mounts.
 
-- [ ] **T3 - Mountpoint checks in bind**
+- [x] **T3 - Mountpoint checks in bind**
   - Goal: check the mountpoint before dialing, and refuse a non-empty one
     unless forced.
   - Files: `cmd/fs-relay-bind/main.go`, a small `mountpoint.go`, tests.
@@ -56,7 +56,7 @@ code, tests and docs only.
     - AC-3.4: the flag allows the mount.
     - AC-3.5: an empty mountpoint still mounts.
 
-- [ ] **T4 - Tests and smoke**
+- [x] **T4 - Tests and smoke**
   - Files: `internal/local/local_test.go`,
     `cmd/fs-relay/serve_test.go` or `join_test.go`,
     `cmd/fs-relay-bind/mountpoint_test.go`.
@@ -68,7 +68,7 @@ code, tests and docs only.
     - AC-4.1: `go test ./...` and `go test -race ./...` pass.
     - AC-4.2: the smoke run exits 0 and the file round-trips.
 
-- [ ] **T5 - Docs and evidence**
+- [x] **T5 - Docs and evidence**
   - Files: `README.md`, `SPEC.md`, `goals/startup-validation/evidence.md`.
   - Requirements:
     1. README says the server creates `data` but not `data/<namespace>`,

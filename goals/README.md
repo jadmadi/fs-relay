@@ -28,11 +28,11 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 ## Summary
 - **Total Goals**: 5
-- 🟡 **Ready to Execute (Pending)**: 1 (1 independent ⚡, 0 unblocked 🔗)
+- 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
 - 🔵 **In Progress (Claimed)**: 1
-- 🟢 **Implemented**: 3 (3 verified 📜, 0 unverified)
+- 🟢 **Implemented**: 4 (3 verified 📜, 1 unverified)
 - 🎯 **By Tier**: 0 immediate (Tier 1), 5 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 31/36 completed (86%)
+- 📋 **Execution Tasks Progress**: 36/36 completed (100%)
 
 ---
 
@@ -40,15 +40,7 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 | Goal Package | Tier | Mode | Agent | Status & Note | Started |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| [`cli-review-fixes`](cli-review-fixes/goal.md) | `🗺️ Roadmap` | `⚡ Indep` | `@opencode` | in progress | 3m0s ago |
-
----
-
-## 🟡 Ready to Execute (Pending Goals)
-
-| Goal Package | Tier | Mode & Sequence | Dependencies | Focus & Description | Launch Command |
-| :--- | :---: | :---: | :--- | :--- | :--- |
-| [`startup-validation`](startup-validation/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⚡ Independent (#2)` | - | Validate the mountpoint, data directory and namespace — Close the three assigned startup issues: | `/goal goals/startup-validation/goal.md` |
+| [`startup-validation`](startup-validation/goal.md) | `🗺️ Roadmap` | `⚡ Indep` | `@opencode` | in progress | 0s ago |
 
 ---
 
@@ -57,5 +49,6 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | Goal Package | Mode | Shape | Verification | Task / Ref | Commit |
 | :--- | :---: | :--- | :---: | :--- | :--- |
 | [`advisory-record-locks`](advisory-record-locks/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `c84e4b2` |
+| [`cli-review-fixes`](cli-review-fixes/goal.md) | `⚡ Indep` | 🚢 SHIP | unverified | Git Commit | `a69607e` |
 | [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `e991617` |
 | [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `daa9689` |

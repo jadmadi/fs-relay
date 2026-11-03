@@ -39,6 +39,7 @@ func run() error {
 	allowOther := flags.Bool("allow-other", false, "allow other users to access the mount")
 	useRaw := flags.Bool("raw", true, "carry large reads and writes on a separate connection")
 	debug := flags.Bool("debug", false, "enable FUSE debug logging")
+	forceExisting := flags.Bool("force-existing-mnt", false, "mount over a non-empty directory")
 	token := flags.String("token", "", "secret printed by fs-relay")
 	showVersion := flags.Bool("version", false, "print the version and exit")
 	flags.SetOutput(os.Stderr)
@@ -64,6 +65,9 @@ func run() error {
 	}
 	if *post && *useWS {
 		return fmt.Errorf("pass -post or -ws, not both")
+	}
+	if err := checkMountpoint(flags.Arg(0), *forceExisting); err != nil {
+		return err
 	}
 	if err := wire.CheckNS(*ns); err != nil {
 		return fmt.Errorf("namespace: %w", err)
@@ -92,11 +96,11 @@ func run() error {
 	go k.loop(ctx, events)
 	root := &node{c: c, k: k, ino: 1}
 	defer attachRaw(root, base, *ns, *token, *useRaw)()
-	server, err := fs.Mount(flag.Arg(0), root, mountOptions(*allowOther, *debug))
+	server, err := fs.Mount(flags.Arg(0), root, mountOptions(*allowOther, *debug))
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)
 	}
-	log.Printf("fs-relay-bind: mounted on %s, namespace %s, %s, %s", flag.Arg(0), *ns, mode, base)
+	log.Printf("fs-relay-bind: mounted on %s, namespace %s, %s, %s", flags.Arg(0), *ns, mode, base)
 	go unmountOnSignal(server)
 	server.Wait()
 	return nil
