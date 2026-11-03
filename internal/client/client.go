@@ -25,6 +25,23 @@ type Client struct {
 
 	once   sync.Once
 	evicts chan wire.Change
+	mu     sync.Mutex
+	id     string
+}
+
+func (c *Client) setID(id string) {
+	if id == "" {
+		return
+	}
+	c.mu.Lock()
+	c.id = id
+	c.mu.Unlock()
+}
+
+func (c *Client) clientID() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.id
 }
 
 // Events receives cache evictions from the join stream.
@@ -41,6 +58,9 @@ func (c *Client) ensure() {
 func (c *Client) Call(ctx context.Context, method string, p wire.Params) (wire.Result, error) {
 	if p.Namespace == "" {
 		p.Namespace = c.NS
+	}
+	if p.Client == "" {
+		p.Client = c.clientID()
 	}
 	body, err := wire.MarshalRequest(method, p)
 	if err != nil {

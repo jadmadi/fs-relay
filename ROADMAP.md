@@ -9,56 +9,11 @@
 - specialized end point for large files
 - get sqlite working
 - Benchmark serving millions of rows to DuckDB.
+- Advisory record locks. `getlk`, `setlk` and `setlkw` reach the server, which owns one table per namespace, so two mounts of one name exclude each other. A holder is the mount's client id plus the kernel owner, because a classic POSIX lock is per process and two mounts never share one. The table keeps one record per locked inode: counts for the pending byte, the reserved byte and the 510-byte shared range, and an overflow list for any other range. A release wakes a parked `setlkw` only when one is parked, and a commit nobody waits on sends nothing. `flock` shares the table as a whole-file entry. A mount that does not rejoin loses its locks when the 8s hold expires. `SPEC.md` has the contract. Verified 2026-11-03 on Linux 6.12.113, SQLite 3.46.1, rollback journal: two mounts, four writers split across them committed 200 rows with four distinct markers, and `PRAGMA integrity_check` was `ok` from both mounts. A reader on one mount held a transaction for 2s and a writer on the other waited 1.4s, then committed, with no `database is locked`. A new reader was held at the pending byte while a writer waited, then granted after it finished. Killing a mount that held a write lock released it after 8s. `flock` conflicted and released across mounts.
 
 ## Yet to be done
 
-The calls a single program uses are in: create, open, read, write, close, fsync, mkdir, rmdir, unlink, rename, symlink, getattr, setattr, readdir, statfs, access. The work that is left is the lock table, because two mounts do not share one today. The rest are either outside a one-token mount, or a refusal POSIX already allows. Each one says what it would take, what refusing costs, and whether a program handles the error.
-
-### Advisory record locks
-
-This is what SQLite's rollback journal needs.
-
-A lock is advisory and it is a byte range. `read` and `write` ignore it. Only another lock call observes it. A read lock (`F_RDLCK`) conflicts with a write lock (`F_WRLCK`) on an overlapping byte. Two read locks on the same bytes both hold. A write lock conflicts with every other lock on an overlapping byte. A lock on a different byte does not conflict.
-
-SQLite depends on the ranges. Readers hold a read lock in the shared range. A reserved lock is a write lock on a single byte that does not overlap that range, so a writer can reserve while readers still hold their read locks. The exclusive lock is a write lock over the shared range. That one is granted only after every reader has released.
-
-The owner is one open, not the server process. The server keeps the table. Each client open is its own owner: the mount's client id together with the lock owner the kernel sent for that open. Taking the lock with one `fcntl` in the server process would make every client the same owner, and a second open would be granted a lock it should wait for. An open-file-description lock (`F_OFD_SETLK`) on the fd the server already holds would get the same conflicts inside the kernel, and a waiting call would then block on that fd. The wait has to stay on the pubsub, so the table is in memory. A process that opens a file under `data/` itself is outside the table.
-
-A Django worker keeps its connection open (`CONN_MAX_AGE`). The lock does not. Autocommit takes a read lock for one statement and drops it at the commit. `ATOMIC_REQUESTS` holds it for the view. What piles up is transactions in flight, one per worker that is inside a query: tens on a normal site, a few hundred on a large one. They all lock the same bytes. A read lock on the shared range, a write lock on the reserved byte, a write lock on the pending byte, then a write lock over the shared range. The offset does not change from query to query. The mutation is a holder added and a holder removed. Every other file in the tree is never locked.
-
-The round trip is the cost that shows up. A walk of a few hundred holders does not. An allocation per query does, and a release broadcast to every mount on every commit does. The layout is whatever makes those two zero on the path Django actually takes.
-
-The inode carries one pointer, nil when the file has no locks. That nil is the check. There is no side table of files and no second flag. The first lock on the database allocates one small record and leaves it there for the life of the process.
-
-The counters are the bytes SQLite locks, not its five named states. The pending byte is offset `0x40000000`, length 1. The reserved byte is the next byte. The shared range is the 510 bytes after that. A new reader read-locks the pending byte, then read-locks the shared range, then unlocks the pending byte. That momentary read is what stops a new reader while a writer is waiting. A pending write is a write lock on that one byte, so it conflicts with the momentary read and with another write there, and it does not overlap the shared range. A reserved lock is a write lock on the reserved byte. An exclusive lock is a write lock on the shared range. The same owner already holds a read lock on that range, and the call upgrades it. Other owners' read locks on the range conflict. The reserved byte and the pending byte do not, and the writer still holds its pending write while it asks for the exclusive lock. A rule that waits for `reserved` and `pending` to fall to zero refuses the upgrade SQLite makes on every commit.
-
-The record holds five numbers and the id of one holder: shared readers, reserved holders (zero or one), pending readers, a pending writer (zero or one), and exclusive (zero or one). A read on the pending byte is granted when the pending writer is zero. A read on the shared range is granted when exclusive is zero. A reserved write is granted when reserved is zero. A pending write is granted when the pending readers and the pending writer are zero. An exclusive write is granted when no other owner holds the shared range. The release decrements. No list is walked, and nothing is allocated on this path. The same record answers `F_GETLK` for those bytes, because the one stored holder is a real blocker. That is a covering field: the grant and the common query are answered from the record the inode already points at. A lock that is not one of those three ranges conflicts by overlap only, on the overflow list below.
-
-A lock on any other byte is the rest. It goes on a short unsorted overflow list on that same record. The fast path checks the list is empty, one pointer, and continues. When it is not empty, the call scans it. The Django path pays for a nil check and never enters the scan. A program that locks arbitrary ranges still gets the right conflict. An interval tree or a log-structured merge pays for nodes and compaction on a key set of three offsets. It becomes worth building only after that overflow list is measured long, which the journal will not make it.
-
-The holder names that do not fit in the one stored id live in one dense array on the record, grown to the high-water mark of transactions in flight and then kept. A release finds its owner by scanning that array and swaps in the last entry. A hash from owner to slot would rehash as workers come up and would answer a question the counts already answered. The array exists so a `F_GETLK` whose stored holder has since released can name another, and so the overflow stays honest. Idle files never allocate it.
-
-A release is broadcast only when `waiting` on that record is non-zero. A commit that nobody is blocked on sends nothing. `waiting` is incremented when an `F_SETLKW` parks and decremented when it leaves. The pubsub event is the wake-up, not a log of every unlock.
-
-`F_SETLK` returns at once. A conflict is `EAGAIN`. `F_SETLKW` waits. The wait is not a held HTTP response, and it is not held under the inode mutex: the waiter sleeps on the namespace pubsub and reads the counts again when it wakes. Two waiters that wake together: one takes it, the other waits again. A dropped connection repeats, on rejoin, a release that client has not seen, so a missed event cannot leave a waiter blocked. The last close of that open unlocks its ranges, and that close is a release too. `F_GETLK` reports the conflicting lock, or reports that the range is clear. A call that names two inodes takes their mutexes in inode order.
-
-Four machines. S holds the files and the table. C1, C2 and C3 are three mounts.
-
-1. C1 runs a select and takes a read lock on the shared range. Granted.
-2. C2 runs a select and takes a read lock on the same range. Granted. The two read locks do not conflict.
-3. C3 runs an update and takes the exclusive write lock over that range. The range is held. An immediate lock (`F_SETLK`) fails with `EAGAIN`. A waiting lock (`F_SETLKW`) waits.
-4. C1 finishes and releases. C2 finishes and releases.
-5. C3's write lock is granted.
-6. C1 runs another select and takes a read lock. The write lock is still held. The immediate lock fails with `EAGAIN`. The waiting lock waits until C3 releases.
-
-One client, two opens. P1 and P2 are two processes on C1, or two threads that hold two opens.
-
-1. P1 takes a write lock. Granted.
-2. P2 takes a read lock on an overlapping byte. The immediate lock fails with `EAGAIN`. The waiting lock waits until P1 releases, and is granted then.
-
-Two threads of one process that share a single POSIX owner are one owner. The kernel merges those calls before a second owner exists, and SQLite excludes those threads with its own mutex. The relay's job is two owners. Two processes on one mount are two owners. Two mounts are two owners.
-
-Today the mount implements no `getlk`, `setlk` or `setlkw`. go-fuse answers the first one with `ENOSYS`, and the Linux kernel keeps a lock table for that mount alone. Several processes on one machine therefore wait on each other, which is why the rollback journal works on one mount. The file on S is not locked. A second mount has its own kernel table, so C1's read lock and C3's write lock are both granted and both can write. WAL stays out of scope: it needs the `-shm` file mapped shared by every process, and a `MAP_SHARED` mapping is private to each mount.
+The calls a single program uses are in: create, open, read, write, close, fsync, mkdir, rmdir, unlink, rename, symlink, getattr, setattr, readdir, statfs, access, and the advisory record locks. What remains below is either outside a one-token mount, or a refusal POSIX already allows. Each one says what it would take, what refusing costs, and whether a program handles the error.
 
 ### Outside this system
 

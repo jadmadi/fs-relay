@@ -190,3 +190,50 @@ func TestClientAndReleaseRoundTrip(t *testing.T) {
 		t.Fatalf("hello %+v", rp)
 	}
 }
+
+func TestLockRoundTrip(t *testing.T) {
+	b, err := MarshalRequest(Setlkw, Params{
+		Namespace: "demo", Inode: 2, Fh: 3, Owner: 42, Pid: 7,
+		Lock: LockWrite, Offset: 0x40000000, Size: 1, Flags: FlagFlock,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := DecodeRequest(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := req.Params
+	if req.Method != Setlkw || p.Owner != 42 || p.Pid != 7 || p.Lock != LockWrite {
+		t.Fatalf("decoded %+v", req)
+	}
+	if p.Offset != 0x40000000 || p.Size != 1 || p.Flags != FlagFlock {
+		t.Fatalf("range %+v", p)
+	}
+}
+
+func TestLockResult(t *testing.T) {
+	want := Lock{Type: LockUnlock, Start: 5, End: 9, Pid: 11}
+	b, err := MarshalResult(Result{Lock: &want})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := DecodeResponse(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Lock == nil || *res.Lock != want {
+		t.Fatalf("lock %+v", res.Lock)
+	}
+	zero, err := MarshalResult(Result{Lock: &Lock{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = DecodeResponse(zero)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Lock == nil || *res.Lock != (Lock{}) {
+		t.Fatalf("zero lock %+v", res.Lock)
+	}
+}

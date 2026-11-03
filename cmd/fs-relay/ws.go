@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -20,6 +21,7 @@ func serveWS(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad namespace", http.StatusBadRequest)
 		return
 	}
+	client := r.URL.Query().Get("client")
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true,
 		CompressionMode:    websocket.CompressionDisabled,
@@ -29,13 +31,13 @@ func serveWS(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 	conn.SetReadLimit(wire.MaxBody)
-	runWS(h, r.Context(), tree, conn, ns)
+	runWS(h, r.Context(), tree, conn, ns, client)
 }
 
-func runWS(h *hub, ctx context.Context, tree *local.Tree, conn *websocket.Conn, ns string) {
+func runWS(h *hub, ctx context.Context, tree *local.Tree, conn *websocket.Conn, ns, client string) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	m, err := h.attach(ns, "", true, cancel)
+	m, err := h.attach(ns, client, true, cancel)
 	if err != nil {
 		return
 	}
@@ -55,7 +57,7 @@ func runWS(h *hub, ctx context.Context, tree *local.Tree, conn *websocket.Conn, 
 		return wr.send(ctx, b)
 	})
 	go ping(ctx, conn)
-	readCalls(ctx, h, tree, conn, ns, wr, &wg)
+	readCalls(ctx, h, tree, conn, ns, m.id, wr, &wg)
 }
 
 func ping(ctx context.Context, conn *websocket.Conn) {
@@ -77,7 +79,7 @@ func ping(ctx context.Context, conn *websocket.Conn) {
 	}
 }
 
-func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Conn, ns string, wr *wsWriter, wg *sync.WaitGroup) {
+func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Conn, ns, client string, wr *wsWriter, wg *sync.WaitGroup) {
 	var mu sync.Mutex
 	lanes := map[uint64]struct{}{}
 	for {
@@ -85,11 +87,18 @@ func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Co
 		if !ok || req.Params.Namespace != ns || !claim(lanes, &mu, req.ID) {
 			return
 		}
+		req.Params.Client = client
 		wg.Add(1)
 		go func(req wire.Request) {
 			defer wg.Done()
 			defer release(lanes, &mu, req.ID)
-			res, callErr := tree.Call(ctx, req.Method, req.Params)
+			res, callErr := callWait(ctx, h, tree, ns, req.Method, req.Params, func() error {
+				b, err := wire.MarshalPending(req.ID, pendingTicket(req.ID))
+				if err != nil {
+					return err
+				}
+				return wr.send(ctx, b)
+			})
 			publishCall(h, tree, ns, req.Method, req.Params, callErr)
 			b, err := wsBody(req.ID, res, callErr)
 			if err != nil {
@@ -98,6 +107,10 @@ func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Co
 			_ = wr.send(ctx, b)
 		}(req)
 	}
+}
+
+func pendingTicket(id uint64) string {
+	return "lock-" + strconv.FormatUint(id, 10)
 }
 
 func readWS(ctx context.Context, conn *websocket.Conn) (wire.Request, bool) {

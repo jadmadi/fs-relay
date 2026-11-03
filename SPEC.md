@@ -171,7 +171,7 @@ FlatBuffers is the only filesystem wire. The content type is `application/x-flat
 
 `GET /ws/<namespace>` is the same envelope, one binary websocket message per call. The client sets `id` (a nonzero integer) on the request and the server copies it onto every message for that call. Calls overlap. A filesystem failure carries that `id` and the error. A fault that is not an errno carries that `id` and a fault string, and the socket stays up. A body that is not a call, an `id` of 0, a repeated `id`, or a namespace that does not match the URL closes the socket.
 
-`setlkw` is an ordinary call. It does not hold a response open. The grant is the reply to that call. The wake-up arrives on the mount's one pubsub, described under Locks.
+`setlkw` is an ordinary call that may wait. The server owns the wait. On `/ws/` it answers first with a `pending` ticket, then with the result under the same id when the lock is granted. A POST has one reply, so the server holds the response until the grant. A release in the namespace ends the wait. A canceled request returns `EINTR`. The mount does not poll.
 
 `namespace` is required and must match the URL. The other fields are the kernel arguments the method needs: `inode`, `inodes`, `name`, `new_inode`, `new_name`, `fh`, `mode`, `flags`, `offset`, `size`, `data`, `target`, `valid`, `atime`, `mtime`, `uid`, `gid`, `mask`. `inodes` is the list for `reads` and `readdirs`. `valid` uses the Linux FUSE `FATTR_*` bits. Empty strings and empty byte vectors are absent. A numeric zero is present. `valid` still says which setattr fields count, so a size or owner of zero is applied. A missing required field is HTTP 400. A name of `.`, `..`, or one that contains `/` or NUL is `EINVAL`.
 
@@ -197,6 +197,8 @@ M1 surface, which is also what `tar` needs: `lookup`, `getattr`, `setattr`, `acc
 
 `rename` follows `rename(2)`: a file replaces a file, a directory replaces an empty directory, and the other pairings fail with `EISDIR`, `ENOTDIR` or `ENOTEMPTY`. `RENAME_NOREPLACE` is honored. `RENAME_EXCHANGE` and `RENAME_WHITEOUT` fail with `EINVAL`.
 
+`getlk`, `setlk` and `setlkw` carry `owner`, `lock`, `offset`, `size`, `pid` and, for `flock`, the flag bit. `lock` is `F_RDLCK`, `F_WRLCK` or `F_UNLCK`. `offset` is the first byte and `size` the length; a size of all ones means to the end of the file. `getlk` returns a `lock` table with type, start, end and pid, or `F_UNLCK` when the range is clear.
+
 ## Coherence
 
 Attribute and entry timeouts are 1s. The negative timeout is 500ms. A read-only open keeps the kernel page cache (`FOPEN_KEEP_CACHE`). A create, and any writable open, bypasses it (`FOPEN_DIRECT_IO`).
@@ -216,14 +218,17 @@ The server sends an eviction after a successful `create`, `mkdir`, `symlink`, `w
 
 ## Locks
 
-Not built. `ROADMAP.md` records what one mount does today. The contract, once the table exists, is:
+Built. The server's table is the authority for POSIX byte-range locks.
 
-- POSIX record locks: `getlk`, `setlk`, `setlkw`. The owner is the FUSE owner plus a per-mount client id. Two mounts do not share an owner, and two opens on one mount do not either.
-- The server's lock table is the authority. `setlk` is an ordinary envelope and returns `EAGAIN` on a conflict.
-- `setlkw` is an ordinary call. The FUSE handler waits on the pubsub reader. It does not hold its own response.
-- A release is an envelope on that pubsub whose release field is the lock id, sent only when a `setlkw` is parked on that file. A commit that nobody is waiting on sends nothing. On `/ws/` it is one binary message with no call id. The waiting mount wakes and tries `setlk` again. If two waiters wake together, one `setlk` wins and the other waits again.
-- A dropped `join` is the rejoin above. The server repeats a wake-up that this client has not seen, so a missed event cannot leave `setlkw` blocked.
-- The hot path is the three ranges SQLite locks: the pending byte at `0x40000000`, the reserved byte after it, and the 510-byte shared range after that. A new reader read-locks the pending byte, then the shared range, then unlocks the pending byte. Exclusive is a write lock on the shared range and upgrades the same owner's own read lock there. It does not wait for that owner's pending or reserved lock to clear. Any other byte range conflicts by overlap. `ROADMAP.md` records the counts.
+- `getlk`, `setlk` and `setlkw` name the inode and, where there is one, the `fh`. `owner` is the lock owner the kernel sent for that open. A holder is keyed by the mount's client id and that owner. Classic POSIX locks are per process, so two opens of one process share an owner; two mounts never do.
+- The kernel keeps its own lock table only while the mount does not advertise `FUSE_POSIX_LOCKS`. `fs-relay-bind` sets `EnableLocks`, so every lock call reaches the server.
+- `setlk` returns `EAGAIN` on a conflict. `setlkw` waits in the server: on `/ws/` a `pending` ticket first, then the result under the same id; on a POST the response is held. A release in the namespace wakes every waiter. Two waiters that wake together retry; one wins and the other waits again.
+- A release is one event on the namespace pubsub whose `release` field is the event id, sent only when a `setlkw` is parked on that file. A commit that nobody waits on sends nothing. The event is replayed to a client that rejoins, so a dropped stream cannot leave a wait stuck.
+- A `release` call drops every lock the calling owner holds on that inode. POSIX drops a process's locks on any close of a descriptor for the file.
+- `getlk` reports the first conflicting lock, or `F_UNLCK` when the range is clear. It never blocks.
+- The hot path is the three ranges SQLite locks: the pending byte at `0x40000000`, the reserved byte after it, and the 510-byte shared range after that. A new reader read-locks the pending byte, then the shared range, then unlocks the pending byte. Exclusive is a write lock on the shared range and upgrades the same owner's own read lock there. It does not wait for that owner's pending or reserved lock to clear. Any other byte range conflicts by overlap.
+- A partial unlock of one of those three ranges splits the remaining bytes onto the overflow list, so the counts stay exact.
+- `flock` uses the same record as a whole-file entry. It conflicts with other `flock` locks and never with a byte-range lock.
 - The server is the only writer under `data/`. A process that opens those files directly is outside the lock table.
 
 This is what SQLite's rollback journal needs (SHARED, RESERVED and EXCLUSIVE byte ranges). WAL needs shared memory between processes and is not a goal.
@@ -240,7 +245,7 @@ This is what SQLite's rollback journal needs (SHARED, RESERVED and EXCLUSIVE byt
 
 - `internal/local` against `t.TempDir()`: every M1 operation, path escape, errno, inode stability across rename.
 - `internal/wire`: a round trip of one request and both response shapes. The buffer carries the `FSR1` file identifier.
-- Lock grant, conflict, release fan-out and rejoin are tested with the lock table once it exists.
+- Lock grant, conflict, partial unlock, release fan-out and rejoin are tested with the lock table.
 - A real mount is not a unit test. It belongs in the README smoke checklist.
 - Cost: one POST per FUSE call, or one websocket frame per FUSE call on a shared socket, except `reads`, which carries up to 32 small files from one listing, except `readdirs`, which carries up to 32 child directories from one listing, and except a write, which is one call per contiguous 1 MiB or per `release`. A read or write inside the raw window is one frame on a raw connection instead. Each POST mount also holds one `join` stream. `setlkw` does not hold a stream of its own.
 

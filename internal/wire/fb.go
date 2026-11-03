@@ -119,6 +119,9 @@ func putParams(b *flatbuffers.Builder, p *Params) flatbuffers.UOffsetT {
 	addOffset(b, client, FbParamsAddClient)
 	FbParamsAddFhOut(b, p.FhOut)
 	FbParamsAddOffsetOut(b, p.OffsetOut)
+	FbParamsAddOwner(b, p.Owner)
+	FbParamsAddPid(b, p.Pid)
+	FbParamsAddLock(b, p.Lock)
 	return FbParamsEnd(b)
 }
 
@@ -144,6 +147,7 @@ func putResult(b *flatbuffers.Builder, res *Result) flatbuffers.UOffsetT {
 	stat := putStat(b, res.Stat)
 	blobs := putBlobs(b, res.Blobs)
 	listings := putListings(b, res.Listings)
+	lock := putLock(b, res.Lock)
 	FbResultStart(b)
 	addOffset(b, attr, FbResultAddAttr)
 	addOffset(b, entries, FbResultAddEntries)
@@ -154,7 +158,20 @@ func putResult(b *flatbuffers.Builder, res *Result) flatbuffers.UOffsetT {
 	FbResultAddWritten(b, res.Written)
 	addOffset(b, blobs, FbResultAddBlobs)
 	addOffset(b, listings, FbResultAddListings)
+	addOffset(b, lock, FbResultAddLock)
 	return FbResultEnd(b)
+}
+
+func putLock(b *flatbuffers.Builder, l *Lock) flatbuffers.UOffsetT {
+	if l == nil {
+		return 0
+	}
+	FbLockStart(b)
+	FbLockAddTyp(b, l.Type)
+	FbLockAddStart(b, l.Start)
+	FbLockAddEnd(b, l.End)
+	FbLockAddPid(b, l.Pid)
+	return FbLockEnd(b)
 }
 
 func putAttr(b *flatbuffers.Builder, a *Attr) flatbuffers.UOffsetT {
@@ -347,6 +364,9 @@ func paramsFrom(p *FbParams) Params {
 		Client:    string(p.Client()),
 		FhOut:     p.FhOut(),
 		OffsetOut: p.OffsetOut(),
+		Owner:     p.Owner(),
+		Pid:       p.Pid(),
+		Lock:      p.Lock(),
 	}
 }
 
@@ -399,7 +419,15 @@ func resultFrom(res *FbResult) Result {
 		stat := statFrom(s)
 		out.Stat = &stat
 	}
+	if l := res.Lock(new(FbLock)); l != nil {
+		lock := lockFrom(l)
+		out.Lock = &lock
+	}
 	return out
+}
+
+func lockFrom(l *FbLock) Lock {
+	return Lock{Type: l.Typ(), Start: l.Start(), End: l.End(), Pid: l.Pid()}
 }
 
 func attrFrom(a *FbAttr) Attr {

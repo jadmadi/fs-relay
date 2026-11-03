@@ -111,6 +111,7 @@ func mountOptions(allowOther, debug bool) *fs.Options {
 	opts.FsName = "fs-relay"
 	opts.Name = "fs-relay"
 	opts.DisableXAttrs = true
+	opts.EnableLocks = true
 	opts.MaxWrite = wire.MaxWrite
 	opts.RootStableAttr = &fs.StableAttr{Ino: 1, Mode: syscall.S_IFDIR}
 	return opts

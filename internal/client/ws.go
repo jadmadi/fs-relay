@@ -35,6 +35,7 @@ type Socket struct {
 	stopped  chan struct{}
 	joined   chan struct{}
 	joinOnce sync.Once
+	id       string
 	err      error
 }
 
@@ -136,6 +137,9 @@ func (s *Socket) Call(ctx context.Context, method string, p wire.Params) (wire.R
 	if p.Namespace == "" {
 		p.Namespace = s.ns
 	}
+	if p.Client == "" {
+		p.Client = s.session()
+	}
 	id, ch, dead, err := s.begin()
 	if err != nil {
 		return wire.Result{}, err
@@ -166,6 +170,28 @@ func wsEndpoint(base, ns string) (string, error) {
 	}
 	u.Path = strings.TrimRight(u.Path, "/") + "/ws/" + url.PathEscape(ns)
 	return u.String(), nil
+}
+
+func (s *Socket) setSession(id string) {
+	s.mu.Lock()
+	s.id = id
+	s.mu.Unlock()
+}
+
+func (s *Socket) session() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.id
+}
+
+// endpointWithID keeps the mount's client id across a reconnect, so its
+// locks stay its own.
+func (s *Socket) endpointWithID() string {
+	id := s.session()
+	if id == "" {
+		return s.endpoint
+	}
+	return s.endpoint + "?client=" + url.QueryEscape(id)
 }
 
 func (s *Socket) begin() (uint64, <-chan wire.Reply, <-chan struct{}, error) {
@@ -260,7 +286,7 @@ func (s *Socket) serve() {
 			return
 		}
 		if s.current() == nil {
-			conn, err := dialConn(context.Background(), s.endpoint, s.token)
+			conn, err := dialConn(context.Background(), s.endpointWithID(), s.token)
 			if Refused(err) {
 				log.Fatalf("fs-relay-bind: %v", err)
 			}
@@ -333,6 +359,7 @@ func (s *Socket) loop(again bool) (bool, error) {
 			return named, err
 		}
 		if id, ok := sessionID(rp); ok {
+			s.setSession(id)
 			if !named {
 				named = true
 				s.markJoined()

@@ -32,5 +32,8 @@ var operations = map[string]op{
 	wire.Rename:        rename,
 	wire.Symlink:       symlink,
 	wire.Readlink:      readlink,
+	wire.Getlk:         getlk,
+	wire.Setlk:         setlk,
+	wire.Setlkw:        setlk,
 	wire.CopyFileRange: copyRange,
 }
