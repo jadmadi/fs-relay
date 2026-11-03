@@ -33,6 +33,7 @@ func run() error {
 	useRaw := flag.Bool("raw", true, "carry large reads and writes on a separate connection")
 	debug := flag.Bool("debug", false, "enable FUSE debug logging")
 	token := flag.String("token", "", "secret printed by fs-relay")
+	tokenFile := flag.String("token-file", "", "read the secret from this file (mode 600)")
 	flag.Parse()
 	if flag.NArg() != 1 {
 		fmt.Fprintf(os.Stderr, "usage: %s [flags] <mountpoint>\n", os.Args[0])
@@ -46,10 +47,8 @@ func run() error {
 		return fmt.Errorf("namespace: %w", err)
 	}
 	base := normalizeURL(*url)
-	if *token == "" {
-		return fmt.Errorf("pass -token")
-	}
-	if err := wire.CheckToken(*token); err != nil {
+	tk, err := resolveToken(*token, *tokenFile)
+	if err != nil {
 		return err
 	}
 	open := openSocket
@@ -58,7 +57,7 @@ func run() error {
 		open = openHTTP
 		mode = "HTTP POST"
 	}
-	c, events, stop, err := open(base, *ns, *token)
+	c, events, stop, err := open(base, *ns, tk)
 	if err != nil {
 		return err
 	}
@@ -68,7 +67,7 @@ func run() error {
 	defer cancel()
 	go k.loop(ctx, events)
 	root := &node{c: c, k: k, ino: 1}
-	defer attachRaw(root, base, *ns, *token, *useRaw)()
+	defer attachRaw(root, base, *ns, tk, *useRaw)()
 	server, err := fs.Mount(flag.Arg(0), root, mountOptions(*allowOther, *debug))
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)

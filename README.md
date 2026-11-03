@@ -86,13 +86,13 @@ Generate the token once and keep it in a file only you can read:
 ```bash
 install -d -m 700 ~/.config/fs-relay
 (umask 077; openssl rand -hex 16 > ~/.config/fs-relay/token)
-./fs-relay -token "$(cat ~/.config/fs-relay/token)"
-./fs-relay-bind -token "$(cat ~/.config/fs-relay/token)" /mnt/fs-relay
+./fs-relay -token-file ~/.config/fs-relay/token
+./fs-relay-bind -token-file ~/.config/fs-relay/token /mnt/fs-relay
 ```
 
-The value is still on the command line while the process runs, so another
-local user can read it from `ps`. On a shared host, restrict who can run `ps`
-on the box, or keep the mount on a single-user machine.
+`-token-file` reads a regular file, and the process stops if another user can
+read it, so keep the file at mode 600. `-token` still works, but the value
+sits in the process list (`ps aux`), which every local user can read.
 
 Add `-post` to send each operation as its own request. `-raw=false` sends large reads and writes on the main connection. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
 

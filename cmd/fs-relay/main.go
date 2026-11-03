@@ -26,9 +26,10 @@ func run() error {
 	listen := flag.String("listen", "127.0.0.1:8080", "address to listen on")
 	data := flag.String("data", "data", "directory that holds one folder per namespace")
 	given := flag.String("token", "", "shared secret; printed when omitted")
+	file := flag.String("token-file", "", "read the shared secret from this file (mode 600)")
 	flag.Parse()
 
-	token, err := chooseToken(*given)
+	token, err := chooseToken(*given, *file)
 	if err != nil {
 		return err
 	}
