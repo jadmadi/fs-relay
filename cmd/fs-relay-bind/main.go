@@ -45,6 +45,7 @@ func run() error {
 	if err := wire.CheckNS(*ns); err != nil {
 		return fmt.Errorf("namespace: %w", err)
 	}
+	base := normalizeURL(*url)
 	if *token == "" {
 		return fmt.Errorf("pass -token")
 	}
@@ -57,7 +58,7 @@ func run() error {
 		open = openHTTP
 		mode = "HTTP POST"
 	}
-	c, events, stop, err := open(*url, *ns, *token)
+	c, events, stop, err := open(base, *ns, *token)
 	if err != nil {
 		return err
 	}
@@ -67,12 +68,12 @@ func run() error {
 	defer cancel()
 	go k.loop(ctx, events)
 	root := &node{c: c, k: k, ino: 1}
-	defer attachRaw(root, *url, *ns, *token, *useRaw)()
+	defer attachRaw(root, base, *ns, *token, *useRaw)()
 	server, err := fs.Mount(flag.Arg(0), root, mountOptions(*allowOther, *debug))
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)
 	}
-	log.Printf("fs-relay-bind: mounted on %s, namespace %s, %s, %s", flag.Arg(0), *ns, mode, *url)
+	log.Printf("fs-relay-bind: mounted on %s, namespace %s, %s, %s", flag.Arg(0), *ns, mode, base)
 	go unmountOnSignal(server)
 	server.Wait()
 	return nil
