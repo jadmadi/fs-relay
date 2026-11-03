@@ -66,15 +66,18 @@ func (t *Tree) Prepare() error {
 		return fmt.Errorf("data directory %s: %w", t.root, err)
 	}
 	t.root = abs
-	if err := os.MkdirAll(abs, 0o755); err != nil {
-		return fmt.Errorf("data directory %s: %w", abs, err)
-	}
 	info, err := os.Stat(abs)
-	if err != nil {
+	switch {
+	case err == nil:
+		if !info.IsDir() {
+			return fmt.Errorf("data directory %s is not a directory", abs)
+		}
+	case errors.Is(err, os.ErrNotExist):
+		if err := os.MkdirAll(abs, 0o755); err != nil {
+			return fmt.Errorf("data directory %s: %w", abs, err)
+		}
+	default:
 		return fmt.Errorf("data directory %s: %w", abs, err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("data directory %s is not a directory", abs)
 	}
 	return nil
 }

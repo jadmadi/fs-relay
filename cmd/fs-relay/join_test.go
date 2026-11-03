@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -281,6 +283,40 @@ func TestJoinMissingNamespace(t *testing.T) {
 	}
 	text, _ := io.ReadAll(resp.Body)
 	if !strings.Contains(string(text), "does not exist") {
+		t.Fatalf("body %q", text)
+	}
+}
+
+func TestJoinNamespaceIsFile(t *testing.T) {
+	tree, dir := newTestTreeDir(t)
+	if err := os.WriteFile(filepath.Join(dir, "bad"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := newHub(testToken)
+	hnd, _ := handler(tree, h)
+	srv := httptest.NewServer(hnd)
+	t.Cleanup(srv.Close)
+
+	body, err := wire.MarshalRequest(wire.Join, wire.Params{Namespace: "bad"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/fs/bad", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", wire.ContentType)
+	req.Header.Set(wire.TokenHeader, wire.TokenScheme+" "+testToken)
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	text, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(text), "not a directory") {
 		t.Fatalf("body %q", text)
 	}
 }

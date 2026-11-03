@@ -29,9 +29,19 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 ## Summary
 - **Total Goals**: 5
 - 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
-- 🟢 **Implemented**: 5 (5 verified 📜, 0 unverified)
+- 🔵 **In Progress (Claimed)**: 1
+- 🟢 **Implemented**: 4 (4 verified 📜, 0 unverified)
+- 🔁 **Reopened for Remediation**: 1
 - 🎯 **By Tier**: 0 immediate (Tier 1), 5 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
 - 📋 **Execution Tasks Progress**: 37/37 completed (100%)
+
+---
+
+## 🔵 In Progress (Claimed Goals)
+
+| Goal Package | Tier | Mode | Agent | Status & Note | Started |
+| :--- | :---: | :---: | :--- | :--- | :--- |
+| [`startup-validation`](startup-validation/goal.md) | `🗺️ Roadmap` | `⚡ Indep` | `@agent` | [REOPENED] remediation: Qodo low findings: bare 500 and unreachable not-a-directory message | 0s ago |
 
 ---
 
@@ -41,6 +51,5 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | :--- | :---: | :--- | :---: | :--- | :--- |
 | [`advisory-record-locks`](advisory-record-locks/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `c84e4b2` |
 | [`cli-review-fixes`](cli-review-fixes/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `a69607e` |
-| [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `6bade08` |
 | [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `e991617` |
 | [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `daa9689` |

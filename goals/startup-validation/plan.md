@@ -102,6 +102,19 @@ T5 last.
     - AC-6.4: the websocket error says the namespace does not exist.
     - AC-6.5: a data-root error names the absolute path.
 
+- [x] **T7 - Close the two low findings**
+  - Goal: name a namespace that is a file, and make the data-root message
+    reachable.
+  - Files: `internal/local/tree.go`, `cmd/fs-relay/serve.go`, tests.
+  - Requirements:
+    1. `Prepare` stats before `MkdirAll`, so a file yields
+       `data directory <path> is not a directory`.
+    2. `writeNamespaceErr` maps `ENOTDIR` to 404 with a message, permission
+       to 403, and includes the error on 500.
+  - Acceptance:
+    - AC-7.1: a file root prints the not-a-directory message.
+    - AC-7.2: a namespace that is a file is 404 `is not a directory`.
+
 ## Definition of done
 
 ```

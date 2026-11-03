@@ -77,6 +77,17 @@ Observed: `fs-relay-bind` with no args exits 2; a websocket and a `-post`
 mount with a missing namespace both print `namespace nope does not exist` and
 exit 1.
 
+## Low findings, second pass
+
+| Finding | Fix |
+|---------|-----|
+| Namespace failures other than missing return a bare 500 | `writeNamespaceErr` maps `ENOTDIR` to 404, permission to 403, and includes the error on 500 |
+| The not-a-directory startup message never prints | `Prepare` stats before `MkdirAll`, so a file hits the direct message |
+
+Observed: `fs-relay -data <file>` prints `data directory <abs> is not a
+directory`; a join to a namespace that is a file is 404 `namespace bad is not
+a directory`.
+
 ## Memory Writes
 
 ```json

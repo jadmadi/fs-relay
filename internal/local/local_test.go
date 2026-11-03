@@ -542,8 +542,8 @@ func TestPrepareRejectsFile(t *testing.T) {
 	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := New(file).Prepare(); err == nil {
-		t.Fatal("accepted a file as the data root")
+	if err := New(file).Prepare(); err == nil || !strings.Contains(err.Error(), "is not a directory") {
+		t.Fatalf("file root: %v", err)
 	}
 }
 

@@ -1,11 +1,10 @@
 {
   "goal_slug": "startup-validation",
-  "reopened_at": "2026-11-03T16:08:42.454220834Z",
+  "reopened_at": "2026-11-03T16:10:34.936603368Z",
   "reopened_by": "agent",
-  "reason": "Qodo review found five startup bugs",
-  "original_commit": "2876886",
-  "resolved_commit": "66dff17",
-  "resolved_at": "2026-11-03T16:08:54.836480369Z",
-  "active": false,
-  "reopen_epoch": 1
+  "reason": "Qodo low findings: bare 500 and unreachable not-a-directory message",
+  "original_commit": "6bade08",
+  "resolved_at": "0001-01-01T00:00:00Z",
+  "active": true,
+  "reopen_epoch": 2
 }
