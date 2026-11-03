@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"fs-relay/internal/client"
-	"fs-relay/internal/local"
 	"fs-relay/internal/wire"
 )
 
@@ -24,7 +23,7 @@ func (c *countTrip) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func TestOnePost(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { tree.Close() })
 	srv := httptest.NewServer(newHandler(tree, testToken))
 	t.Cleanup(srv.Close)

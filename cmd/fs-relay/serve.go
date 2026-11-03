@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 	"syscall"
 
@@ -49,6 +50,10 @@ func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad body", http.StatusBadRequest)
 		return
 	}
+	if err := tree.OpenNamespace(ns); err != nil {
+		writeNamespaceErr(w, ns, err)
+		return
+	}
 	if req.Method == wire.Join {
 		serveJoin(h, ns, w, r, req.Params.Client)
 		return
@@ -64,6 +69,14 @@ func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 	}
 	publishCall(h, tree, ns, req.Method, req.Params, err)
 	writeCall(w, res, err)
+}
+
+func writeNamespaceErr(w http.ResponseWriter, ns string, err error) {
+	if errors.Is(err, os.ErrNotExist) {
+		http.Error(w, "namespace "+ns+" does not exist", http.StatusNotFound)
+		return
+	}
+	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
 
 func publishCall(h *hub, tree *local.Tree, ns, method string, p wire.Params, err error) {

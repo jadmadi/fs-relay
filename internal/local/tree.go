@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -24,6 +25,8 @@ type Tree struct {
 	fmu    sync.Mutex
 	files  map[uint64]*openFile
 	nextFH uint64
+
+	dirs map[string]bool
 }
 
 type entry struct {
@@ -51,7 +54,49 @@ func New(root string) *Tree {
 		ns:     map[string]*names{},
 		files:  map[uint64]*openFile{},
 		nextFH: 1,
+		dirs:   map[string]bool{},
 	}
+}
+
+// Prepare creates the data root if needed and verifies it is a directory.
+// It does not create a namespace.
+func (t *Tree) Prepare() error {
+	if err := os.MkdirAll(t.root, 0o755); err != nil {
+		return fmt.Errorf("data directory %s: %w", t.root, err)
+	}
+	info, err := os.Stat(t.root)
+	if err != nil {
+		return fmt.Errorf("data directory %s: %w", t.root, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("data directory %s is not a directory", t.root)
+	}
+	return nil
+}
+
+// OpenNamespace checks that data/<ns> is an existing directory. A hit is
+// cached; a miss is not, so creating the directory later works.
+func (t *Tree) OpenNamespace(ns string) error {
+	if err := wire.CheckNS(ns); err != nil {
+		return err
+	}
+	t.mu.Lock()
+	ok := t.dirs[ns]
+	t.mu.Unlock()
+	if ok {
+		return nil
+	}
+	info, err := os.Stat(filepath.Join(t.root, ns))
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return syscall.ENOTDIR
+	}
+	t.mu.Lock()
+	t.dirs[ns] = true
+	t.mu.Unlock()
+	return nil
 }
 
 // BlockSize is the data directory's preferred I/O size, read once at startup.
@@ -85,6 +130,9 @@ func (t *Tree) Call(ctx context.Context, method string, p wire.Params) (wire.Res
 		return wire.Result{}, err
 	}
 	if err := wire.CheckNS(p.Namespace); err != nil {
+		return wire.Result{}, err
+	}
+	if err := t.OpenNamespace(p.Namespace); err != nil {
 		return wire.Result{}, err
 	}
 	fn, ok := operations[method]

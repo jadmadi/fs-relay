@@ -62,6 +62,10 @@ func serveRaw(h *hub, tree *local.Tree, set *rawSet, min, max int, w http.Respon
 		http.Error(w, "bad namespace", http.StatusBadRequest)
 		return
 	}
+	if err := tree.OpenNamespace(ns); err != nil {
+		writeNamespaceErr(w, ns, err)
+		return
+	}
 	if r.Header.Get("Upgrade") != wire.RawProtocol {
 		http.Error(w, "upgrade", http.StatusBadRequest)
 		return

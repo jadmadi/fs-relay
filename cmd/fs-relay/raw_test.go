@@ -19,7 +19,7 @@ import (
 )
 
 func TestRawRoundTrip(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { _ = tree.Close() })
 	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
@@ -59,7 +59,7 @@ func TestRawRoundTrip(t *testing.T) {
 }
 
 func TestRawLargeWrite(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { _ = tree.Close() })
 	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
@@ -109,7 +109,7 @@ func TestRawLargeWrite(t *testing.T) {
 }
 
 func TestRawEvict(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { _ = tree.Close() })
 	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
@@ -135,7 +135,7 @@ func TestRawEvict(t *testing.T) {
 }
 
 func TestRawNoUpgrade(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { _ = tree.Close() })
 	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
@@ -156,7 +156,7 @@ func TestRawNoUpgrade(t *testing.T) {
 }
 
 func TestRawPoolAndCancel(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { _ = tree.Close() })
 	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)

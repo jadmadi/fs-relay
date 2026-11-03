@@ -39,6 +39,7 @@ func run() error {
 	allowOther := flags.Bool("allow-other", false, "allow other users to access the mount")
 	useRaw := flags.Bool("raw", true, "carry large reads and writes on a separate connection")
 	debug := flags.Bool("debug", false, "enable FUSE debug logging")
+	forceExisting := flags.Bool("force-existing-mnt", false, "mount over a non-empty directory")
 	token := flags.String("token", "", "secret printed by fs-relay")
 	tokenFile := flags.String("token-file", "", "read the secret from this file (mode 600)")
 	showVersion := flags.Bool("version", false, "print the version and exit")
@@ -65,6 +66,9 @@ func run() error {
 	}
 	if *post && *useWS {
 		return fmt.Errorf("pass -post or -ws, not both")
+	}
+	if err := checkMountpoint(flags.Arg(0), *forceExisting); err != nil {
+		return err
 	}
 	if err := wire.CheckNS(*ns); err != nil {
 		return fmt.Errorf("namespace: %w", err)

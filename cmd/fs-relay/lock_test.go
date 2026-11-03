@@ -24,7 +24,7 @@ const (
 
 func lockServer(t *testing.T) (*httptest.Server, *local.Tree, *hub) {
 	t.Helper()
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { tree.Close() })
 	h := newHub(testToken)
 	srv := httptest.NewServer(mustHandler(tree, h))
@@ -158,7 +158,7 @@ func TestWebsocketSetlkwReturnsEAGAINAndReleaseArrives(t *testing.T) {
 }
 
 func TestHoldExpiryReleasesClientLocks(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { tree.Close() })
 	h := newHub(testToken)
 	h.tree = tree
@@ -204,7 +204,7 @@ func TestHoldExpiryReleasesClientLocks(t *testing.T) {
 }
 
 func TestHoldKeepsLocksOnRejoin(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { tree.Close() })
 	h := newHub(testToken)
 	h.tree = tree

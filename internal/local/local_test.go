@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -17,6 +18,9 @@ import (
 func newTree(t *testing.T) (*Tree, string) {
 	t.Helper()
 	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "demo"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	tr := New(dir)
 	t.Cleanup(func() { tr.Close() })
 	return tr, dir
@@ -450,7 +454,7 @@ func TestBadNamespaceWritesNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ents) != 0 {
+	if len(ents) != 1 || ents[0].Name() != "demo" {
 		t.Fatalf("namespace escaped: %v", ents)
 	}
 }
@@ -497,7 +501,12 @@ func TestRenameRules(t *testing.T) {
 }
 
 func TestNamespacesDoNotShare(t *testing.T) {
-	tr, _ := newTree(t)
+	tr, dir := newTree(t)
+	for _, ns := range []string{"a", "b"} {
+		if err := os.Mkdir(filepath.Join(dir, ns), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
 	a, err := tr.Call(context.Background(), wire.Create, wire.Params{Namespace: "a", Inode: 1, Name: "f", Mode: 0o644})
 	if err != nil {
 		t.Fatal(err)
@@ -512,5 +521,52 @@ func TestNamespacesDoNotShare(t *testing.T) {
 	_, err = tr.Call(context.Background(), wire.Lookup, wire.Params{Namespace: "a", Inode: 1, Name: "onlyb"})
 	if errnoOf(t, err) != syscall.ENOENT {
 		t.Fatal(err)
+	}
+}
+
+func TestPrepareCreatesRoot(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "data")
+	tr := New(root)
+	t.Cleanup(func() { _ = tr.Close() })
+	if err := tr.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(root)
+	if err != nil || !info.IsDir() {
+		t.Fatalf("root %v %v", info, err)
+	}
+}
+
+func TestPrepareRejectsFile(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := New(file).Prepare(); err == nil {
+		t.Fatal("accepted a file as the data root")
+	}
+}
+
+func TestOpenNamespace(t *testing.T) {
+	tr, dir := newTree(t)
+	if err := tr.OpenNamespace("demo"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tr.OpenNamespace("missing"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "later"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := tr.OpenNamespace("later"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCallMissingNamespace(t *testing.T) {
+	tr, _ := newTree(t)
+	_, err := tr.Call(context.Background(), wire.Lookup, wire.Params{Namespace: "missing", Inode: 1})
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("call: %v", err)
 	}
 }

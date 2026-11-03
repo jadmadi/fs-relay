@@ -8,12 +8,10 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"fs-relay/internal/local"
 )
 
 func TestRootNegotiates(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { tree.Close() })
 	srv := httptest.NewServer(newHandler(tree, testToken))
 	t.Cleanup(srv.Close)
