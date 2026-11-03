@@ -13,3 +13,5 @@ goals/*/claim.json
 .sila/state/
 .sila/charters/
 .sila/locks/
+
+rm/
