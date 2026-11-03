@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"syscall"
 
@@ -10,6 +11,9 @@ import (
 func toErrno(err error) syscall.Errno {
 	if err == nil {
 		return 0
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return syscall.EINTR
 	}
 	var w *wire.Error
 	if errors.As(err, &w) {

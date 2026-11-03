@@ -421,6 +421,12 @@ func release(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 	if err := ctx.Err(); err != nil {
 		return wire.Result{}, err
 	}
+	if p.Fh == 0 {
+		if p.Owner != 0 {
+			t.DropOwner(p.Namespace, p.Inode, p.Client, p.Owner)
+		}
+		return wire.Result{}, nil
+	}
 	if len(p.Data) > 0 {
 		n, err := writeAt(t, p, "release")
 		if err != nil || n != len(p.Data) {
@@ -431,9 +437,14 @@ func release(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 			return wire.Result{}, wrap("release", io.ErrShortWrite)
 		}
 	}
+	ino := p.Inode
+	if ino == 0 {
+		ino, _ = t.inoOf(p.Fh)
+	}
 	if err := t.dropFH(p.Fh); err != nil {
 		return wire.Result{}, wrap("release", err)
 	}
+	t.DropFH(p.Namespace, ino, p.Fh)
 	return wire.Result{}, nil
 }
 

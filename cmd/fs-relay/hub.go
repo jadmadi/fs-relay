@@ -1,9 +1,11 @@
 package main
 
 import (
+	"strconv"
 	"sync"
 	"time"
 
+	"fs-relay/internal/local"
 	"fs-relay/internal/wire"
 )
 
@@ -18,6 +20,12 @@ type hub struct {
 	rooms   map[string]*room
 	holdFor time.Duration
 	token   string
+	tree    *local.Tree
+
+	// waiting is ns -> inode -> client. A release sends an event only when
+	// a client is waiting on that inode.
+	waiting map[string]map[uint64]map[string]struct{}
+	events  uint64
 }
 
 type room struct {
@@ -34,7 +42,71 @@ type member struct {
 }
 
 func newHub(token string) *hub {
-	return &hub{rooms: map[string]*room{}, holdFor: holdFor, token: token}
+	return &hub{
+		rooms:   map[string]*room{},
+		holdFor: holdFor,
+		token:   token,
+		waiting: map[string]map[uint64]map[string]struct{}{},
+	}
+}
+
+// markWaiting records that a client is about to wait on an inode.
+func (h *hub) markWaiting(ns string, ino uint64, client string) {
+	if ino == 0 {
+		return
+	}
+	h.mu.Lock()
+	if h.waiting[ns] == nil {
+		h.waiting[ns] = map[uint64]map[string]struct{}{}
+	}
+	if h.waiting[ns][ino] == nil {
+		h.waiting[ns][ino] = map[string]struct{}{}
+	}
+	h.waiting[ns][ino][client] = struct{}{}
+	h.mu.Unlock()
+}
+
+// clearWaiting reports whether anyone waited on the inode, and forgets them.
+func (h *hub) clearWaiting(ns string, ino uint64) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	set := h.waiting[ns][ino]
+	if len(set) == 0 {
+		return false
+	}
+	delete(h.waiting[ns], ino)
+	if len(h.waiting[ns]) == 0 {
+		delete(h.waiting, ns)
+	}
+	return true
+}
+
+func (h *hub) anyWaiting(ns string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.waiting[ns]) > 0
+}
+
+// releaseAll sends one release event to every subscriber and keeps it owed
+// until the stream proves it delivered a later event.
+func (h *hub) releaseAll(ns string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	r := h.rooms[ns]
+	if r == nil {
+		return
+	}
+	h.events++
+	p := wire.Pub{Release: "lock-" + strconv.FormatUint(h.events, 10)}
+	for _, m := range r.live {
+		r.owed[m.id] = append(r.owed[m.id], p)
+		select {
+		case m.ch <- p:
+		default:
+			m.cancel()
+		}
+	}
+	h.holdAbsent(r, p)
 }
 
 func (h *hub) attach(ns, id string, ws bool, cancel func()) (*member, error) {
@@ -89,6 +161,11 @@ func (h *hub) detach(ns string, m *member) {
 	}
 	delete(r.live, m.id)
 	if m.ws {
+		if r.hold == nil {
+			r.hold = map[string]time.Time{}
+		}
+		r.hold[m.id] = time.Now().Add(h.holdFor)
+		h.arm(ns, m.id)
 		return
 	}
 	h.keepOwed(r, m)
@@ -129,12 +206,22 @@ func (h *hub) arm(ns, id string) {
 
 func (h *hub) dropHold(ns, id string) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	r := h.rooms[ns]
 	if r == nil || r.live[id] != nil {
+		h.mu.Unlock()
 		return
 	}
-	h.holding(r, id)
+	until, held := r.hold[id]
+	if !held || time.Now().Before(until) {
+		h.mu.Unlock()
+		return
+	}
+	delete(r.hold, id)
+	delete(r.owed, id)
+	h.mu.Unlock()
+	if h.tree != nil && h.tree.ReleaseClient(ns, id) && h.anyWaiting(ns) {
+		h.releaseAll(ns)
+	}
 }
 
 func (h *hub) evict(ns string, changes []wire.Change) {

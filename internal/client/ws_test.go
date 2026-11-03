@@ -70,46 +70,6 @@ func TestRepliesFollowIDs(t *testing.T) {
 	}
 }
 
-func TestPendingThenResult(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
-		if err != nil {
-			return
-		}
-		defer conn.Close(websocket.StatusNormalClosure, "")
-		if err := greet(conn); err != nil {
-			t.Error(err)
-			return
-		}
-		req, err := readCall(conn)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		b, err := wire.MarshalPending(req.ID, "ticket")
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		if err := conn.Write(context.Background(), websocket.MessageBinary, b); err != nil {
-			t.Error(err)
-			return
-		}
-		if err := writeReply(conn, req.ID, wire.Result{Written: 7}); err != nil {
-			t.Error(err)
-		}
-	}))
-	t.Cleanup(srv.Close)
-	sock := mustDial(t, srv.URL)
-	res, err := sock.Call(context.Background(), wire.Write, wire.Params{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.Written != 7 {
-		t.Fatalf("written %d", res.Written)
-	}
-}
-
 func mustDial(t *testing.T, base string) *Socket {
 	t.Helper()
 	sock, err := Dial(context.Background(), base, "demo", "testtoken")

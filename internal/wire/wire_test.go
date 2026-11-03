@@ -61,16 +61,16 @@ func TestCallID(t *testing.T) {
 	if req.ID != 7 || req.Method != Mkdir || req.Params.Name != "a" {
 		t.Fatalf("decoded %+v", req)
 	}
-	pending, err := MarshalPending(7, "ticket")
+	rel, err := MarshalRelease("lock-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	rp, err := DecodeReply(pending)
+	rp, err := DecodeReply(rel)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rp.ID != 7 || rp.Pending != "ticket" || rp.Result != nil || rp.Err != nil {
-		t.Fatalf("pending %+v", rp)
+	if rp.ID != 0 || rp.Release != "lock-1" || rp.Result != nil || rp.Err != nil {
+		t.Fatalf("release %+v", rp)
 	}
 	ok, err := MarshalReply(7, Result{Written: 3})
 	if err != nil {
@@ -80,7 +80,7 @@ func TestCallID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rp.ID != 7 || rp.Result == nil || rp.Result.Written != 3 || rp.Pending != "" {
+	if rp.ID != 7 || rp.Result == nil || rp.Result.Written != 3 {
 		t.Fatalf("reply %+v", rp)
 	}
 }
@@ -188,5 +188,52 @@ func TestClientAndReleaseRoundTrip(t *testing.T) {
 	}
 	if rp.Client != "01a18f33-1f73-7000-b869-6772b604713a" || rp.ID != 0 {
 		t.Fatalf("hello %+v", rp)
+	}
+}
+
+func TestLockRoundTrip(t *testing.T) {
+	b, err := MarshalRequest(Setlkw, Params{
+		Namespace: "demo", Inode: 2, Fh: 3, Owner: 42, Pid: 7,
+		Lock: LockWrite, Offset: 0x40000000, Size: 1, Flags: FlagFlock,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := DecodeRequest(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := req.Params
+	if req.Method != Setlkw || p.Owner != 42 || p.Pid != 7 || p.Lock != LockWrite {
+		t.Fatalf("decoded %+v", req)
+	}
+	if p.Offset != 0x40000000 || p.Size != 1 || p.Flags != FlagFlock {
+		t.Fatalf("range %+v", p)
+	}
+}
+
+func TestLockResult(t *testing.T) {
+	want := Lock{Type: LockUnlock, Start: 5, End: 9, Pid: 11}
+	b, err := MarshalResult(Result{Lock: &want})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := DecodeResponse(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Lock == nil || *res.Lock != want {
+		t.Fatalf("lock %+v", res.Lock)
+	}
+	zero, err := MarshalResult(Result{Lock: &Lock{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = DecodeResponse(zero)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Lock == nil || *res.Lock != (Lock{}) {
+		t.Fatalf("zero lock %+v", res.Lock)
 	}
 }

@@ -100,6 +100,8 @@ Open the server URL in a browser for a welcome page. `curl` against the same URL
 
 On a new mount, create a directory, write and read a small file, make a symlink, rename, and delete. Mount the same name a second time, write on one, and read on the other. Copy a file from one path on the mount to another. Append with `>>`. Write about 10 MiB with `dd bs=10k` and read it back. Repeat that write with `-raw=false` and compare the bytes.
 
+Two mounts of one name exclude each other for advisory locks. `flock -n` on the second mount fails while the first holds the file, and an `fcntl` write lock on one mount makes the other's write lock fail with `EAGAIN` until it is released. A SQLite database opened through two mounts, in rollback journal mode, commits from both sides, and `PRAGMA integrity_check` returns `ok` on each. A lock is advisory: a process that opens the files under `data/` directly is outside the table.
+
 ## How such performance is even possible?
 
 We used zero-copy Linux kernel features similar to [sendfile(2)](https://linux.die.net/man/2/sendfile) as in [my article](https://medium.com/@alsadi/secret-sauce-is-zero-copy-single-context-switching-b749bd614dca). Those features are:

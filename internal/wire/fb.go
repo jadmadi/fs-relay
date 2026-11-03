@@ -17,7 +17,6 @@ type fbMsg struct {
 	Result  *Result
 	Err     *Error
 	Fault   string
-	Pending string
 	Evict   *Change
 	Release string
 	Client  string
@@ -31,11 +30,10 @@ func encodeFB(msg fbMsg) ([]byte, error) {
 	evict := putChange(b, msg.Evict)
 	method := putStr(b, msg.Method)
 	fault := putStr(b, msg.Fault)
-	pending := putStr(b, msg.Pending)
 	release := putStr(b, msg.Release)
 	client := putStr(b, msg.Client)
 	FbEnvelopeStart(b)
-	addEnvelope(b, msg, method, params, result, failure, evict, fault, pending, release, client)
+	addEnvelope(b, msg, method, params, result, failure, evict, fault, release, client)
 	b.FinishWithFileIdentifier(FbEnvelopeEnd(b), []byte(fbID))
 	return b.FinishedBytes(), nil
 }
@@ -50,7 +48,7 @@ func fileBytes(msg fbMsg) []byte {
 	return nil
 }
 
-func addEnvelope(b *flatbuffers.Builder, msg fbMsg, method, params, result, failure, evict, fault, pending, release, client flatbuffers.UOffsetT) {
+func addEnvelope(b *flatbuffers.Builder, msg fbMsg, method, params, result, failure, evict, fault, release, client flatbuffers.UOffsetT) {
 	if msg.ID != 0 {
 		FbEnvelopeAddId(b, msg.ID)
 	}
@@ -60,7 +58,6 @@ func addEnvelope(b *flatbuffers.Builder, msg fbMsg, method, params, result, fail
 	addOffset(b, failure, FbEnvelopeAddFailure)
 	addOffset(b, evict, FbEnvelopeAddEvict)
 	addOffset(b, fault, FbEnvelopeAddFault)
-	addOffset(b, pending, FbEnvelopeAddPending)
 	addOffset(b, release, FbEnvelopeAddRelease)
 	addOffset(b, client, FbEnvelopeAddClient)
 }
@@ -119,6 +116,9 @@ func putParams(b *flatbuffers.Builder, p *Params) flatbuffers.UOffsetT {
 	addOffset(b, client, FbParamsAddClient)
 	FbParamsAddFhOut(b, p.FhOut)
 	FbParamsAddOffsetOut(b, p.OffsetOut)
+	FbParamsAddOwner(b, p.Owner)
+	FbParamsAddPid(b, p.Pid)
+	FbParamsAddLock(b, p.Lock)
 	return FbParamsEnd(b)
 }
 
@@ -144,6 +144,7 @@ func putResult(b *flatbuffers.Builder, res *Result) flatbuffers.UOffsetT {
 	stat := putStat(b, res.Stat)
 	blobs := putBlobs(b, res.Blobs)
 	listings := putListings(b, res.Listings)
+	lock := putLock(b, res.Lock)
 	FbResultStart(b)
 	addOffset(b, attr, FbResultAddAttr)
 	addOffset(b, entries, FbResultAddEntries)
@@ -154,7 +155,20 @@ func putResult(b *flatbuffers.Builder, res *Result) flatbuffers.UOffsetT {
 	FbResultAddWritten(b, res.Written)
 	addOffset(b, blobs, FbResultAddBlobs)
 	addOffset(b, listings, FbResultAddListings)
+	addOffset(b, lock, FbResultAddLock)
 	return FbResultEnd(b)
+}
+
+func putLock(b *flatbuffers.Builder, l *Lock) flatbuffers.UOffsetT {
+	if l == nil {
+		return 0
+	}
+	FbLockStart(b)
+	FbLockAddTyp(b, l.Type)
+	FbLockAddStart(b, l.Start)
+	FbLockAddEnd(b, l.End)
+	FbLockAddPid(b, l.Pid)
+	return FbLockEnd(b)
 }
 
 func putAttr(b *flatbuffers.Builder, a *Attr) flatbuffers.UOffsetT {
@@ -347,6 +361,9 @@ func paramsFrom(p *FbParams) Params {
 		Client:    string(p.Client()),
 		FhOut:     p.FhOut(),
 		OffsetOut: p.OffsetOut(),
+		Owner:     p.Owner(),
+		Pid:       p.Pid(),
+		Lock:      p.Lock(),
 	}
 }
 
@@ -367,7 +384,7 @@ func decodeFBReply(buf []byte) (Reply, error) {
 	if err != nil {
 		return Reply{}, err
 	}
-	rp := Reply{ID: env.Id(), Client: string(env.Client()), Fault: string(env.Fault()), Pending: string(env.Pending()), Release: string(env.Release())}
+	rp := Reply{ID: env.Id(), Client: string(env.Client()), Fault: string(env.Fault()), Release: string(env.Release())}
 	if res := env.Result(new(FbResult)); res != nil {
 		got := resultFrom(res)
 		rp.Result = &got
@@ -399,7 +416,15 @@ func resultFrom(res *FbResult) Result {
 		stat := statFrom(s)
 		out.Stat = &stat
 	}
+	if l := res.Lock(new(FbLock)); l != nil {
+		lock := lockFrom(l)
+		out.Lock = &lock
+	}
 	return out
+}
+
+func lockFrom(l *FbLock) Lock {
+	return Lock{Type: l.Typ(), Start: l.Start(), End: l.End(), Pid: l.Pid()}
 }
 
 func attrFrom(a *FbAttr) Attr {

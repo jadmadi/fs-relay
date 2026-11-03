@@ -31,10 +31,12 @@ type Socket struct {
 	next     uint64
 	waiters  map[uint64]chan wire.Reply
 	evicts   chan wire.Change
+	releases chan string
 	dead     chan struct{}
 	stopped  chan struct{}
 	joined   chan struct{}
 	joinOnce sync.Once
+	id       string
 	err      error
 }
 
@@ -62,6 +64,7 @@ func Dial(ctx context.Context, baseURL, ns, token string) (*Socket, error) {
 		token:    token,
 		waiters:  map[uint64]chan wire.Reply{},
 		evicts:   make(chan wire.Change, 32),
+		releases: make(chan string, 32),
 		dead:     make(chan struct{}),
 		stopped:  make(chan struct{}),
 		joined:   make(chan struct{}),
@@ -114,6 +117,11 @@ func (s *Socket) noteFail(err error) {
 }
 
 // Events receives cache evictions pushed on this socket.
+// Releases receives lock-release events from the socket.
+func (s *Socket) Releases() <-chan string {
+	return s.releases
+}
+
 func (s *Socket) Events() <-chan wire.Change {
 	return s.evicts
 }
@@ -135,6 +143,9 @@ func (s *Socket) Close() error {
 func (s *Socket) Call(ctx context.Context, method string, p wire.Params) (wire.Result, error) {
 	if p.Namespace == "" {
 		p.Namespace = s.ns
+	}
+	if p.Client == "" {
+		p.Client = s.session()
 	}
 	id, ch, dead, err := s.begin()
 	if err != nil {
@@ -166,6 +177,28 @@ func wsEndpoint(base, ns string) (string, error) {
 	}
 	u.Path = strings.TrimRight(u.Path, "/") + "/ws/" + url.PathEscape(ns)
 	return u.String(), nil
+}
+
+func (s *Socket) setSession(id string) {
+	s.mu.Lock()
+	s.id = id
+	s.mu.Unlock()
+}
+
+func (s *Socket) session() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.id
+}
+
+// endpointWithID keeps the mount's client id across a reconnect, so its
+// locks stay its own.
+func (s *Socket) endpointWithID() string {
+	id := s.session()
+	if id == "" {
+		return s.endpoint
+	}
+	return s.endpoint + "?client=" + url.QueryEscape(id)
 }
 
 func (s *Socket) begin() (uint64, <-chan wire.Reply, <-chan struct{}, error) {
@@ -242,9 +275,6 @@ func finish(rp wire.Reply) (wire.Result, error, bool) {
 	if rp.Result != nil {
 		return *rp.Result, nil, false
 	}
-	if rp.Pending != "" {
-		return wire.Result{}, nil, true
-	}
 	return wire.Result{}, errors.New("empty reply"), false
 }
 
@@ -260,7 +290,7 @@ func (s *Socket) serve() {
 			return
 		}
 		if s.current() == nil {
-			conn, err := dialConn(context.Background(), s.endpoint, s.token)
+			conn, err := dialConn(context.Background(), s.endpointWithID(), s.token)
 			if Refused(err) {
 				log.Fatalf("fs-relay-bind: %v", err)
 			}
@@ -333,10 +363,19 @@ func (s *Socket) loop(again bool) (bool, error) {
 			return named, err
 		}
 		if id, ok := sessionID(rp); ok {
+			s.setSession(id)
 			if !named {
 				named = true
 				s.markJoined()
 				noteSession(s.url, id, again)
+			}
+			continue
+		}
+		if rp.Release != "" {
+			select {
+			case s.releases <- rp.Release:
+			case <-s.dead:
+				return named, errors.New("connection lost")
 			}
 			continue
 		}
@@ -364,7 +403,7 @@ func sessionID(rp wire.Reply) (string, bool) {
 	if rp.Client == "" || rp.ID != 0 || rp.Evict != nil || rp.Result != nil || rp.Err != nil {
 		return "", false
 	}
-	if rp.Fault != "" || rp.Pending != "" || rp.Release != "" {
+	if rp.Fault != "" || rp.Release != "" {
 		return "", false
 	}
 	return rp.Client, true

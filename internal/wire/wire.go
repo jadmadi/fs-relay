@@ -63,7 +63,20 @@ const (
 	Readlink      = "readlink"
 	Join          = "join"
 	CopyFileRange = "copyfilerange"
+	Getlk         = "getlk"
+	Setlk         = "setlk"
+	Setlkw        = "setlkw"
 )
+
+// Lock types mirror Linux F_RDLCK, F_WRLCK and F_UNLCK.
+const (
+	LockRead   uint32 = 0
+	LockWrite  uint32 = 1
+	LockUnlock uint32 = 2
+)
+
+// FlagFlock marks a whole-file flock request instead of a byte range.
+const FlagFlock uint32 = 1 << 0
 
 // Setattr bits match Linux FUSE FATTR_* so the mount can pass Valid through.
 const (
@@ -117,6 +130,9 @@ type Params struct {
 	Client    string
 	FhOut     uint64
 	OffsetOut int64
+	Owner     uint64
+	Pid       uint32
+	Lock      uint32
 }
 
 // Blob is one whole small file returned by reads.
@@ -143,6 +159,15 @@ type Result struct {
 	Written  uint32
 	Blobs    []Blob
 	Listings []Listing
+	Lock     *Lock
+}
+
+// Lock is the answer to getlk. A free range reports Type F_UNLCK.
+type Lock struct {
+	Type  uint32
+	Start uint64
+	End   uint64
+	Pid   uint32
 }
 
 // Listing is one directory returned by readdirs.
@@ -300,7 +325,6 @@ func DecodeResponse(b []byte) (Result, error) {
 }
 
 // Reply is one websocket message for a call id.
-// A pending ticket is not the result: the same id is answered again when the call finishes.
 // Client is set on the first message, which has no call id.
 type Reply struct {
 	ID      uint64
@@ -308,7 +332,6 @@ type Reply struct {
 	Result  *Result
 	Err     *Error
 	Fault   string
-	Pending string
 	Evict   *Change
 	Release string
 }
@@ -326,11 +349,6 @@ func MarshalReplyError(id uint64, e Error) ([]byte, error) {
 // MarshalFault encodes a failure that is not an errno. The mount treats it as a transport error.
 func MarshalFault(id uint64, message string) ([]byte, error) {
 	return encodeFB(fbMsg{ID: id, Fault: message})
-}
-
-// MarshalPending encodes the lock-wait notice for a call that has not finished.
-func MarshalPending(id uint64, ticket string) ([]byte, error) {
-	return encodeFB(fbMsg{ID: id, Pending: ticket})
 }
 
 // DecodeReply reads one websocket reply.
