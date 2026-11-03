@@ -171,7 +171,7 @@ FlatBuffers is the only filesystem wire. The content type is `application/x-flat
 
 `GET /ws/<namespace>` is the same envelope, one binary websocket message per call. The client sets `id` (a nonzero integer) on the request and the server copies it onto every message for that call. Calls overlap. A filesystem failure carries that `id` and the error. A fault that is not an errno carries that `id` and a fault string, and the socket stays up. A body that is not a call, an `id` of 0, a repeated `id`, or a namespace that does not match the URL closes the socket.
 
-`setlkw` is an ordinary call. It does not hold a response open. The grant and the release arrive on the mount's one pubsub, described under Locks.
+`setlkw` is an ordinary call. It does not hold a response open. The grant is the reply to that call. The wake-up arrives on the mount's one pubsub, described under Locks.
 
 `namespace` is required and must match the URL. The other fields are the kernel arguments the method needs: `inode`, `inodes`, `name`, `new_inode`, `new_name`, `fh`, `mode`, `flags`, `offset`, `size`, `data`, `target`, `valid`, `atime`, `mtime`, `uid`, `gid`, `mask`. `inodes` is the list for `reads` and `readdirs`. `valid` uses the Linux FUSE `FATTR_*` bits. Empty strings and empty byte vectors are absent. A numeric zero is present. `valid` still says which setattr fields count, so a size or owner of zero is applied. A missing required field is HTTP 400. A name of `.`, `..`, or one that contains `/` or NUL is `EINVAL`.
 
@@ -209,20 +209,21 @@ After that listing, the mount calls `reads` for the regular files in it that are
 
 A mount is one subscriber for its namespace. There is no per-file socket and no per-lock socket.
 
-- The server writes a heartbeat on the chunked `join` response every 2s. A mount that receives nothing for 6s treats the stream as stalled and joins again. The first try of an outage runs at once. Each try after that waits 100ms. A session that stays up for 1s clears that wait. The server keeps that mount's undelivered cache evictions, lock grants, and releases for 8s, then discards them. A rejoin inside the window receives them. A signed id the server has not seen is a new mount. An id whose signature does not match the token is refused. Inodes still die with the server process.
+- The server writes a heartbeat on the chunked `join` response every 2s. A mount that receives nothing for 6s treats the stream as stalled and joins again. The first try of an outage runs at once. Each try after that waits 100ms. A session that stays up for 1s clears that wait. The server keeps that mount's undelivered cache evictions and lock wake-ups for 8s, then discards them. A rejoin inside the window receives them. A signed id the server has not seen is a new mount. An id whose signature does not match the token is refused. Inodes still die with the server process.
 - A websocket client does not call `join`. The same events are envelopes on the call socket, with no call id. The websocket frame is the framing, so those events have no length prefix. The server sends a ping every 2s and the mount answers with a pong. The mount also sees the same 2s heartbeat. Six seconds of silence, or a dropped socket, fails the calls in flight and dials again. The mount stays up. The retry wait is the same as for `-post`.
 
 The server sends an eviction after a successful `create`, `mkdir`, `symlink`, `write`, `setattr`, `unlink`, or `rmdir`, after a `release` that carried file bytes, and after a rename it sends the old name and then the new name. A refused call sends nothing. The mount reads those events on a background loop, never on a FUSE handler, and calls `NotifyEntry` and `NotifyContent`. A name this mount itself just created, wrote, or changed is left in place: the saved file body is dropped and page cache is invalidated, and the directory listing is dropped, but the name stays so the next lookup is local. Another mount still drops the name. A missed eviction leaves cached file bytes stale until the kernel drops the pages. Names and attributes recover within the 1s timeout.
 
 ## Locks
 
-Specified now, implemented for M3.
+Not built. `ROADMAP.md` records what one mount does today. The contract, once the table exists, is:
 
-- POSIX record locks: `getlk`, `setlk`, `setlkw`. The owner is the FUSE owner plus a per-mount client id, so two mounts never share an owner number.
+- POSIX record locks: `getlk`, `setlk`, `setlkw`. The owner is the FUSE owner plus a per-mount client id. Two mounts do not share an owner, and two opens on one mount do not either.
 - The server's lock table is the authority. `setlk` is an ordinary envelope and returns `EAGAIN` on a conflict.
 - `setlkw` is an ordinary call. The FUSE handler waits on the pubsub reader. It does not hold its own response.
-- A release is an envelope on that pubsub whose release field is the lock id, sent to every subscriber of the namespace. On `/ws/` it is one binary message with no call id. The waiting mount wakes and acquires. If two waiters wake together, one `setlk` wins and the other waits again.
-- A dropped `join` is the rejoin above. The server repeats a release that this client has not seen, so a missed event cannot leave `setlkw` blocked.
+- A release is an envelope on that pubsub whose release field is the lock id, sent only when a `setlkw` is parked on that file. A commit that nobody is waiting on sends nothing. On `/ws/` it is one binary message with no call id. The waiting mount wakes and tries `setlk` again. If two waiters wake together, one `setlk` wins and the other waits again.
+- A dropped `join` is the rejoin above. The server repeats a wake-up that this client has not seen, so a missed event cannot leave `setlkw` blocked.
+- The hot path is the three ranges SQLite locks: the pending byte at `0x40000000`, the reserved byte after it, and the 510-byte shared range after that. A new reader read-locks the pending byte, then the shared range, then unlocks the pending byte. Exclusive is a write lock on the shared range and upgrades the same owner's own read lock there. It does not wait for that owner's pending or reserved lock to clear. Any other byte range conflicts by overlap. `ROADMAP.md` records the counts.
 - The server is the only writer under `data/`. A process that opens those files directly is outside the lock table.
 
 This is what SQLite's rollback journal needs (SHARED, RESERVED and EXCLUSIVE byte ranges). WAL needs shared memory between processes and is not a goal.
@@ -239,13 +240,13 @@ This is what SQLite's rollback journal needs (SHARED, RESERVED and EXCLUSIVE byt
 
 - `internal/local` against `t.TempDir()`: every M1 operation, path escape, errno, inode stability across rename.
 - `internal/wire`: a round trip of one request and both response shapes. The buffer carries the `FSR1` file identifier.
-- Lock grant, conflict, release fan-out and rejoin are tested with the lock table.
+- Lock grant, conflict, release fan-out and rejoin are tested with the lock table once it exists.
 - A real mount is not a unit test. It belongs in the README smoke checklist.
 - Cost: one POST per FUSE call, or one websocket frame per FUSE call on a shared socket, except `reads`, which carries up to 32 small files from one listing, except `readdirs`, which carries up to 32 child directories from one listing, and except a write, which is one call per contiguous 1 MiB or per `release`. A read or write inside the raw window is one frame on a raw connection instead. Each POST mount also holds one `join` stream. `setlkw` does not hold a stream of its own.
 
 ## Benchmarks
 
-Against the baseline filesystem, the Go kvfs, and SMB or NFS with and without FUSE. Numbers say which run produced them.
+The runs on record are a local directory, kvfs, s3fs, and NFS through FUSE, plus the DuckDB read. The numbers and the method are in `Benchmark.md`.
 
 ## Out of scope
 

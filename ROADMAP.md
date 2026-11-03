@@ -2,25 +2,93 @@
 
 ## Done
 
-- Design documents: `SPEC.md`, `AGENTS.md`, this file.
-- M1 code and a real mount: mkdir, write, symlink, rename, read, unlink.
-- M2: extract and re-archive `ansible.tar` through a mount. The tree matched the local extract.
-- The same tar workload against a local directory, kvfs, fs-relay (websocket default and `-post`), s3fs on rustfs, and fuse-nfs. Retimed every column on `ansible.tar` and `Antigravity.tar.gz` from 2026-10-31 15:04 +03 to 15:22 +03, production binaries (`-trimpath -ldflags='-s -w'`). Those numbers are the README tables, except the Antigravity fs-relay columns. Those two columns were retimed on 2026-10-31 18:24 +03 to 18:25 +03, same production flags, after writes are sent in 1 MiB chunks and large reads and writes use the raw connection. Unpack 9.78 s and 9.36 s, pack 2.38 s and 2.40 s, copy 0.65 s and 0.79 s, list 6.13 s and 6.12 s, default mount then `-post`, all four steps exited 0. The other Antigravity columns are still the 15:04 +03 run. The Ansible fs-relay columns were retimed on 2026-10-31 23:07 +03 to 23:08 +03, same flags: unpack 17.72 s and 20.47 s, pack 5.64 s and 6.09 s, copy 0.11 s and 0.12 s, list 0.22 s and 0.24 s, default mount then `-post`, all four steps exited 0. They were retimed again on 2026-11-01 00:14 +03 to 00:15 +03, after `release` carries the pending bytes, a listing's child directories are fetched together, and an eviction of a name this mount just changed leaves that name in place: unpack 15.47 s and 18.11 s, pack 3.76 s and 4.18 s, copy 0.12 s and 0.11 s, list 0.16 s and 0.19 s, default mount then `-post`, all four steps exited 0. The other Ansible columns are still the 15:04 +03 run. On `ansible.tar`, s3fs unpack and pack exited 2 because symlinks failed to close (8609 members packed); copy and list exited 0. Antigravity s3fs exited 0 on all four steps. fuse-nfs used `-p 0 -R 8192 -H 8192` against the running unfsd.
-- M3 on one mount, rollback journal (SQLite 3.51.2, 2026-10-30): one connection inserts and `integrity_check` is `ok`. Four writers with `busy_timeout` committed 200 rows, four distinct values, `integrity_check` `ok`. The kernel's own locks on that mount did the waiting. The relay lock table is not built. WAL mode fails with `disk I/O error`. Retested the same evening after `reads`: 202 rows, `integrity_check` `ok`, including a read after listing the directory. WAL still fails with `disk I/O error`.
-- A multiplexed `/ws/<namespace>` socket. The mount uses it by default. `-post` selects one POST per call. Replies on the socket carry the call id.
-- Kernel cache with the same timeouts and open flags as kvfs. A POST mount joins once and reads length-prefixed FlatBuffers frames on that chunked response. A websocket mount reads the same events on its call socket. A read-only pass reuses the attributes from `readdir` and reads by inode. Small regular files in a listing are fetched together by `reads` and served from memory until an eviction. The non-fs-relay columns in both README tables are the 2026-10-31 15:04 +03 run recorded above.
-
-- `copyfilerange` relays `copy_file_range(2)`. The server opens host files without `O_APPEND`, so an append offset arrives with the write.
-- The mount holds contiguous writes and sends them at 1 MiB, at a gap, or on fsync, release, read, setattr, or `copyfilerange`. `release` carries the bytes still held and closes the handle. `flush` does not send.
-- A listing's child directories are fetched together by `readdirs`. `readdir` stats each child once. An eviction of a name this mount just created, wrote, or changed leaves that name in place on this mount.
-- Large reads and writes travel on `GET /raw/<namespace>`, upgraded to a fixed-header stream the server splices. The size window is `32 × st_blksize` of the data directory, clamped, and the mount flag `-raw` defaults on.
-- A dropped `-post` stream keeps undelivered cache evictions, lock grants, and releases for 8s. A heartbeat every 2s marks the stream stalled after 6s of silence, and the mount joins again. The websocket server pings on that same interval. Both transports retry at once, then every 100ms, and a session up for 1s clears the wait.
-- A shared token. Omit `-token` and the server prints one. The mount sends the same value. A client id whose signature does not match that token is refused.
+- a web server that servers the shared directories over a custom wire protocol on top of HTTP
+- a rootless remote client that connects to the server and mounts a share into a directory using Linux Fuse v3
+- token based security
+- Linux Kernel specific optimizations: zero-copy routines reducing context switching, memory allocation and fragmentation, ..etc.
+- specialized end point for large files
+- get sqlite working
+- Benchmark serving millions of rows to DuckDB.
 
 ## Yet to be done
 
-1. The relay lock table, so two mounts exclude each other. One mount does not need it. A release already travels on the mount's pubsub, and a rejoin repeats one the client has not seen.
-2. Benchmarks against SMB or NFS, with and without FUSE.
+The calls a single program uses are in: create, open, read, write, close, fsync, mkdir, rmdir, unlink, rename, symlink, getattr, setattr, readdir, statfs, access. The work that is left is the lock table, because two mounts do not share one today. The rest are either outside a one-token mount, or a refusal POSIX already allows. Each one says what it would take, what refusing costs, and whether a program handles the error.
+
+### Advisory record locks
+
+This is what SQLite's rollback journal needs.
+
+A lock is advisory and it is a byte range. `read` and `write` ignore it. Only another lock call observes it. A read lock (`F_RDLCK`) conflicts with a write lock (`F_WRLCK`) on an overlapping byte. Two read locks on the same bytes both hold. A write lock conflicts with every other lock on an overlapping byte. A lock on a different byte does not conflict.
+
+SQLite depends on the ranges. Readers hold a read lock in the shared range. A reserved lock is a write lock on a single byte that does not overlap that range, so a writer can reserve while readers still hold their read locks. The exclusive lock is a write lock over the shared range. That one is granted only after every reader has released.
+
+The owner is one open, not the server process. The server keeps the table. Each client open is its own owner: the mount's client id together with the lock owner the kernel sent for that open. Taking the lock with one `fcntl` in the server process would make every client the same owner, and a second open would be granted a lock it should wait for. An open-file-description lock (`F_OFD_SETLK`) on the fd the server already holds would get the same conflicts inside the kernel, and a waiting call would then block on that fd. The wait has to stay on the pubsub, so the table is in memory. A process that opens a file under `data/` itself is outside the table.
+
+A Django worker keeps its connection open (`CONN_MAX_AGE`). The lock does not. Autocommit takes a read lock for one statement and drops it at the commit. `ATOMIC_REQUESTS` holds it for the view. What piles up is transactions in flight, one per worker that is inside a query: tens on a normal site, a few hundred on a large one. They all lock the same bytes. A read lock on the shared range, a write lock on the reserved byte, a write lock on the pending byte, then a write lock over the shared range. The offset does not change from query to query. The mutation is a holder added and a holder removed. Every other file in the tree is never locked.
+
+The round trip is the cost that shows up. A walk of a few hundred holders does not. An allocation per query does, and a release broadcast to every mount on every commit does. The layout is whatever makes those two zero on the path Django actually takes.
+
+The inode carries one pointer, nil when the file has no locks. That nil is the check. There is no side table of files and no second flag. The first lock on the database allocates one small record and leaves it there for the life of the process.
+
+The counters are the bytes SQLite locks, not its five named states. The pending byte is offset `0x40000000`, length 1. The reserved byte is the next byte. The shared range is the 510 bytes after that. A new reader read-locks the pending byte, then read-locks the shared range, then unlocks the pending byte. That momentary read is what stops a new reader while a writer is waiting. A pending write is a write lock on that one byte, so it conflicts with the momentary read and with another write there, and it does not overlap the shared range. A reserved lock is a write lock on the reserved byte. An exclusive lock is a write lock on the shared range. The same owner already holds a read lock on that range, and the call upgrades it. Other owners' read locks on the range conflict. The reserved byte and the pending byte do not, and the writer still holds its pending write while it asks for the exclusive lock. A rule that waits for `reserved` and `pending` to fall to zero refuses the upgrade SQLite makes on every commit.
+
+The record holds five numbers and the id of one holder: shared readers, reserved holders (zero or one), pending readers, a pending writer (zero or one), and exclusive (zero or one). A read on the pending byte is granted when the pending writer is zero. A read on the shared range is granted when exclusive is zero. A reserved write is granted when reserved is zero. A pending write is granted when the pending readers and the pending writer are zero. An exclusive write is granted when no other owner holds the shared range. The release decrements. No list is walked, and nothing is allocated on this path. The same record answers `F_GETLK` for those bytes, because the one stored holder is a real blocker. That is a covering field: the grant and the common query are answered from the record the inode already points at. A lock that is not one of those three ranges conflicts by overlap only, on the overflow list below.
+
+A lock on any other byte is the rest. It goes on a short unsorted overflow list on that same record. The fast path checks the list is empty, one pointer, and continues. When it is not empty, the call scans it. The Django path pays for a nil check and never enters the scan. A program that locks arbitrary ranges still gets the right conflict. An interval tree or a log-structured merge pays for nodes and compaction on a key set of three offsets. It becomes worth building only after that overflow list is measured long, which the journal will not make it.
+
+The holder names that do not fit in the one stored id live in one dense array on the record, grown to the high-water mark of transactions in flight and then kept. A release finds its owner by scanning that array and swaps in the last entry. A hash from owner to slot would rehash as workers come up and would answer a question the counts already answered. The array exists so a `F_GETLK` whose stored holder has since released can name another, and so the overflow stays honest. Idle files never allocate it.
+
+A release is broadcast only when `waiting` on that record is non-zero. A commit that nobody is blocked on sends nothing. `waiting` is incremented when an `F_SETLKW` parks and decremented when it leaves. The pubsub event is the wake-up, not a log of every unlock.
+
+`F_SETLK` returns at once. A conflict is `EAGAIN`. `F_SETLKW` waits. The wait is not a held HTTP response, and it is not held under the inode mutex: the waiter sleeps on the namespace pubsub and reads the counts again when it wakes. Two waiters that wake together: one takes it, the other waits again. A dropped connection repeats, on rejoin, a release that client has not seen, so a missed event cannot leave a waiter blocked. The last close of that open unlocks its ranges, and that close is a release too. `F_GETLK` reports the conflicting lock, or reports that the range is clear. A call that names two inodes takes their mutexes in inode order.
+
+Four machines. S holds the files and the table. C1, C2 and C3 are three mounts.
+
+1. C1 runs a select and takes a read lock on the shared range. Granted.
+2. C2 runs a select and takes a read lock on the same range. Granted. The two read locks do not conflict.
+3. C3 runs an update and takes the exclusive write lock over that range. The range is held. An immediate lock (`F_SETLK`) fails with `EAGAIN`. A waiting lock (`F_SETLKW`) waits.
+4. C1 finishes and releases. C2 finishes and releases.
+5. C3's write lock is granted.
+6. C1 runs another select and takes a read lock. The write lock is still held. The immediate lock fails with `EAGAIN`. The waiting lock waits until C3 releases.
+
+One client, two opens. P1 and P2 are two processes on C1, or two threads that hold two opens.
+
+1. P1 takes a write lock. Granted.
+2. P2 takes a read lock on an overlapping byte. The immediate lock fails with `EAGAIN`. The waiting lock waits until P1 releases, and is granted then.
+
+Two threads of one process that share a single POSIX owner are one owner. The kernel merges those calls before a second owner exists, and SQLite excludes those threads with its own mutex. The relay's job is two owners. Two processes on one mount are two owners. Two mounts are two owners.
+
+Today the mount implements no `getlk`, `setlk` or `setlkw`. go-fuse answers the first one with `ENOSYS`, and the Linux kernel keeps a lock table for that mount alone. Several processes on one machine therefore wait on each other, which is why the rollback journal works on one mount. The file on S is not locked. A second mount has its own kernel table, so C1's read lock and C3's write lock are both granted and both can write. WAL stays out of scope: it needs the `-shm` file mapped shared by every process, and a `MAP_SHARED` mapping is private to each mount.
+
+### Outside this system
+
+Both ends run as one non-root user. A client that presents the token acts as the server's user. The client's uids and the server's uids are numbers from two machines, and they do not name the same people. `-allow_other` lets another local user see the mount. That user still presents the same token, so the server still sees its own user. There is no second principal to grant a right to.
+
+ACLs. An ACL names users and groups. This server has one user, the one it runs as, so an entry for any other uid would point at someone who never connects. Base POSIX does not require ACLs. `getfacl` and `setfacl` see `EOPNOTSUPP` and stop. Programs that open files follow the mode bits, which are the server user's bits. They do not mis-read a file because an ACL was absent.
+
+Extended attributes. These are the named blobs beside a file. `security.selinux` and `security.capability` are the SELinux and capability labels, and setting them takes a privilege neither end has. `system.posix_acl_*` is the ACL above. `trusted.*` takes `CAP_SYS_ADMIN`. The class a normal user can write is `user.*`, which some backup tools copy when asked (`tar --xattrs`, `rsync -X`). Base POSIX does not include any of them. The kernel turns the first `ENOSYS` into `EOPNOTSUPP` and stops asking. Default tar, rsync, SQLite and DuckDB never look. A tool that was asked to copy attributes reports the error on that file and still copies the bytes.
+
+Device nodes. FUSE has `mknod`, and the kernel accepts it. A character or block device needs `CAP_MKNOD` on the client and again on the server. Both ends are non-root, so the call is `EPERM` on a local disk too. Returning `EPERM` is the POSIX result. `mknod` of a device fails in the caller's hands, and nothing else changes.
+
+`access` today runs `faccessat` as the server user. That matches the token: the client is that user. It is not a stand-in for the client's local uid.
+
+### Possible later, and safe to refuse
+
+POSIX allows a filesystem to refuse these. The caller gets an error on that call. The rest of the file still reads and writes.
+
+Hard links. FUSE implements `link`, and a non-root process can create one. The rule is the same as a local disk: both names in one filesystem. Here that filesystem is one namespace, the tree under `data/<namespace>/`. A link that would leave the namespace is `EXDEV`. The name map is one path per inode today (`byIno` holds one string). A link is a second path on the same inode, with `nlink` above 1, and unlinking one path leaves the inode while a path remains. The host call is `link` inside that directory. Leaving it unimplemented is conforming: `link(2)` returns `EPERM` when the filesystem has no hard links. SQLite and DuckDB do not make hard links. `tar` and `rsync` of a tree that contains some do not invent a shared inode. They print the error for that member. `ansible.tar` has none.
+
+Fifos. FUSE `mknod` of `S_IFIFO`, and a socket, need no capability. A non-root server can `mkfifo` inside the namespace. Opening the fifo blocks until the other end opens, and that wait has to sit off the FUSE handler or the mount stalls. A program that needs a named pipe sees `ENOSYS` today and reports it. Pipes between programs on one client use the kernel pipe, which never comes to the server.
+
+`flock`. A whole-file advisory lock on one open. Linux SQLite uses the byte-range locks above, not `flock`. The same table can hold it as one whole-file entry. It conflicts with other `flock` locks. It does not conflict with a byte-range lock. Today the kernel keeps `flock` inside one mount. A second mount does not see it. Programs that use `flock` across two mounts can both hold it, the same hole as record locks, and the fix is the same table.
+
+`fallocate`. Reserving a range is an optimization. POSIX allows `EOPNOTSUPP`, which is what the caller sees now. SQLite writes the bytes instead and continues.
+
+`RENAME_EXCHANGE` and `RENAME_WHITEOUT`. These are Linux flags, not POSIX. `EINVAL` is the right refusal. `RENAME_NOREPLACE` already works. `mv` of a file does not need the exchange flag.
+
+Directory `fsync`. Committing a rename can be done by the server, on the parent directory, inside `rename`, `create` and `unlink`. The client then has nothing to wait for. A client `fsync` of a directory is `ENOSYS` today. Tools that check the error treat `EOPNOTSUPP` as "this filesystem cannot", and the server-side sync is what actually makes the name durable.
+
+Shared maps. `MAP_SHARED` on one mount is that mount's page cache. Another mount does not see those bytes through its own mapping. WAL needs the `-shm` file mapped that way by every process, so WAL fails, and that stays out. A program that only reads and writes, without mapping, is unaffected. An eviction still drops cached bytes when it arrives. A missed one stays stale until the 1s attribute timeout.
 
 ## macOS
 
