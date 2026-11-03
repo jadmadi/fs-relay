@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"syscall"
 
 	"fs-relay/internal/wire"
 )
@@ -29,7 +30,7 @@ func resolveToken(given, file string) (string, error) {
 
 // readTokenFile reads a secret from a regular file only its user can read.
 func readTokenFile(path string) (string, error) {
-	f, err := os.Open(path)
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return "", fmt.Errorf("token file %s: %w", path, err)
 	}

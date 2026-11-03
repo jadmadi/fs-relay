@@ -6,8 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"fs-relay/internal/wire"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestResolveTokenFile(t *testing.T) {
@@ -45,5 +48,25 @@ func TestResolveTokenFile(t *testing.T) {
 	}
 	if _, err := resolveToken("", big); err == nil || !strings.Contains(err.Error(), "too large") {
 		t.Fatalf("oversized: %v", err)
+	}
+}
+
+func TestResolveTokenFileFIFO(t *testing.T) {
+	fifo := filepath.Join(t.TempDir(), "fifo")
+	if err := unix.Mkfifo(fifo, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := resolveToken("", fifo)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "not a regular file") {
+			t.Fatalf("fifo: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("blocked on the FIFO")
 	}
 }

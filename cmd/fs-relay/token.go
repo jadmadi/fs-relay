@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"fs-relay/internal/wire"
 )
@@ -42,7 +43,7 @@ func chooseToken(given, file string) (string, error) {
 // The mode check is the point: a token in argv is visible in ps, while a
 // mode-600 file is not.
 func readTokenFile(path string) (string, error) {
-	f, err := os.Open(path)
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return "", fmt.Errorf("token file %s: %w", path, err)
 	}
