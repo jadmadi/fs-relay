@@ -72,11 +72,16 @@ func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 }
 
 func writeNamespaceErr(w http.ResponseWriter, ns string, err error) {
-	if errors.Is(err, os.ErrNotExist) {
+	switch {
+	case errors.Is(err, os.ErrNotExist):
 		http.Error(w, "namespace "+ns+" does not exist", http.StatusNotFound)
-		return
+	case errors.Is(err, syscall.ENOTDIR):
+		http.Error(w, "namespace "+ns+" is not a directory", http.StatusNotFound)
+	case errors.Is(err, os.ErrPermission):
+		http.Error(w, "namespace "+ns+": permission denied", http.StatusForbidden)
+	default:
+		http.Error(w, "namespace "+ns+": "+err.Error(), http.StatusInternalServerError)
 	}
-	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
 
 func publishCall(h *hub, tree *local.Tree, ns, method string, p wire.Params, err error) {
