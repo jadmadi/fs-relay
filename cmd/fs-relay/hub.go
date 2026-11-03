@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"fs-relay/internal/local"
 	"fs-relay/internal/wire"
 )
 
@@ -18,6 +19,16 @@ type hub struct {
 	rooms   map[string]*room
 	holdFor time.Duration
 	token   string
+	tree    *local.Tree
+
+	wmu     sync.Mutex
+	waiters map[string]map[*waiter]struct{}
+}
+
+// waiter is one parked setlkw on a namespace. Its channel is a one-slot
+// wake-up, so a release that lands before the wait still leaves a token.
+type waiter struct {
+	ch chan struct{}
 }
 
 type room struct {
@@ -34,7 +45,60 @@ type member struct {
 }
 
 func newHub(token string) *hub {
-	return &hub{rooms: map[string]*room{}, holdFor: holdFor, token: token}
+	return &hub{
+		rooms:   map[string]*room{},
+		holdFor: holdFor,
+		token:   token,
+		waiters: map[string]map[*waiter]struct{}{},
+	}
+}
+
+// park registers a waiter before the first grant attempt. A release after
+// this point always leaves a wake-up, so the wait cannot be lost.
+func (h *hub) park(ns string) *waiter {
+	w := &waiter{ch: make(chan struct{}, 1)}
+	h.wmu.Lock()
+	if h.waiters[ns] == nil {
+		h.waiters[ns] = map[*waiter]struct{}{}
+	}
+	h.waiters[ns][w] = struct{}{}
+	h.wmu.Unlock()
+	return w
+}
+
+func (h *hub) unpark(ns string, w *waiter) {
+	h.wmu.Lock()
+	if set := h.waiters[ns]; set != nil {
+		delete(set, w)
+		if len(set) == 0 {
+			delete(h.waiters, ns)
+		}
+	}
+	h.wmu.Unlock()
+}
+
+// wake releases every parked call in the namespace. It is a no-op when
+// nobody waits, which keeps an uncontended commit free of events.
+func (h *hub) wake(ns string) {
+	h.wmu.Lock()
+	set := h.waiters[ns]
+	out := make([]*waiter, 0, len(set))
+	for w := range set {
+		out = append(out, w)
+	}
+	h.wmu.Unlock()
+	for _, w := range out {
+		select {
+		case w.ch <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (h *hub) waiting(ns string) bool {
+	h.wmu.Lock()
+	defer h.wmu.Unlock()
+	return len(h.waiters[ns]) > 0
 }
 
 func (h *hub) attach(ns, id string, ws bool, cancel func()) (*member, error) {
@@ -89,6 +153,11 @@ func (h *hub) detach(ns string, m *member) {
 	}
 	delete(r.live, m.id)
 	if m.ws {
+		if r.hold == nil {
+			r.hold = map[string]time.Time{}
+		}
+		r.hold[m.id] = time.Now().Add(h.holdFor)
+		h.arm(ns, m.id)
 		return
 	}
 	h.keepOwed(r, m)
@@ -129,12 +198,22 @@ func (h *hub) arm(ns, id string) {
 
 func (h *hub) dropHold(ns, id string) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	r := h.rooms[ns]
 	if r == nil || r.live[id] != nil {
+		h.mu.Unlock()
 		return
 	}
-	h.holding(r, id)
+	until, held := r.hold[id]
+	if !held || time.Now().Before(until) {
+		h.mu.Unlock()
+		return
+	}
+	delete(r.hold, id)
+	delete(r.owed, id)
+	h.mu.Unlock()
+	if h.tree != nil && h.tree.ReleaseClient(ns, id) {
+		h.wake(ns)
+	}
 }
 
 func (h *hub) evict(ns string, changes []wire.Change) {

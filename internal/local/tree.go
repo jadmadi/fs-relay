@@ -26,9 +26,14 @@ type Tree struct {
 	nextFH uint64
 }
 
+type entry struct {
+	rel   string
+	locks *lockRec
+}
+
 type names struct {
 	next   uint64
-	byIno  map[uint64]string
+	byIno  map[uint64]*entry
 	byPath map[string]uint64
 }
 
@@ -104,7 +109,7 @@ func (t *Tree) withW(fn func() (wire.Result, error)) (wire.Result, error) {
 func newNames() *names {
 	return &names{
 		next:   1,
-		byIno:  map[uint64]string{1: ""},
+		byIno:  map[uint64]*entry{1: {rel: ""}},
 		byPath: map[string]uint64{"": 1},
 	}
 }
@@ -127,7 +132,7 @@ func (t *Tree) assign(ns, rel string) uint64 {
 	}
 	st.next++
 	st.byPath[rel] = st.next
-	st.byIno[st.next] = rel
+	st.byIno[st.next] = &entry{rel: rel}
 	return st.next
 }
 
@@ -148,7 +153,7 @@ func (t *Tree) relOf(ns string, ino uint64) (string, error) {
 	if !ok {
 		return "", syscall.ENOENT
 	}
-	return rel, nil
+	return rel.rel, nil
 }
 
 func (t *Tree) forget(ns, rel string) {
@@ -195,10 +200,13 @@ func (t *Tree) shift(ns, oldRel, newRel string) {
 	}
 	for _, m := range moves {
 		delete(st.byPath, m.from)
-		delete(st.byIno, m.id)
 	}
 	for _, m := range moves {
 		st.byPath[m.to] = m.id
-		st.byIno[m.id] = m.to
+		if e := st.byIno[m.id]; e != nil {
+			e.rel = m.to
+			continue
+		}
+		st.byIno[m.id] = &entry{rel: m.to}
 	}
 }

@@ -71,10 +71,10 @@ func (t *Tree) parentOf(ns string, ino uint64) (uint64, string, bool) {
 		return 0, "", false
 	}
 	rel, ok := st.byIno[ino]
-	if !ok || rel == "" {
+	if !ok || rel.rel == "" {
 		return 0, "", false
 	}
-	parentRel, name := splitRel(rel)
+	parentRel, name := splitRel(rel.rel)
 	pid, ok := st.byPath[parentRel]
 	if !ok {
 		return 0, "", false

@@ -16,6 +16,7 @@ func newHandler(tree *local.Tree, token string) http.Handler {
 }
 
 func handler(tree *local.Tree, h *hub) (http.Handler, *rawSet) {
+	h.tree = tree
 	set := newRawSet()
 	min, max := rawLimits(tree)
 	mux := http.NewServeMux()
@@ -52,7 +53,12 @@ func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 		serveJoin(h, ns, w, r, req.Params.Client)
 		return
 	}
-	res, err := tree.Call(r.Context(), req.Method, req.Params)
+	needsClient := isLock(req.Method) || req.Method == wire.Release && req.Params.Fh == 0
+	if needsClient && !clientSigned(h.token, req.Params.Client) {
+		http.Error(w, "bad client", http.StatusBadRequest)
+		return
+	}
+	res, err := callWait(r.Context(), h, tree, ns, req.Method, req.Params, nil)
 	publishCall(h, tree, ns, req.Method, req.Params, err)
 	writeCall(w, res, err)
 }
@@ -62,6 +68,12 @@ func publishCall(h *hub, tree *local.Tree, ns, method string, p wire.Params, err
 		return
 	}
 	h.evict(ns, tree.Changed(method, p))
+	switch method {
+	case wire.Setlk, wire.Setlkw, wire.Release:
+		if tree.TookWake(ns, p) {
+			h.wake(ns)
+		}
+	}
 }
 
 func flatbufferType(ct string) bool {

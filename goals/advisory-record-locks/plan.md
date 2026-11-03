@@ -8,7 +8,7 @@ likely to be implemented wrong. Run `sila gate` before each commit.
 
 ## Execution Steps
 
-- [ ] **T1 - Freeze the wait model and the contract in SPEC**
+- [x] **T1 - Freeze the wait model and the contract in SPEC**
   - Goal: make the prose match the code that will exist, before coding.
   - Files: edit `SPEC.md` (Envelope, Locks, Testing, Cost); edit
     `ROADMAP.md` only if a claim is wrong.
@@ -30,7 +30,7 @@ likely to be implemented wrong. Run `sila gate` before each commit.
   - Wrong-way: editing the wire comment in `wire.go` and calling it the
     contract. The contract lives in `SPEC.md`.
 
-- [ ] **T2 - Wire fields, methods and the lock result**
+- [x] **T2 - Wire fields, methods and the lock result**
   - Goal: the message can carry a lock request and a `getlk` answer.
   - Files: edit `internal/wire/fsrelay.fbs`, regenerate
     `internal/wire/fsrelay_generated.go` with `just flatc`, edit
@@ -54,7 +54,7 @@ likely to be implemented wrong. Run `sila gate` before each commit.
   - Wrong-way: reusing `mode` for the lock type and leaving `lock` in
     `FbResult` out. `setattr` already uses `mode`.
 
-- [ ] **T3 - Per-inode entry and record allocation**
+- [x] **T3 - Per-inode entry and record allocation**
   - Goal: an inode can carry one lock record, nil until first use.
   - Files: edit `internal/local/tree.go` (`names`, `assign`, `relOf`,
     `forget`, `drop`, `shift`), `internal/local/dir.go`,
@@ -77,7 +77,7 @@ likely to be implemented wrong. Run `sila gate` before each commit.
   - Wrong-way: a parallel `map[uint64]*lockRec`. The roadmap forbids a side
     table.
 
-- [ ] **T4 - Grant, conflict, release, getlk, overflow**
+- [x] **T4 - Grant, conflict, release, getlk, overflow**
   - Goal: the table answers every POSIX case in the grant matrix.
   - Files: new `internal/local/lock.go`; new `internal/local/lock_test.go`;
     register the three methods in `internal/local/call.go`.
@@ -105,7 +105,7 @@ likely to be implemented wrong. Run `sila gate` before each commit.
       uncontended lock of the same inode.
   - Wrong-way: counting self as a reader, so an upgrade never grants.
 
-- [ ] **T5 - Waiter bookkeeping and the sequence counter**
+- [x] **T5 - Waiter bookkeeping and the sequence counter**
   - Goal: a parked call cannot miss a release that lands before it parks.
   - Files: `internal/local/lock.go`, `internal/local/lock_test.go`.
   - Requirements:
@@ -123,7 +123,7 @@ likely to be implemented wrong. Run `sila gate` before each commit.
   - Wrong-way: checking `waiting` outside the table mutex. That reopens the
     lost wake-up.
 
-- [ ] **T6 - Server wait loop and namespace broadcast**
+- [x] **T6 - Server wait loop and namespace broadcast**
   - Goal: `setlkw` blocks in the server and wakes on any namespace release.
   - Files: edit `cmd/fs-relay/serve.go`, `cmd/fs-relay/ws.go`,
     `cmd/fs-relay/hub.go`; extend `cmd/fs-relay/serve_test.go` and
@@ -149,7 +149,7 @@ likely to be implemented wrong. Run `sila gate` before each commit.
   - Wrong-way: using `oweRelease`, which targets one client. Every mount
     must be able to retry.
 
-- [ ] **T7 - Client death releases locks on the hold expiry**
+- [x] **T7 - Client death releases locks on the hold expiry**
   - Goal: a mount that never rejoins cannot block the namespace forever.
   - Files: `cmd/fs-relay/hub.go` (the `arm` and `dropHold` path), new hook
     to `internal/local`, tests in `cmd/fs-relay/join_test.go`.
@@ -165,7 +165,7 @@ likely to be implemented wrong. Run `sila gate` before each commit.
       second client still gets `EAGAIN`.
   - Wrong-way: releasing on detach. That breaks rejoin.
 
-- [ ] **T8 - Mount methods, EnableLocks, flock, errno**
+- [x] **T8 - Mount methods, EnableLocks, flock, errno**
   - Goal: the kernel forwards locks and the mount handles every one.
   - Files: new `cmd/fs-relay-bind/lock.go`; edit `node.go` or `handle.go`
     to satisfy the three interfaces; edit `main.go` `mountOptions`; new
@@ -188,7 +188,7 @@ likely to be implemented wrong. Run `sila gate` before each commit.
   - Wrong-way: setting `EnableLocks` before the methods exist. Every lock
     call then fails with `EOPNOTSUPP`, worse than today.
 
-- [ ] **T9 - Docs, smoke checklist, evidence**
+- [x] **T9 - Docs, smoke checklist, evidence**
   - Goal: an operator can verify the feature without reading the code.
   - Files: `README.md` smoke checklist, `SPEC.md`, `ROADMAP.md`, new
     `goals/advisory-record-locks/evidence.md`.

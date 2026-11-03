@@ -151,6 +151,7 @@ func (c *Client) saw(line wire.Pub, id string, up, rejoin bool) (string, bool) {
 		return id, up
 	}
 	id = line.Client
+	c.setID(id)
 	if up {
 		return id, true
 	}

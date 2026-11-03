@@ -114,6 +114,10 @@ func (h *handle) Release(ctx context.Context) syscall.Errno {
 		if sticky != 0 {
 			return sticky
 		}
+		if h.n != nil && h.n.locked.Load() {
+			_, errno := h.call(ctx, wire.Release, wire.Params{Inode: h.ino})
+			return errno
+		}
 		return 0
 	}
 	parent, name := uint64(0), ""
@@ -274,4 +278,7 @@ func (d *dirHandle) Seekdir(_ context.Context, off uint64) syscall.Errno {
 	return 0
 }
 
-func (d *dirHandle) Releasedir(context.Context, uint32) {}
+func (d *dirHandle) Releasedir(context.Context, uint32) {
+	// The listing is memory only; there is no server handle to release.
+	return
+}

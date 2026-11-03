@@ -1028,8 +1028,44 @@ func (rcv *FbParams) MutateOffsetOut(n int64) bool {
 	return rcv._tab.MutateInt64Slot(46, n)
 }
 
+func (rcv *FbParams) Owner() uint64 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(48))
+	if o != 0 {
+		return rcv._tab.GetUint64(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FbParams) MutateOwner(n uint64) bool {
+	return rcv._tab.MutateUint64Slot(48, n)
+}
+
+func (rcv *FbParams) Pid() uint32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(50))
+	if o != 0 {
+		return rcv._tab.GetUint32(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FbParams) MutatePid(n uint32) bool {
+	return rcv._tab.MutateUint32Slot(50, n)
+}
+
+func (rcv *FbParams) Lock() uint32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(52))
+	if o != 0 {
+		return rcv._tab.GetUint32(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FbParams) MutateLock(n uint32) bool {
+	return rcv._tab.MutateUint32Slot(52, n)
+}
+
 func FbParamsStart(builder *flatbuffers.Builder) {
-	builder.StartObject(22)
+	builder.StartObject(25)
 }
 func FbParamsAddNamespace(builder *flatbuffers.Builder, namespace flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(namespace), 0)
@@ -1103,7 +1139,118 @@ func FbParamsAddFhOut(builder *flatbuffers.Builder, fhOut uint64) {
 func FbParamsAddOffsetOut(builder *flatbuffers.Builder, offsetOut int64) {
 	builder.PrependInt64Slot(21, offsetOut, 0)
 }
+func FbParamsAddOwner(builder *flatbuffers.Builder, owner uint64) {
+	builder.PrependUint64Slot(22, owner, 0)
+}
+func FbParamsAddPid(builder *flatbuffers.Builder, pid uint32) {
+	builder.PrependUint32Slot(23, pid, 0)
+}
+func FbParamsAddLock(builder *flatbuffers.Builder, lock uint32) {
+	builder.PrependUint32Slot(24, lock, 0)
+}
 func FbParamsEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+	return builder.EndObject()
+}
+
+type FbLock struct {
+	_tab flatbuffers.Table
+}
+
+func GetRootAsFbLock(buf []byte, offset flatbuffers.UOffsetT) *FbLock {
+	n := flatbuffers.GetUOffsetT(buf[offset:])
+	x := &FbLock{}
+	x.Init(buf, n+offset)
+	return x
+}
+
+func FinishFbLockBuffer(builder *flatbuffers.Builder, offset flatbuffers.UOffsetT) {
+	builder.Finish(offset)
+}
+
+func GetSizePrefixedRootAsFbLock(buf []byte, offset flatbuffers.UOffsetT) *FbLock {
+	n := flatbuffers.GetUOffsetT(buf[offset+flatbuffers.SizeUint32:])
+	x := &FbLock{}
+	x.Init(buf, n+offset+flatbuffers.SizeUint32)
+	return x
+}
+
+func FinishSizePrefixedFbLockBuffer(builder *flatbuffers.Builder, offset flatbuffers.UOffsetT) {
+	builder.FinishSizePrefixed(offset)
+}
+
+func (rcv *FbLock) Init(buf []byte, i flatbuffers.UOffsetT) {
+	rcv._tab.Bytes = buf
+	rcv._tab.Pos = i
+}
+
+func (rcv *FbLock) Table() flatbuffers.Table {
+	return rcv._tab
+}
+
+func (rcv *FbLock) Typ() uint32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(4))
+	if o != 0 {
+		return rcv._tab.GetUint32(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FbLock) MutateTyp(n uint32) bool {
+	return rcv._tab.MutateUint32Slot(4, n)
+}
+
+func (rcv *FbLock) Start() uint64 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.GetUint64(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FbLock) MutateStart(n uint64) bool {
+	return rcv._tab.MutateUint64Slot(6, n)
+}
+
+func (rcv *FbLock) End() uint64 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	if o != 0 {
+		return rcv._tab.GetUint64(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FbLock) MutateEnd(n uint64) bool {
+	return rcv._tab.MutateUint64Slot(8, n)
+}
+
+func (rcv *FbLock) Pid() uint32 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
+	if o != 0 {
+		return rcv._tab.GetUint32(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *FbLock) MutatePid(n uint32) bool {
+	return rcv._tab.MutateUint32Slot(10, n)
+}
+
+func FbLockStart(builder *flatbuffers.Builder) {
+	builder.StartObject(4)
+}
+func FbLockAddTyp(builder *flatbuffers.Builder, typ uint32) {
+	builder.PrependUint32Slot(0, typ, 0)
+}
+func FbLockAddStart(builder *flatbuffers.Builder, start uint64) {
+	builder.PrependUint64Slot(1, start, 0)
+}
+func FbLockAddEnd(builder *flatbuffers.Builder, end uint64) {
+	builder.PrependUint64Slot(2, end, 0)
+}
+func FbLockAddPid(builder *flatbuffers.Builder, pid uint32) {
+	builder.PrependUint32Slot(3, pid, 0)
+}
+func FbLockEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
 }
 
@@ -1294,8 +1441,21 @@ func (rcv *FbResult) ListingsLength() int {
 	return 0
 }
 
+func (rcv *FbResult) Lock(obj *FbLock) *FbLock {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(22))
+	if o != 0 {
+		x := rcv._tab.Indirect(o + rcv._tab.Pos)
+		if obj == nil {
+			obj = new(FbLock)
+		}
+		obj.Init(rcv._tab.Bytes, x)
+		return obj
+	}
+	return nil
+}
+
 func FbResultStart(builder *flatbuffers.Builder) {
-	builder.StartObject(9)
+	builder.StartObject(10)
 }
 func FbResultAddAttr(builder *flatbuffers.Builder, attr flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(attr), 0)
@@ -1335,6 +1495,9 @@ func FbResultAddListings(builder *flatbuffers.Builder, listings flatbuffers.UOff
 }
 func FbResultStartListingsVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
+}
+func FbResultAddLock(builder *flatbuffers.Builder, lock flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(9, flatbuffers.UOffsetT(lock), 0)
 }
 func FbResultEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()
