@@ -1,0 +1,24 @@
+{
+  "goal_slug": "advisory-record-locks",
+  "certified_at": "2026-11-03T10:25:55.917998514Z",
+  "certified_by": "agent",
+  "evidence_file": "goals/advisory-record-locks/evidence.md",
+  "note": "certified from review document: evidence.md",
+  "verified": true,
+  "facts_passed": 1,
+  "facts_total": 1,
+  "evidence_kind": "review_document",
+  "commit_sha": "681826e5b4b059da24bf166be22787497e547332",
+  "memory_required": true,
+  "memory_verified": true,
+  "memory": {
+    "required": true,
+    "status": "verified",
+    "prime": true,
+    "recall": true,
+    "writes": true,
+    "facts": true,
+    "handoff": true,
+    "verified": true
+  }
+}

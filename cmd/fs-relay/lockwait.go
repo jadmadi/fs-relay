@@ -32,6 +32,14 @@ func callWait(ctx context.Context, h *hub, tree *local.Tree, ns, method string, 
 			return wire.Result{}, syscall.EINTR
 		}
 		res, err := tree.Call(ctx, method, p)
+		if err == nil && p.Fh != 0 {
+			if _, live := tree.InodeOf(p.Fh); !live {
+				undo := p
+				undo.Lock = wire.LockUnlock
+				_, _ = tree.Call(ctx, wire.Setlk, undo)
+				return wire.Result{}, syscall.EINTR
+			}
+		}
 		if err == nil || !errors.Is(err, syscall.EAGAIN) {
 			return res, err
 		}

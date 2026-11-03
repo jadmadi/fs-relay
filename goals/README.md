@@ -30,10 +30,9 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 - **Total Goals**: 3
 - 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
 - 🔵 **In Progress (Claimed)**: 1
-- ⛔ **Blocked on Prerequisites**: 1
-- 🟢 **Implemented**: 1 (1 verified 📜, 0 unverified)
+- 🟢 **Implemented**: 2 (2 verified 📜, 0 unverified)
 - 🎯 **By Tier**: 0 immediate (Tier 1), 3 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 4/23 completed (17%)
+- 📋 **Execution Tasks Progress**: 13/23 completed (56%)
 
 ---
 
@@ -41,15 +40,7 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 | Goal Package | Tier | Mode | Agent | Status & Note | Started |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| [`advisory-record-locks`](advisory-record-locks/goal.md) | `🗺️ Roadmap` | `⚡ Indep` | `@opencode` | in progress | 0s ago |
-
----
-
-## 🟡 Ready to Execute (Pending Goals)
-
-| Goal Package | Tier | Mode & Sequence | Dependencies | Focus & Description | Launch Command |
-| :--- | :---: | :---: | :--- | :--- | :--- |
-| [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⛔ Blocked (#2)` | Prereqs: advisory-record-locks | SQLite rollback journal across two mounts — Prove the lock table with the workload that needs it. Two mounts of one namespac... | `/goal goals/sqlite-rollback-journal/goal.md` |
+| [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🗺️ Roadmap` | `🔗 Dep` | `@opencode` | in progress | 0s ago |
 
 ---
 
@@ -57,4 +48,5 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 | Goal Package | Mode | Shape | Verification | Task / Ref | Commit |
 | :--- | :---: | :--- | :---: | :--- | :--- |
+| [`advisory-record-locks`](advisory-record-locks/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `681826e` |
 | [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `e991617` |

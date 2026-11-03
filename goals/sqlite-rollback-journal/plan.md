@@ -9,7 +9,7 @@ from a fresh `data/` and fresh mountpoints.
 
 ## Execution Steps
 
-- [ ] **T1 - Preflight the prerequisite**
+- [x] **T1 - Preflight the prerequisite**
   - Goal: fail fast if the lock table is not actually shipped.
   - Files: read `cmd/fs-relay-bind/main.go`, `cmd/fs-relay-bind/lock.go`,
     `internal/local/lock.go`.
@@ -25,7 +25,7 @@ from a fresh `data/` and fresh mountpoints.
   - Wrong-way: starting the mount anyway. `EOPNOTSUPP` on every lock call
     will look like a table bug.
 
-- [ ] **T2 - Single-mount baseline**
+- [x] **T2 - Single-mount baseline**
   - Goal: prove the change did not break the case that works today.
   - Files: none. Run by hand, record in `evidence.md`.
   - Requirements:
@@ -37,7 +37,7 @@ from a fresh `data/` and fresh mountpoints.
       exit code 0.
     - AC-2.3: `PRAGMA journal_mode` returns `delete`, never `wal`.
 
-- [ ] **T3 - Two mounts, same namespace, distinct clients**
+- [x] **T3 - Two mounts, same namespace, distinct clients**
   - Goal: both mounts see one file, and the server sees two clients.
   - Files: none.
   - Requirements:
@@ -56,7 +56,7 @@ from a fresh `data/` and fresh mountpoints.
   - Wrong-way: mounting two different namespaces and calling it a two-mount
     test.
 
-- [ ] **T4 - Cross-mount writer serialization**
+- [x] **T4 - Cross-mount writer serialization**
   - Goal: four writers, split across mounts, cannot enter a transaction at
     the same time.
   - Files: none.
@@ -72,7 +72,7 @@ from a fresh `data/` and fresh mountpoints.
   - Wrong-way: running all four writers on one mount. That passes today and
     proves nothing.
 
-- [ ] **T5 - Reader blocks a writer across mounts**
+- [x] **T5 - Reader blocks a writer across mounts**
   - Goal: the shared range is honored between mounts.
   - Files: none.
   - Requirements:
@@ -86,7 +86,7 @@ from a fresh `data/` and fresh mountpoints.
   - Wrong-way: interpreting a 5s wait followed by success as a failure. That
     is the correct behaviour; the failure is an immediate error.
 
-- [ ] **T6 - Pending byte and starvation**
+- [x] **T6 - Pending byte and starvation**
   - Goal: record what a new reader does while a writer waits.
   - Files: none.
   - Requirements:
@@ -100,7 +100,7 @@ from a fresh `data/` and fresh mountpoints.
   - Note: either a short reader delay or an immediate grant is acceptable.
     A permanent stall, or a second writer, is not.
 
-- [ ] **T7 - Interrupt a parked lock**
+- [x] **T7 - Interrupt a parked lock**
   - Goal: `EINTR` works and leaves no stale state.
   - Files: a throwaway program under `/tmp`, not committed.
   - Requirements:
@@ -115,7 +115,7 @@ from a fresh `data/` and fresh mountpoints.
       own log or a small test hook).
   - Wrong-way: sending `SIGKILL`. That tests death, not interrupt.
 
-- [ ] **T8 - Mount death releases locks**
+- [x] **T8 - Mount death releases locks**
   - Goal: a dead mount cannot block the namespace.
   - Files: none.
   - Requirements:
@@ -129,7 +129,7 @@ from a fresh `data/` and fresh mountpoints.
     - AC-2.18: a rejoin at 2s keeps A's lock, so B still gets `EAGAIN`.
   - Wrong-way: expecting an immediate release. The 8s hold is deliberate.
 
-- [ ] **T9 - flock and fcntl regression on one mount**
+- [x] **T9 - flock and fcntl regression on one mount**
   - Goal: enabling lock forwarding did not regress local locking.
   - Files: a throwaway program under `/tmp`, not committed.
   - Requirements:
@@ -142,7 +142,7 @@ from a fresh `data/` and fresh mountpoints.
   - Wrong-way: testing only `fcntl`. `EnableLocks` also turns on
     `CAP_FLOCK_LOCKS`, so `flock` is the regression risk.
 
-- [ ] **T10 - Record the run**
+- [x] **T10 - Record the run**
   - Goal: a future session can reproduce and trust the result.
   - Files: `goals/sqlite-rollback-journal/evidence.md`, `ROADMAP.md`,
     `README.md` smoke checklist.
