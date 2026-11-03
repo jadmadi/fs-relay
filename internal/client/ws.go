@@ -33,6 +33,8 @@ type Socket struct {
 	evicts   chan wire.Change
 	dead     chan struct{}
 	stopped  chan struct{}
+	joined   chan struct{}
+	joinOnce sync.Once
 	err      error
 }
 
@@ -62,9 +64,53 @@ func Dial(ctx context.Context, baseURL, ns, token string) (*Socket, error) {
 		evicts:   make(chan wire.Change, 32),
 		dead:     make(chan struct{}),
 		stopped:  make(chan struct{}),
+		joined:   make(chan struct{}),
 	}
 	go s.serve()
-	return s, nil
+	return s.waitHello(ctx)
+}
+
+// waitHello blocks until the server has attached this socket. The hello is sent
+// after attach, and an eviction published before attach is not replayed.
+func (s *Socket) waitHello(ctx context.Context) (*Socket, error) {
+	select {
+	case <-s.joined:
+		return s, nil
+	case <-ctx.Done():
+		_ = s.Close()
+		return nil, ctx.Err()
+	case <-s.stopped:
+		select {
+		case <-s.joined:
+			return s, nil
+		default:
+			return nil, s.sessionErr()
+		}
+	}
+}
+
+func (s *Socket) markJoined() {
+	s.joinOnce.Do(func() { close(s.joined) })
+}
+
+func (s *Socket) sessionErr() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.err != nil {
+		return s.err
+	}
+	return errors.New("ws: no session")
+}
+
+func (s *Socket) noteFail(err error) {
+	if err == nil {
+		err = errors.New("ws: no session")
+	}
+	s.mu.Lock()
+	if s.err == nil {
+		s.err = err
+	}
+	s.mu.Unlock()
 }
 
 // Events receives cache evictions pushed on this socket.
@@ -230,6 +276,10 @@ func (s *Socket) serve() {
 		if s.closed.Load() {
 			return
 		}
+		if !established {
+			s.noteFail(err)
+			return
+		}
 		logLost(s.url)
 		s.kill()
 		again = true
@@ -285,6 +335,7 @@ func (s *Socket) loop(again bool) (bool, error) {
 		if id, ok := sessionID(rp); ok {
 			if !named {
 				named = true
+				s.markJoined()
 				noteSession(s.url, id, again)
 			}
 			continue

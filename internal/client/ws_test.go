@@ -20,6 +20,10 @@ func TestRepliesFollowIDs(t *testing.T) {
 			return
 		}
 		defer conn.Close(websocket.StatusNormalClosure, "")
+		if err := greet(conn); err != nil {
+			t.Error(err)
+			return
+		}
 		first, err := readCall(conn)
 		if err != nil {
 			t.Error(err)
@@ -73,6 +77,10 @@ func TestPendingThenResult(t *testing.T) {
 			return
 		}
 		defer conn.Close(websocket.StatusNormalClosure, "")
+		if err := greet(conn); err != nil {
+			t.Error(err)
+			return
+		}
 		req, err := readCall(conn)
 		if err != nil {
 			t.Error(err)
@@ -117,6 +125,14 @@ func mark(method string) uint32 {
 		return 1
 	}
 	return 2
+}
+
+func greet(conn *websocket.Conn) error {
+	b, err := wire.MarshalPub(wire.Pub{Client: "test-client"})
+	if err != nil {
+		return err
+	}
+	return conn.Write(context.Background(), websocket.MessageBinary, b)
 }
 
 func readCall(conn *websocket.Conn) (wire.Request, error) {
