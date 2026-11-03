@@ -74,7 +74,7 @@ There is no cross dependency between the two and there is no problem if you put 
 For simplicity, we are running the binaries relative to their build directory.
 
 ```bash
-mkdir -p data /mnt/fs-relay
+mkdir -p data/demo /mnt/fs-relay
 ./fs-relay -listen 127.0.0.1:8080 -data data -token local-demo
 ./fs-relay-bind -url http://127.0.0.1:8080 -ns demo -token local-demo /mnt/fs-relay
 ```

@@ -19,6 +19,9 @@ func checkMountpoint(path string, force bool) error {
 	if !info.IsDir() {
 		return fmt.Errorf("mountpoint %s is not a directory", path)
 	}
+	if force {
+		return nil
+	}
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return fmt.Errorf("mountpoint %s: %w", path, err)
