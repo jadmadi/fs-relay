@@ -6,17 +6,25 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"fs-relay/internal/wire"
 )
 
-func chooseToken(given string) (string, error) {
+func chooseToken(given, file string) (string, error) {
+	if given != "" && file != "" {
+		return "", fmt.Errorf("pass -token or -token-file, not both")
+	}
+	if file != "" {
+		return readTokenFile(file)
+	}
 	if given == "" {
 		token, err := newToken()
 		if err != nil {
@@ -29,6 +37,42 @@ func chooseToken(given string) (string, error) {
 		return "", err
 	}
 	return given, nil
+}
+
+// readTokenFile reads a secret from a regular file only its user can read.
+// The mode check is the point: a token in argv is visible in ps, while a
+// mode-600 file is not.
+func readTokenFile(path string) (string, error) {
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return "", fmt.Errorf("token file %s: %w", path, err)
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return "", fmt.Errorf("token file %s: %w", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("token file %s is not a regular file", path)
+	}
+	if info.Mode().Perm()&0o077 != 0 {
+		return "", fmt.Errorf("token file %s is readable by other users; chmod 600 %s", path, path)
+	}
+	b, err := io.ReadAll(io.LimitReader(f, 4097))
+	if err != nil {
+		return "", fmt.Errorf("token file %s: %w", path, err)
+	}
+	if len(b) > 4096 {
+		return "", fmt.Errorf("token file %s is too large", path)
+	}
+	token := strings.TrimSpace(string(b))
+	if token == "" {
+		return "", fmt.Errorf("token file %s is empty", path)
+	}
+	if err := wire.CheckToken(token); err != nil {
+		return "", fmt.Errorf("token file %s: %w", path, err)
+	}
+	return token, nil
 }
 
 // newToken is HMAC-SHA256(key=UUIDv7, msg=pid), as hex.

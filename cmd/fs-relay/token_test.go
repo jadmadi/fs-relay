@@ -9,11 +9,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"fs-relay/internal/local"
 	"fs-relay/internal/wire"
+
+	"golang.org/x/sys/unix"
 )
 
 const testToken = "testtoken"
@@ -48,13 +52,13 @@ func TestNewToken(t *testing.T) {
 }
 
 func TestRejectToken(t *testing.T) {
-	if _, err := chooseToken("short"); !errors.Is(err, wire.ErrTokenShort) {
+	if _, err := chooseToken("short", ""); !errors.Is(err, wire.ErrTokenShort) {
 		t.Fatal(err)
 	}
-	if _, err := chooseToken("bad+token"); !errors.Is(err, wire.ErrTokenChars) {
+	if _, err := chooseToken("bad+token", ""); !errors.Is(err, wire.ErrTokenChars) {
 		t.Fatal(err)
 	}
-	got, err := chooseToken("long-enough")
+	got, err := chooseToken("long-enough", "")
 	if err != nil || got != "long-enough" {
 		t.Fatalf("%q %v", got, err)
 	}
@@ -184,4 +188,73 @@ func joinStatus(t *testing.T, base, id string) int {
 	}
 	resp.Body.Close()
 	return resp.StatusCode
+}
+
+func TestChooseTokenFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "token")
+	if err := os.WriteFile(path, []byte("file-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := chooseToken("", path)
+	if err != nil || got != "file-token" {
+		t.Fatalf("file token %q %v", got, err)
+	}
+	if _, err := chooseToken("given-token", path); err == nil {
+		t.Fatal("accepted both sources")
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := chooseToken("", path); err == nil || !strings.Contains(err.Error(), "readable by other users") {
+		t.Fatalf("mode: %v", err)
+	}
+
+	empty := filepath.Join(dir, "empty")
+	if err := os.WriteFile(empty, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := chooseToken("", empty); err == nil || !strings.Contains(err.Error(), "empty") {
+		t.Fatalf("empty: %v", err)
+	}
+
+	bad := filepath.Join(dir, "bad")
+	if err := os.WriteFile(bad, []byte("bad+token"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := chooseToken("", bad); !errors.Is(err, wire.ErrTokenChars) {
+		t.Fatalf("chars: %v", err)
+	}
+
+	big := filepath.Join(dir, "big")
+	if err := os.WriteFile(big, bytes.Repeat([]byte("a"), 4097), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := chooseToken("", big); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("oversized: %v", err)
+	}
+
+	if _, err := chooseToken("", filepath.Join(dir, "missing")); err == nil {
+		t.Fatal("accepted a missing file")
+	}
+}
+
+func TestChooseTokenFileFIFO(t *testing.T) {
+	fifo := filepath.Join(t.TempDir(), "fifo")
+	if err := unix.Mkfifo(fifo, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := chooseToken("", fifo)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "not a regular file") {
+			t.Fatalf("fifo: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("blocked on the FIFO")
+	}
 }

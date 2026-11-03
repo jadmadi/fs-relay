@@ -26,9 +26,28 @@ func run() error {
 	listen := flag.String("listen", "127.0.0.1:8080", "address to listen on")
 	data := flag.String("data", "data", "directory that holds one folder per namespace")
 	given := flag.String("token", "", "shared secret; printed when omitted")
+	file := flag.String("token-file", "", "read the shared secret from this file (mode 600)")
 	flag.Parse()
 
-	token, err := chooseToken(*given)
+	var tokenSet, fileSet bool
+	flag.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "token":
+			tokenSet = true
+		case "token-file":
+			fileSet = true
+		}
+	})
+	if tokenSet && fileSet {
+		return fmt.Errorf("pass -token or -token-file, not both")
+	}
+	if tokenSet && *given == "" {
+		return fmt.Errorf("pass a value for -token, or omit it and the server prints one")
+	}
+	if fileSet && *file == "" {
+		return fmt.Errorf("pass a path for -token-file")
+	}
+	token, err := chooseToken(*given, *file)
 	if err != nil {
 		return err
 	}

@@ -78,7 +78,7 @@ const landingPage = `<!DOCTYPE html>
 <main>
   <h1>Welcome to fs-relay server</h1>
   <p>A fast network filesystem. Mount it with fs-relay-bind.</p>
-  <p>Pass the server's token to the mount with -token.</p>
+  <p>Pass the server's token to the mount with -token-file, or -token if you accept that ps shows it.</p>
 </main>
 </body>
 </html>
