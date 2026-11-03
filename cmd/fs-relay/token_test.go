@@ -223,6 +223,14 @@ func TestChooseTokenFile(t *testing.T) {
 		t.Fatalf("chars: %v", err)
 	}
 
+	big := filepath.Join(dir, "big")
+	if err := os.WriteFile(big, bytes.Repeat([]byte("a"), 4097), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := chooseToken("", big); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("oversized: %v", err)
+	}
+
 	if _, err := chooseToken("", filepath.Join(dir, "missing")); err == nil {
 		t.Fatal("accepted a missing file")
 	}

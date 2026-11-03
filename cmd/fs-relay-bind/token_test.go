@@ -39,4 +39,11 @@ func TestResolveTokenFile(t *testing.T) {
 	if _, err := resolveToken("", bad); !errors.Is(err, wire.ErrTokenChars) {
 		t.Fatalf("chars: %v", err)
 	}
+	big := filepath.Join(dir, "big")
+	if err := os.WriteFile(big, []byte(strings.Repeat("a", 4097)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveToken("", big); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("oversized: %v", err)
+	}
 }

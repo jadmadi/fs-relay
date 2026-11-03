@@ -47,6 +47,27 @@ func run() error {
 		return fmt.Errorf("namespace: %w", err)
 	}
 	base := normalizeURL(*url)
+	var tokenSet, fileSet bool
+	flag.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "token":
+			tokenSet = true
+		case "token-file":
+			fileSet = true
+		}
+	})
+	if tokenSet && fileSet {
+		return fmt.Errorf("pass -token or -token-file, not both")
+	}
+	if tokenSet && *token == "" {
+		return fmt.Errorf("pass a value for -token, or use -token-file")
+	}
+	if fileSet && *tokenFile == "" {
+		return fmt.Errorf("pass a path for -token-file")
+	}
+	if !tokenSet && !fileSet {
+		return fmt.Errorf("pass -token or -token-file")
+	}
 	tk, err := resolveToken(*token, *tokenFile)
 	if err != nil {
 		return err

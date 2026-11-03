@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -41,7 +42,12 @@ func chooseToken(given, file string) (string, error) {
 // The mode check is the point: a token in argv is visible in ps, while a
 // mode-600 file is not.
 func readTokenFile(path string) (string, error) {
-	info, err := os.Stat(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("token file %s: %w", path, err)
+	}
+	defer f.Close()
+	info, err := f.Stat()
 	if err != nil {
 		return "", fmt.Errorf("token file %s: %w", path, err)
 	}
@@ -51,12 +57,12 @@ func readTokenFile(path string) (string, error) {
 	if info.Mode().Perm()&0o077 != 0 {
 		return "", fmt.Errorf("token file %s is readable by other users; chmod 600 %s", path, path)
 	}
-	if info.Size() > 4096 {
-		return "", fmt.Errorf("token file %s is too large", path)
-	}
-	b, err := os.ReadFile(path)
+	b, err := io.ReadAll(io.LimitReader(f, 4097))
 	if err != nil {
 		return "", fmt.Errorf("token file %s: %w", path, err)
+	}
+	if len(b) > 4096 {
+		return "", fmt.Errorf("token file %s is too large", path)
 	}
 	token := strings.TrimSpace(string(b))
 	if token == "" {
