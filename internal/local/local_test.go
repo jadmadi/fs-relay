@@ -570,3 +570,16 @@ func TestCallMissingNamespace(t *testing.T) {
 		t.Fatalf("call: %v", err)
 	}
 }
+
+func TestCheckNamespaceAfterDelete(t *testing.T) {
+	tr, dir := newTree(t)
+	if err := tr.CheckNamespace("demo"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(dir, "demo")); err != nil {
+		t.Fatal(err)
+	}
+	if err := tr.CheckNamespace("demo"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("deleted namespace: %v", err)
+	}
+}

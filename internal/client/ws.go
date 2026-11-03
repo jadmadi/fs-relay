@@ -339,7 +339,7 @@ func dialErr(endpoint string, resp *http.Response, err error) error {
 		return fmt.Errorf("dial %s: %w", endpoint, err)
 	}
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-	if resp.StatusCode == http.StatusUnauthorized {
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusNotFound {
 		return statusErr("dial", resp.StatusCode, raw)
 	}
 	return fmt.Errorf("dial %s: %w", endpoint, err)
