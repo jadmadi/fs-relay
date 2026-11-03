@@ -27,11 +27,21 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 6. **Auto-Reconciliation**: Run `sila goals` to scan commits, mark 🟢 **Implemented**, and clear the claim lock.
 
 ## Summary
-- **Total Goals**: 1
-- 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
+- **Total Goals**: 3
+- 🟡 **Ready to Execute (Pending)**: 1 (1 independent ⚡, 0 unblocked 🔗)
+- ⛔ **Blocked on Prerequisites**: 1
 - 🟢 **Implemented**: 1 (1 verified 📜, 0 unverified)
-- 🎯 **By Tier**: 0 immediate (Tier 1), 1 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 4/4 completed (100%)
+- 🎯 **By Tier**: 0 immediate (Tier 1), 3 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
+- 📋 **Execution Tasks Progress**: 4/23 completed (17%)
+
+---
+
+## 🟡 Ready to Execute (Pending Goals)
+
+| Goal Package | Tier | Mode & Sequence | Dependencies | Focus & Description | Launch Command |
+| :--- | :---: | :---: | :--- | :--- | :--- |
+| [`advisory-record-locks`](advisory-record-locks/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⚡ Independent (#1)` | - | Advisory record locks across mounts — Make `fs-relay` the authority for POSIX advisory byte-range locks, so two mounts... | `/goal goals/advisory-record-locks/goal.md` |
+| [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⛔ Blocked (#2)` | Prereqs: advisory-record-locks | SQLite rollback journal across two mounts — Prove the lock table with the workload that needs it. Two mounts of one namespac... | `/goal goals/sqlite-rollback-journal/goal.md` |
 
 ---
 
