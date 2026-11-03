@@ -126,6 +126,17 @@ func Refused(err error) bool {
 	return errors.As(err, &rej)
 }
 
+// missing is a namespace the server does not have. Retrying does not change it.
+type missing struct{ why string }
+
+func (e *missing) Error() string { return e.why }
+
+// Missing reports a missing namespace. Another try will get the same answer.
+func Missing(err error) bool {
+	var m *missing
+	return errors.As(err, &m)
+}
+
 func statusErr(op string, status int, body []byte) error {
 	if status == http.StatusUnauthorized {
 		why := tokenWhy(body)
@@ -133,6 +144,13 @@ func statusErr(op string, status int, body []byte) error {
 			why = "unauthorized"
 		}
 		return &rejected{Why: why}
+	}
+	if status == http.StatusNotFound {
+		why := strings.TrimSpace(string(body))
+		if why == "" {
+			why = "namespace does not exist"
+		}
+		return &missing{why: why}
 	}
 	return fmt.Errorf("%s: http %d", op, status)
 }

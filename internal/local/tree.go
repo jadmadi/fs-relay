@@ -61,30 +61,29 @@ func New(root string) *Tree {
 // Prepare creates the data root if needed and verifies it is a directory.
 // It does not create a namespace.
 func (t *Tree) Prepare() error {
-	if err := os.MkdirAll(t.root, 0o755); err != nil {
-		return fmt.Errorf("data directory %s: %w", t.root, err)
-	}
-	info, err := os.Stat(t.root)
+	abs, err := filepath.Abs(t.root)
 	if err != nil {
 		return fmt.Errorf("data directory %s: %w", t.root, err)
 	}
+	t.root = abs
+	if err := os.MkdirAll(abs, 0o755); err != nil {
+		return fmt.Errorf("data directory %s: %w", abs, err)
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		return fmt.Errorf("data directory %s: %w", abs, err)
+	}
 	if !info.IsDir() {
-		return fmt.Errorf("data directory %s is not a directory", t.root)
+		return fmt.Errorf("data directory %s is not a directory", abs)
 	}
 	return nil
 }
 
-// OpenNamespace checks that data/<ns> is an existing directory. A hit is
-// cached; a miss is not, so creating the directory later works.
-func (t *Tree) OpenNamespace(ns string) error {
+// CheckNamespace stats data/<ns> every time. Connections use it so a
+// namespace that was removed is refused.
+func (t *Tree) CheckNamespace(ns string) error {
 	if err := wire.CheckNS(ns); err != nil {
 		return err
-	}
-	t.mu.Lock()
-	ok := t.dirs[ns]
-	t.mu.Unlock()
-	if ok {
-		return nil
 	}
 	info, err := os.Stat(filepath.Join(t.root, ns))
 	if err != nil {
@@ -92,6 +91,15 @@ func (t *Tree) OpenNamespace(ns string) error {
 	}
 	if !info.IsDir() {
 		return syscall.ENOTDIR
+	}
+	return nil
+}
+
+// OpenNamespace checks that data/<ns> is an existing directory. A hit is
+// cached; a miss is not, so creating the directory later works.
+func (t *Tree) OpenNamespace(ns string) error {
+	if err := t.CheckNamespace(ns); err != nil {
+		return err
 	}
 	t.mu.Lock()
 	t.dirs[ns] = true

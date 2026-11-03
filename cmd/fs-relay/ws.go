@@ -20,7 +20,7 @@ func serveWS(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad namespace", http.StatusBadRequest)
 		return
 	}
-	if err := tree.OpenNamespace(ns); err != nil {
+	if err := tree.CheckNamespace(ns); err != nil {
 		writeNamespaceErr(w, ns, err)
 		return
 	}

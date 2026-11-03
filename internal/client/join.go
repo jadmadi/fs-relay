@@ -37,7 +37,7 @@ func (c *Client) Listen(ctx context.Context) error {
 		if ctx.Err() != nil {
 			return nil
 		}
-		if Refused(err) {
+		if Refused(err) || Missing(err) {
 			return err
 		}
 		if err != nil && up {

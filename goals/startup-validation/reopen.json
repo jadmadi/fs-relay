@@ -1,0 +1,10 @@
+{
+  "goal_slug": "startup-validation",
+  "reopened_at": "2026-11-03T16:08:42.454220834Z",
+  "reopened_by": "agent",
+  "reason": "Qodo review found five startup bugs",
+  "original_commit": "2876886",
+  "resolved_at": "0001-01-01T00:00:00Z",
+  "active": true,
+  "reopen_epoch": 1
+}

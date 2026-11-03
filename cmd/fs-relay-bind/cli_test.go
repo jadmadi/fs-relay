@@ -32,6 +32,7 @@ func TestMisplacedFlag(t *testing.T) {
 		args []string
 		want string
 	}{
+		{[]string{}, ""},
 		{[]string{"mnt"}, ""},
 		{[]string{"mnt", "-post"}, "-post"},
 		{[]string{"mnt", "extra"}, ""},

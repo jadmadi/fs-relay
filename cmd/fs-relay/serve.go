@@ -50,11 +50,11 @@ func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad body", http.StatusBadRequest)
 		return
 	}
-	if err := tree.OpenNamespace(ns); err != nil {
-		writeNamespaceErr(w, ns, err)
-		return
-	}
 	if req.Method == wire.Join {
+		if err := tree.CheckNamespace(ns); err != nil {
+			writeNamespaceErr(w, ns, err)
+			return
+		}
 		serveJoin(h, ns, w, r, req.Params.Client)
 		return
 	}

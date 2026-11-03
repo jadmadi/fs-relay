@@ -84,6 +84,24 @@ code, tests and docs only.
 T1 before T2. T3 independent but after T1 for the smoke. T4 after T1 to T3.
 T5 last.
 
+- [x] **T6 - Close the Qodo startup findings**
+  - Goal: fix the five review findings on PR #20.
+  - Files: `internal/local/tree.go`, `cmd/fs-relay/serve.go`, `ws.go`,
+    `raw.go`, `cmd/fs-relay-bind/cli.go`, `internal/client/client.go`,
+    `join.go`, `ws.go`, tests.
+  - Requirements:
+    1. `misplacedFlag` returns empty for fewer than two args.
+    2. Connections use an uncached `CheckNamespace`; calls keep the cache.
+    3. A 404 join is terminal for the POST client.
+    4. The websocket error carries the server's 404 body.
+    5. `Prepare` uses the absolute root in every error.
+  - Acceptance:
+    - AC-6.1: `fs-relay-bind` with no args exits 2.
+    - AC-6.2: a deleted namespace is refused.
+    - AC-6.3: `-post` with a missing namespace stops.
+    - AC-6.4: the websocket error says the namespace does not exist.
+    - AC-6.5: a data-root error names the absolute path.
+
 ## Definition of done
 
 ```

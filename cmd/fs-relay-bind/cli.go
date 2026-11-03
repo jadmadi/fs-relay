@@ -42,6 +42,9 @@ func versionLine(name string) string {
 }
 
 func misplacedFlag(args []string) string {
+	if len(args) < 2 {
+		return ""
+	}
 	for _, a := range args[1:] {
 		if strings.HasPrefix(a, "-") {
 			return a

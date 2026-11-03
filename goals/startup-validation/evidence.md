@@ -61,6 +61,22 @@ fs-relay-bind ... -force-existing-mnt ...
 - `sila facts verify` exits 1 because the ledger already carries hash
   mismatches from other projects; the goal evidence is intact.
 
+## Review remediation, 2026-11-03
+
+Qodo found five bugs on PR #20; all are fixed:
+
+| Finding | Fix |
+|---------|-----|
+| No mountpoint panics | `misplacedFlag` returns empty for fewer than two args |
+| Deleted namespace still joins | Connections use uncached `CheckNamespace`; calls keep the hit cache |
+| `-post` retries a missing namespace | A 404 join is a terminal `Missing` error and stops the mount |
+| Websocket hides the message | `dialErr` passes the 404 body through |
+| Data-root error is relative | `Prepare` stores the absolute root and uses it in errors |
+
+Observed: `fs-relay-bind` with no args exits 2; a websocket and a `-post`
+mount with a missing namespace both print `namespace nope does not exist` and
+exit 1.
+
 ## Memory Writes
 
 ```json
