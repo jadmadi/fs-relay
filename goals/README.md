@@ -34,7 +34,7 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 - 🟢 **Implemented**: 1 (1 verified 📜, 0 unverified)
 - 🔁 **Reopened for Remediation**: 1
 - 🎯 **By Tier**: 0 immediate (Tier 1), 3 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 23/23 completed (100%)
+- 📋 **Execution Tasks Progress**: 25/26 completed (96%)
 
 ---
 
@@ -42,7 +42,7 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 | Goal Package | Tier | Mode | Agent | Status & Note | Started |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| [`advisory-record-locks`](advisory-record-locks/goal.md) | `🗺️ Roadmap` | `⚡ Indep` | `@opencode` | [REOPENED] remediation: Review found a read-only close dropping every lock of the mount; fix and pending downgrade added | 0s ago |
+| [`advisory-record-locks`](advisory-record-locks/goal.md) | `🗺️ Roadmap` | `⚡ Indep` | `@opencode` | [REOPENED] remediation: Review found a read-only close dropping every lock of the mount; fix and pending downgrade added | 1m0s ago |
 
 ---
 
