@@ -1,5 +1,5 @@
 ---
-name: pr-triage
+name: fs-relay-pr-triage
 description: "Triage fs-relay's upstream pull requests and issues: find new maintainer responses, assignments, CI and merge state, then propose the single next action that is assigned and in scope. Use when the user asks what is pending, what to do next on fs-relay contributions, to check PRs or issues, or to triage upstream work."
 ---
 
