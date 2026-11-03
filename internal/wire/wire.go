@@ -325,7 +325,6 @@ func DecodeResponse(b []byte) (Result, error) {
 }
 
 // Reply is one websocket message for a call id.
-// A pending ticket is not the result: the same id is answered again when the call finishes.
 // Client is set on the first message, which has no call id.
 type Reply struct {
 	ID      uint64
@@ -333,7 +332,6 @@ type Reply struct {
 	Result  *Result
 	Err     *Error
 	Fault   string
-	Pending string
 	Evict   *Change
 	Release string
 }
@@ -351,11 +349,6 @@ func MarshalReplyError(id uint64, e Error) ([]byte, error) {
 // MarshalFault encodes a failure that is not an errno. The mount treats it as a transport error.
 func MarshalFault(id uint64, message string) ([]byte, error) {
 	return encodeFB(fbMsg{ID: id, Fault: message})
-}
-
-// MarshalPending encodes the lock-wait notice for a call that has not finished.
-func MarshalPending(id uint64, ticket string) ([]byte, error) {
-	return encodeFB(fbMsg{ID: id, Pending: ticket})
 }
 
 // DecodeReply reads one websocket reply.

@@ -55,10 +55,14 @@ func lockCaller(t *testing.T, url, token string) *lockClient {
 	return &lockClient{c: c, ino: res.Attr.Ino, fh: res.Fh}
 }
 
-func TestPostSetlkwWaitsForRelease(t *testing.T) {
+func TestPostSetlkwReturnsEAGAINAndReleaseWakesClient(t *testing.T) {
 	srv, _, _ := lockServer(t)
 	a := lockCaller(t, srv.URL, testToken)
 	b := &client.Client{URL: srv.URL, NS: "demo", Token: testToken}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = b.Listen(ctx) }()
+	time.Sleep(50 * time.Millisecond)
 
 	pa := wire.Params{
 		Inode: a.ino, Fh: a.fh, Client: signClient(testToken, uuidA),
@@ -72,16 +76,14 @@ func TestPostSetlkwWaitsForRelease(t *testing.T) {
 		Inode: a.ino, Client: signClient(testToken, uuidB), Owner: 2,
 		Lock: wire.LockWrite, Offset: 100, Size: 1,
 	}
-	done := make(chan error, 1)
-	go func() {
-		_, err := b.Call(context.Background(), wire.Setlkw, pb)
-		done <- err
-	}()
-
-	select {
-	case err := <-done:
-		t.Fatalf("setlkw returned before release: %v", err)
-	case <-time.After(150 * time.Millisecond):
+	started := time.Now()
+	_, err := b.Call(ctx, wire.Setlkw, pb)
+	var werr *wire.Error
+	if !errors.As(err, &werr) || werr.Code != uint32(syscall.EAGAIN) {
+		t.Fatalf("setlkw: %v", err)
+	}
+	if time.Since(started) > time.Second {
+		t.Fatal("setlkw did not return at once")
 	}
 
 	pa.Lock = wire.LockUnlock
@@ -89,46 +91,13 @@ func TestPostSetlkwWaitsForRelease(t *testing.T) {
 		t.Fatal(err)
 	}
 	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("setlkw after release: %v", err)
-		}
+	case <-b.Releases():
 	case <-time.After(2 * time.Second):
-		t.Fatal("setlkw did not wake")
+		t.Fatal("release event not received")
 	}
 }
 
-func TestPostSetlkwCancelReturnsEINTR(t *testing.T) {
-	srv, _, h := lockServer(t)
-	a := lockCaller(t, srv.URL, testToken)
-	b := &client.Client{URL: srv.URL, NS: "demo", Token: testToken}
-
-	pa := wire.Params{
-		Inode: a.ino, Fh: a.fh, Client: signClient(testToken, uuidA),
-		Owner: 1, Lock: wire.LockWrite, Offset: 200, Size: 1,
-	}
-	if _, err := a.c.Call(context.Background(), wire.Setlk, pa); err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	_, err := b.Call(ctx, wire.Setlkw, wire.Params{
-		Inode: a.ino, Client: signClient(testToken, uuidB), Owner: 2,
-		Lock: wire.LockWrite, Offset: 200, Size: 1,
-	})
-	if err == nil {
-		t.Fatal("cancel: call returned")
-	}
-	deadline := time.Now().Add(time.Second)
-	for h.waiting("demo") {
-		if time.Now().After(deadline) {
-			t.Fatal("waiter not released after cancel")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-}
-
-func TestWebsocketPendingThenResult(t *testing.T) {
+func TestWebsocketSetlkwReturnsEAGAINAndReleaseArrives(t *testing.T) {
 	srv, _, _ := lockServer(t)
 	a := lockCaller(t, srv.URL, testToken)
 	pa := wire.Params{
@@ -167,11 +136,11 @@ func TestWebsocketPendingThenResult(t *testing.T) {
 	}
 	_, data, err := conn.Read(ctx)
 	if err != nil {
-		t.Fatalf("pending read: %v", err)
+		t.Fatalf("reply: %v", err)
 	}
-	first, err := wire.DecodeReply(data)
-	if err != nil || first.Pending == "" {
-		t.Fatalf("first reply %+v err %v", first, err)
+	reply, err := wire.DecodeReply(data)
+	if err != nil || reply.Err == nil || reply.Err.Code != uint32(syscall.EAGAIN) {
+		t.Fatalf("reply %+v err %v", reply, err)
 	}
 
 	pa.Lock = wire.LockUnlock
@@ -180,11 +149,11 @@ func TestWebsocketPendingThenResult(t *testing.T) {
 	}
 	_, data, err = conn.Read(ctx)
 	if err != nil {
-		t.Fatalf("result read: %v", err)
+		t.Fatalf("release read: %v", err)
 	}
-	last, err := wire.DecodeReply(data)
-	if err != nil || last.ID != 1 || last.Result == nil {
-		t.Fatalf("last reply %+v err %v", last, err)
+	push, err := wire.DecodeReply(data)
+	if err != nil || push.Release == "" {
+		t.Fatalf("release push %+v err %v", push, err)
 	}
 }
 

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"syscall"
+	"time"
 
 	"fs-relay/internal/wire"
 
@@ -42,10 +43,22 @@ func (n *node) Setlk(ctx context.Context, f fs.FileHandle, owner uint64, lk *fus
 	return errno
 }
 
-// Setlkw waits in the server until the lock can be granted or the call is canceled.
+// Setlkw tries the lock, then waits on the mount's release stream and tries
+// again. A dropped stream cannot lose the wait: the release is replayed after
+// a rejoin, and a one-second retry bounds anything that is missed.
 func (n *node) Setlkw(ctx context.Context, f fs.FileHandle, owner uint64, lk *fuse.FileLock, flags uint32) syscall.Errno {
-	_, errno := n.lock(ctx, wire.Setlkw, f, owner, lk, flags)
-	return errno
+	for {
+		_, errno := n.lock(ctx, wire.Setlkw, f, owner, lk, flags)
+		if errno != syscall.EAGAIN {
+			return errno
+		}
+		select {
+		case <-n.c.Releases():
+		case <-ctx.Done():
+			return syscall.EINTR
+		case <-time.After(time.Second):
+		}
+	}
 }
 
 func (n *node) lock(ctx context.Context, method string, f fs.FileHandle, owner uint64, lk *fuse.FileLock, flags uint32) (wire.Result, syscall.Errno) {

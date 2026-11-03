@@ -41,9 +41,9 @@ Scope: `internal/wire`, `internal/local`, `internal/client`, `cmd/fs-relay`,
 | AC-5.2 cancel returns waiters to zero | `TestPostSetlkwCancelReturnsEINTR` |
 | AC-5.3 no broadcast when nobody waits | `hub.wake` no-ops on an empty set |
 | AC-6.1 POST wait wakes on release | `TestPostSetlkwWaitsForRelease` |
-| AC-6.2 websocket pending then result | `TestWebsocketPendingThenResult` |
+| AC-6.2 websocket EAGAIN then release push | `TestWebsocketSetlkwReturnsEAGAINAndReleaseArrives` |
 | AC-6.3 release with no waiter writes nothing | covered by `hub.wake` |
-| AC-6.4 cancel releases the waiter | `TestPostSetlkwCancelReturnsEINTR` |
+| AC-6.4 cancel returns EINTR | `TestSetlkwCancelReturnsEINTR` |
 | AC-7.1 client expiry drops locks | `TestHoldExpiryReleasesClientLocks` |
 | AC-7.2 rejoin keeps locks | `TestHoldKeepsLocksOnRejoin` |
 | AC-8.1 `go test ./cmd/fs-relay-bind` | pass |
@@ -52,20 +52,28 @@ Scope: `internal/wire`, `internal/local`, `internal/client`, `cmd/fs-relay`,
 | AC-9.1 gofmt | empty |
 | AC-9.2 vet, test, race | pass |
 | AC-9.3 all tasks checked | pass |
+| AC-10.1 drop owner keeps the other owner | `TestLockDropOwnerIsNarrow` |
+| AC-10.2 read-only close releases one per owner | `TestReadOnlyCloseDropsOnlyItsOwners` |
+| AC-10.3 `cat` cannot drop a writer's lock | two-mount run below |
+| AC-10.4 read-only lock gone, writer stays | mount run below |
+| AC-11.1 pending downgrade reports read | `TestLockPendingDowngrade` |
+| AC-11.2 writer still refused after downgrade | `TestLockPendingDowngrade` |
+| AC-12.1 POST and websocket wait wake | `TestPostSetlkwReturnsEAGAIN...`, `TestSetlkwRetriesOnRelease` |
+| AC-12.2 release replayed on rejoin | `TestReleaseAllReplayedOnRejoin` |
+| AC-12.3 SQLite across two mounts unchanged | 200 rows, `ok` |
+| AC-12.4 SPEC matches the wait | pass |
 
 ## Deviations from the plan, and why
 
-1. Wait bookkeeping lives in the hub, not in the lock record. The hub already
-   owns the namespace and the hold timer, and it knows exactly who is parked.
-   A second counter in `local` would have been duplicated state.
-2. The plan's `seq` counter is not needed. The server registers the waiter
-   before the first grant attempt, and the wake channel has one slot, so a
-   release between the attempt and the park still leaves a token.
-3. Close semantics use the file handle. FUSE sends no lock owner on `release`,
-   so the table records the handle each owner last named and drops that
-   owner's locks on `release` of the handle. A read-only open has no server
-   handle, so the mount sends one `release` with no `fh` and the server drops
-   the client's locks on that inode.
+1. The wait is client-side, as `main` specifies. The server tracks waiting
+   inodes only to decide whether to send a release event; the mount waits on
+   its event stream and retries. The wire `pending` field was removed.
+2. The plan's `seq` counter is not needed. The release replay and the
+   one-second retry bound a missed event.
+3. Close semantics are owner-scoped. A read-only handle records the owners
+   that locked through it, and its close sends one `release` per owner with no
+   handle. This is narrower than a lazy server handle and avoids an `fh` race
+   on read-only handles.
 
 ## Defect found and fixed
 
@@ -96,6 +104,27 @@ Mount checks, two mounts of one namespace, Linux 6.12.113:
 | SQLite 3.46.1, two mounts, 4 writers, 200 rows | `integrity_check` `ok` |
 | new reader while a writer waits on the pending byte | held, then granted |
 
+## Review remediation, 2026-11-03
+
+The maintainer's review found that a read-only close dropped every lock the
+mount held on the database. Fixed by owner-scoped release: a read-only handle
+records the owners that locked through it, and its close sends one release per
+owner. The mount-wide `DropClient` path and `node.locked` are gone.
+
+Also fixed: a write lock on the pending byte replaced by a read now
+downgrades, and `setlkw` is back to the client-side wait with a replayed
+release.
+
+Verified on two mounts plus one `-post` mount:
+
+| Case | Result |
+|------|--------|
+| `cat` on the holder's mount | other mount stays `EAGAIN` |
+| read-only fd takes a read lock, closes | its byte free, writer stays |
+| websocket `F_SETLKW` while A holds | granted after 3.6s |
+| `-post` `F_SETLKW` while A holds | granted after 3.6s |
+| SQLite, 4 writers, 200 rows | `integrity_check` `ok` |
+
 ## Memory Writes
 
 ```json
@@ -104,8 +133,8 @@ Mount checks, two mounts of one namespace, Linux 6.12.113:
   "goal_slug": "advisory-record-locks",
   "prime": {"ran": true},
   "recall": [{"query": "sqlite database is locked", "matches": 0}],
-  "memos": [{"id": "fact_68f43052"}],
-  "lessons": [{"id": "fact_d51d5f40"}],
+  "memos": [{"id": "fact_68f43052"}, {"id": "fact_ccbaf335"}],
+  "lessons": [{"id": "fact_d51d5f40"}, {"id": "fact_ff81b41c"}],
   "cases": [{"id": "fact_5e91eb5f"}],
   "facts_verify": {"exit_code": 0},
   "handoff": {"id": "session-end"}

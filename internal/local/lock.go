@@ -551,21 +551,22 @@ func (t *Tree) InodeOf(fh uint64) (uint64, bool) {
 	return t.inoOf(fh)
 }
 
-// TookWake consumes a pending release wake for the inode a call named.
-func (t *Tree) TookWake(ns string, p wire.Params) bool {
+// TookWake consumes a pending release wake and returns the inode it
+// happened on.
+func (t *Tree) TookWake(ns string, p wire.Params) (uint64, bool) {
 	ino := p.Inode
 	if ino == 0 && p.Fh != 0 {
 		ino, _ = t.inoOf(p.Fh)
 	}
 	if ino == 0 {
-		return false
+		return 0, false
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	e, ok := t.entry(ns, ino)
 	if !ok || e.locks == nil || !e.locks.wake {
-		return false
+		return 0, false
 	}
 	e.locks.wake = false
-	return true
+	return ino, true
 }

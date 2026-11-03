@@ -1753,16 +1753,8 @@ func (rcv *FbEnvelope) Fault() []byte {
 	return nil
 }
 
-func (rcv *FbEnvelope) Pending() []byte {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
-	if o != 0 {
-		return rcv._tab.ByteVector(o + rcv._tab.Pos)
-	}
-	return nil
-}
-
 func (rcv *FbEnvelope) Evict(obj *FbChange) *FbChange {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(18))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
@@ -1775,7 +1767,7 @@ func (rcv *FbEnvelope) Evict(obj *FbChange) *FbChange {
 }
 
 func (rcv *FbEnvelope) Release() []byte {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(20))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(18))
 	if o != 0 {
 		return rcv._tab.ByteVector(o + rcv._tab.Pos)
 	}
@@ -1783,7 +1775,7 @@ func (rcv *FbEnvelope) Release() []byte {
 }
 
 func (rcv *FbEnvelope) Client() []byte {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(22))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(20))
 	if o != 0 {
 		return rcv._tab.ByteVector(o + rcv._tab.Pos)
 	}
@@ -1791,7 +1783,7 @@ func (rcv *FbEnvelope) Client() []byte {
 }
 
 func FbEnvelopeStart(builder *flatbuffers.Builder) {
-	builder.StartObject(10)
+	builder.StartObject(9)
 }
 func FbEnvelopeAddId(builder *flatbuffers.Builder, id uint64) {
 	builder.PrependUint64Slot(0, id, 0)
@@ -1811,17 +1803,14 @@ func FbEnvelopeAddFailure(builder *flatbuffers.Builder, failure flatbuffers.UOff
 func FbEnvelopeAddFault(builder *flatbuffers.Builder, fault flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(5, flatbuffers.UOffsetT(fault), 0)
 }
-func FbEnvelopeAddPending(builder *flatbuffers.Builder, pending flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(6, flatbuffers.UOffsetT(pending), 0)
-}
 func FbEnvelopeAddEvict(builder *flatbuffers.Builder, evict flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(7, flatbuffers.UOffsetT(evict), 0)
+	builder.PrependUOffsetTSlot(6, flatbuffers.UOffsetT(evict), 0)
 }
 func FbEnvelopeAddRelease(builder *flatbuffers.Builder, release flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(8, flatbuffers.UOffsetT(release), 0)
+	builder.PrependUOffsetTSlot(7, flatbuffers.UOffsetT(release), 0)
 }
 func FbEnvelopeAddClient(builder *flatbuffers.Builder, client flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(9, flatbuffers.UOffsetT(client), 0)
+	builder.PrependUOffsetTSlot(8, flatbuffers.UOffsetT(client), 0)
 }
 func FbEnvelopeEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

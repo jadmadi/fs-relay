@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -92,13 +91,10 @@ func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Co
 		go func(req wire.Request) {
 			defer wg.Done()
 			defer release(lanes, &mu, req.ID)
-			res, callErr := callWait(ctx, h, tree, ns, req.Method, req.Params, func() error {
-				b, err := wire.MarshalPending(req.ID, pendingTicket(req.ID))
-				if err != nil {
-					return err
-				}
-				return wr.send(ctx, b)
-			})
+			res, callErr := tree.Call(ctx, req.Method, req.Params)
+			if req.Method == wire.Setlkw && errors.Is(callErr, syscall.EAGAIN) {
+				h.markWaiting(ns, lockInode(tree, req.Params), req.Params.Client)
+			}
 			publishCall(h, tree, ns, req.Method, req.Params, callErr)
 			b, err := wsBody(req.ID, res, callErr)
 			if err != nil {
@@ -107,10 +103,6 @@ func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Co
 			_ = wr.send(ctx, b)
 		}(req)
 	}
-}
-
-func pendingTicket(id uint64) string {
-	return "lock-" + strconv.FormatUint(id, 10)
 }
 
 func readWS(ctx context.Context, conn *websocket.Conn) (wire.Request, bool) {

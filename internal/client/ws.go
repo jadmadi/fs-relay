@@ -31,6 +31,7 @@ type Socket struct {
 	next     uint64
 	waiters  map[uint64]chan wire.Reply
 	evicts   chan wire.Change
+	releases chan string
 	dead     chan struct{}
 	stopped  chan struct{}
 	joined   chan struct{}
@@ -63,6 +64,7 @@ func Dial(ctx context.Context, baseURL, ns, token string) (*Socket, error) {
 		token:    token,
 		waiters:  map[uint64]chan wire.Reply{},
 		evicts:   make(chan wire.Change, 32),
+		releases: make(chan string, 32),
 		dead:     make(chan struct{}),
 		stopped:  make(chan struct{}),
 		joined:   make(chan struct{}),
@@ -115,6 +117,11 @@ func (s *Socket) noteFail(err error) {
 }
 
 // Events receives cache evictions pushed on this socket.
+// Releases receives lock-release events from the socket.
+func (s *Socket) Releases() <-chan string {
+	return s.releases
+}
+
 func (s *Socket) Events() <-chan wire.Change {
 	return s.evicts
 }
@@ -268,9 +275,6 @@ func finish(rp wire.Reply) (wire.Result, error, bool) {
 	if rp.Result != nil {
 		return *rp.Result, nil, false
 	}
-	if rp.Pending != "" {
-		return wire.Result{}, nil, true
-	}
 	return wire.Result{}, errors.New("empty reply"), false
 }
 
@@ -367,6 +371,14 @@ func (s *Socket) loop(again bool) (bool, error) {
 			}
 			continue
 		}
+		if rp.Release != "" {
+			select {
+			case s.releases <- rp.Release:
+			case <-s.dead:
+				return named, errors.New("connection lost")
+			}
+			continue
+		}
 		if rp.Evict != nil {
 			select {
 			case s.evicts <- *rp.Evict:
@@ -391,7 +403,7 @@ func sessionID(rp wire.Reply) (string, bool) {
 	if rp.Client == "" || rp.ID != 0 || rp.Evict != nil || rp.Result != nil || rp.Err != nil {
 		return "", false
 	}
-	if rp.Fault != "" || rp.Pending != "" || rp.Release != "" {
+	if rp.Fault != "" || rp.Release != "" {
 		return "", false
 	}
 	return rp.Client, true

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	"fs-relay/internal/wire"
 
@@ -18,15 +19,46 @@ type callRecord struct {
 }
 
 type fakeCaller struct {
-	mu    sync.Mutex
-	calls []callRecord
+	mu       sync.Mutex
+	calls    []callRecord
+	releases chan string
+	deny     bool
 }
 
 func (f *fakeCaller) Call(ctx context.Context, method string, p wire.Params) (wire.Result, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, callRecord{method: method, p: p})
+	deny := f.deny && (method == wire.Setlk || method == wire.Setlkw)
 	f.mu.Unlock()
+	if deny {
+		return wire.Result{}, &wire.Error{Code: uint32(syscall.EAGAIN)}
+	}
 	return wire.Result{}, nil
+}
+
+func (f *fakeCaller) Releases() <-chan string {
+	if f.releases == nil {
+		f.releases = make(chan string, 1)
+	}
+	return f.releases
+}
+
+func (f *fakeCaller) setDeny(v bool) {
+	f.mu.Lock()
+	f.deny = v
+	f.mu.Unlock()
+}
+
+func (f *fakeCaller) count(method string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, c := range f.calls {
+		if c.method == method {
+			n++
+		}
+	}
+	return n
 }
 
 func (f *fakeCaller) records() []callRecord {
@@ -112,5 +144,52 @@ func TestGetlkRecordsNoOwner(t *testing.T) {
 	_ = n.Getlk(context.Background(), h, 7, ask, 0, &out)
 	if len(h.takeOwners()) != 0 {
 		t.Fatal("getlk recorded an owner")
+	}
+}
+
+func TestSetlkwRetriesOnRelease(t *testing.T) {
+	f := &fakeCaller{releases: make(chan string, 1)}
+	n := &node{c: f, ino: 5}
+	h := &handle{c: f, n: n, ino: 5, local: true}
+	lk := &fuse.FileLock{Start: 0, End: 0, Typ: syscall.F_RDLCK}
+	f.setDeny(true)
+
+	done := make(chan syscall.Errno, 1)
+	go func() { done <- n.Setlkw(context.Background(), h, 7, lk, 0) }()
+
+	deadline := time.Now().Add(time.Second)
+	for f.count(wire.Setlkw) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("setlkw never tried")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	f.setDeny(false)
+	f.releases <- "lock-1"
+
+	select {
+	case errno := <-done:
+		if errno != 0 {
+			t.Fatalf("setlkw: %v", errno)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("setlkw did not wake")
+	}
+	if f.count(wire.Setlkw) < 2 {
+		t.Fatalf("setlkw tried %d times", f.count(wire.Setlkw))
+	}
+}
+
+func TestSetlkwCancelReturnsEINTR(t *testing.T) {
+	f := &fakeCaller{}
+	f.setDeny(true)
+	n := &node{c: f, ino: 5}
+	h := &handle{c: f, n: n, ino: 5, local: true}
+	lk := &fuse.FileLock{Start: 0, End: 0, Typ: syscall.F_RDLCK}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if errno := n.Setlkw(ctx, h, 7, lk, 0); errno != syscall.EINTR {
+		t.Fatalf("cancel: %v", errno)
 	}
 }

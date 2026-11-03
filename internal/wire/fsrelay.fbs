@@ -111,7 +111,6 @@ table FbEnvelope {
   result:FbResult;
   failure:FbFailure;
   fault:string;
-  pending:string;
   evict:FbChange;
   release:string;
   client:string;

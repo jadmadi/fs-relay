@@ -116,6 +116,14 @@ func (c *Client) readJoin(ctx context.Context, body io.Reader, id string) (strin
 			}
 			stall.Reset(wire.Stall)
 			id, up = c.saw(fr.line, id, up, rejoin)
+			if fr.line.Release != "" {
+				select {
+				case c.releases <- fr.line.Release:
+				case <-ctx.Done():
+					return id, up, ctx.Err()
+				}
+				continue
+			}
 			if fr.line.Evict == nil {
 				continue
 			}

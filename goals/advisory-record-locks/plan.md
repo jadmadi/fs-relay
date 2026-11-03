@@ -233,7 +233,7 @@ likely to be implemented wrong. Run `sila gate` before each commit.
     - AC-11.2: another owner's write is still refused until the reader
       unlocks.
 
-- [ ] **T12 - Client-side setlkw wait with rejoin replay**
+- [x] **T12 - Client-side setlkw wait with rejoin replay**
   - Goal: restore the contract on `main`: `setlkw` returns at once, the
     mount waits on the release stream, and a rejoin replays a release the
     client has not seen.
