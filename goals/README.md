@@ -28,19 +28,20 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 ## Summary
 - **Total Goals**: 5
-- 🟡 **Ready to Execute (Pending)**: 2 (2 independent ⚡, 0 unblocked 🔗)
+- 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
+- 🔵 **In Progress (Claimed)**: 2
 - 🟢 **Implemented**: 3 (3 verified 📜, 0 unverified)
 - 🎯 **By Tier**: 0 immediate (Tier 1), 5 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 26/34 completed (76%)
+- 📋 **Execution Tasks Progress**: 26/36 completed (72%)
 
 ---
 
-## 🟡 Ready to Execute (Pending Goals)
+## 🔵 In Progress (Claimed Goals)
 
-| Goal Package | Tier | Mode & Sequence | Dependencies | Focus & Description | Launch Command |
+| Goal Package | Tier | Mode | Agent | Status & Note | Started |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| [`cli-review-fixes`](cli-review-fixes/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⚡ Independent (#1)` | - | Close the CLI review findings on PR 19 — Add the version to help and health, fix the help-like value bug, and make releas... | `/goal goals/cli-review-fixes/goal.md` |
-| [`startup-validation`](startup-validation/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⚡ Independent (#2)` | - | Validate the mountpoint, data directory and namespace — Refuse a non-empty mountpoint unless forced, prepare the data root, and reject a... | `/goal goals/startup-validation/goal.md` |
+| [`cli-review-fixes`](cli-review-fixes/goal.md) | `🗺️ Roadmap` | `⚡ Indep` | `@opencode` | in progress | 0s ago |
+| [`startup-validation`](startup-validation/goal.md) | `🗺️ Roadmap` | `⚡ Indep` | `@opencode` | in progress | 0s ago |
 
 ---
 
