@@ -17,11 +17,17 @@ A third connection, described under Large transfers, carries only large reads an
 
 The path segment after `/fs/` is the namespace: `[A-Za-z0-9_-]+`, non-empty, at most 64 bytes. It selects the directory under `data/` and nothing else. There is no shard level, because there is one directory tree. Anything outside the grammar is refused before any file is touched.
 
+## Command line
+
+`fs-relay -version` prints the binary name, the build version and the revision when known, then exits 0. `-h` prints the purpose, usage, example, version and flags to stdout, then exits 0. A flag after the mountpoint prints `flags must come before the mountpoint: <flag>` and the usage to stderr, then exits 2. `fs-relay-bind` follows the same rules.
+
 ## Token
 
 Every connection except `GET /` carries one shared secret. The header is `Authorization: Bearer <token>`. The secret is at least 8 characters from `[A-Za-z0-9_-]`. Capitals are distinct. That alphabet needs no encoding in a header or a URL. The server does not write the secret into a response, a client id, or a URL.
 
-Omit `-token` and the server prints a secret on its standard error, then uses it. Pass `-token` and that value is the secret when it meets the rule. A value that is too short, or that uses another character, stops the process before it listens. `fs-relay-bind` takes the same flag and sends the secret. It does not invent one. An empty flag on the mount stops it with `pass -token`.
+Omit `-token` and `-token-file` and the server prints a secret on its standard error, then uses it. Pass `-token` and that value is the secret when it meets the rule. A value that is too short, or that uses another character, stops the process before it listens. `fs-relay-bind` takes the same flags and sends the secret. It does not invent one. An empty pair on the mount stops it with `pass -token or -token-file`.
+
+`-token-file <path>` reads the secret from a regular file. The process stops if the file is missing, is not a regular file, is larger than 4 KiB, is empty, or has any group or other permission bit. That last rule is the point: an argv secret is readable in `ps`, while a mode-600 file is not. `-token` and `-token-file` cannot be combined, and an explicitly empty value for either flag is refused.
 
 A request with no secret is `401` and `{"error":{"code":401,"message":"missing token"}}`. A secret that is not the server's is `401` and `{"error":{"code":401,"message":"wrong token"}}`. The server writes the client's address and that reason to its standard error. A bad client id is `400`, and that refusal is logged with the address too. The mount does not retry a refused token. It stops and says so. A server that was restarted without `-token` printed a new secret. `GET /` stays open: it is the welcome page and the health check.
 

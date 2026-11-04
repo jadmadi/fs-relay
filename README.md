@@ -74,7 +74,7 @@ There is no cross dependency between the two and there is no problem if you put 
 For simplicity, we are running the binaries relative to their build directory.
 
 ```bash
-mkdir -p data /mnt/fs-relay
+mkdir -p data/demo /mnt/fs-relay
 ./fs-relay -listen 127.0.0.1:8080 -data data -token local-demo
 ./fs-relay-bind -url http://127.0.0.1:8080 -ns demo -token local-demo /mnt/fs-relay
 ```
@@ -86,13 +86,13 @@ Generate the token once and keep it in a file only you can read:
 ```bash
 install -d -m 700 ~/.config/fs-relay
 (umask 077; openssl rand -hex 16 > ~/.config/fs-relay/token)
-./fs-relay -token "$(cat ~/.config/fs-relay/token)"
-./fs-relay-bind -token "$(cat ~/.config/fs-relay/token)" /mnt/fs-relay
+./fs-relay -token-file ~/.config/fs-relay/token
+./fs-relay-bind -token-file ~/.config/fs-relay/token /mnt/fs-relay
 ```
 
-The value is still on the command line while the process runs, so another
-local user can read it from `ps`. On a shared host, restrict who can run `ps`
-on the box, or keep the mount on a single-user machine.
+`-token-file` reads a regular file, and the process stops if another user can
+read it, so keep the file at mode 600. `-token` still works, but the value
+sits in the process list (`ps aux`), which every local user can read.
 
 The server creates the `-data` directory if it is missing, but it never
 creates `data/<namespace>`. Create each namespace directory before a mount

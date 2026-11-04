@@ -41,6 +41,7 @@ func run() error {
 	debug := flags.Bool("debug", false, "enable FUSE debug logging")
 	forceExisting := flags.Bool("force-existing-mnt", false, "mount over a non-empty directory")
 	token := flags.String("token", "", "secret printed by fs-relay")
+	tokenFile := flags.String("token-file", "", "read the secret from this file (mode 600)")
 	showVersion := flags.Bool("version", false, "print the version and exit")
 	flags.SetOutput(os.Stderr)
 	flags.Usage = func() {}
@@ -73,10 +74,29 @@ func run() error {
 		return fmt.Errorf("namespace: %w", err)
 	}
 	base := normalizeURL(*url)
-	if *token == "" {
-		return fmt.Errorf("pass -token")
+	var tokenSet, fileSet bool
+	flags.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "token":
+			tokenSet = true
+		case "token-file":
+			fileSet = true
+		}
+	})
+	if tokenSet && fileSet {
+		return fmt.Errorf("pass -token or -token-file, not both")
 	}
-	if err := wire.CheckToken(*token); err != nil {
+	if tokenSet && *token == "" {
+		return fmt.Errorf("pass a value for -token, or use -token-file")
+	}
+	if fileSet && *tokenFile == "" {
+		return fmt.Errorf("pass a path for -token-file")
+	}
+	if !tokenSet && !fileSet {
+		return fmt.Errorf("pass -token or -token-file")
+	}
+	tk, err := resolveToken(*token, *tokenFile)
+	if err != nil {
 		return err
 	}
 	open := openSocket
@@ -85,7 +105,7 @@ func run() error {
 		open = openHTTP
 		mode = "HTTP POST"
 	}
-	c, events, stop, err := open(base, *ns, *token)
+	c, events, stop, err := open(base, *ns, tk)
 	if err != nil {
 		return err
 	}
@@ -95,7 +115,7 @@ func run() error {
 	defer cancel()
 	go k.loop(ctx, events)
 	root := &node{c: c, k: k, ino: 1}
-	defer attachRaw(root, base, *ns, *token, *useRaw)()
+	defer attachRaw(root, base, *ns, tk, *useRaw)()
 	server, err := fs.Mount(flags.Arg(0), root, mountOptions(*allowOther, *debug))
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)
