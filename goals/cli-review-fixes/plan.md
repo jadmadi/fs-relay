@@ -26,8 +26,9 @@ Read `facts.md` first. Work on `feat/cli-ergonomics`; the PR is open.
   - Files: the `cli.go` files, tests.
   - Requirements: add one `Version: <line>` line after the purpose.
   - Acceptance:
-    - AC-2.1: `fs-relay -h` contains `Version: fs-relay`.
-    - AC-2.2: `fs-relay-bind -h` contains `Version: fs-relay-bind`.
+    - AC-2.1: `fs-relay -h` prints `Version:` and `fs-relay` on separate lines.
+    - AC-2.2: `fs-relay-bind -h` prints `Version:` and `fs-relay-bind` on
+      separate lines.
 
 - [x] **T3 - Put the version in health**
   - Goal: the deployed version is visible over HTTP.
@@ -62,7 +63,8 @@ Read `facts.md` first. Work on `feat/cli-ergonomics`; the PR is open.
   - Requirements:
     1. Table tests for `versionLine` with and without ldflags.
     2. Health JSON test.
-    3. README mentions `-version` and the version in health.
+    3. README mentions `-version` and the version in health. Follow-up: the
+       README still lacks the health line.
     4. Evidence with commands and `Verdict: PASS`.
   - Acceptance:
     - AC-5.1: `gofmt -l .` empty, `go vet`, `go test`, `go test -race`

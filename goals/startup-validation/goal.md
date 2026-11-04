@@ -30,8 +30,8 @@ forced.
 | Force flag | `-force-existing-mnt` | Matches the maintainer's `-force-*` convention in #7 |
 | Data root | Create it at startup with mode 0755 | #14 says "assert the creation of data" |
 | Namespace | Never create it; require the operator to create it | #14 says "not data/namespace" |
-| Missing namespace | HTTP 404 with a one-line message | It is a configuration error, not a call error |
-| Namespace check | Once per namespace, positive results cached | Avoid a stat per call |
+| Missing namespace | HTTP 404 with a one-line message on join and websocket admission; `/fs/` calls keep the encoded filesystem error | It is a configuration error, not a call error |
+| Namespace check | Once per namespace, positive results cached (not implemented; #28) | Avoid a stat per call |
 | Mountpoint order | Stat and emptiness check before dialing | #14 asks for the check first |
 | Empty check | `ReadDir`; an empty dir is fine | Hidden files count as non-empty |
 | Logging | Log the resolved data path beside the listen URL | #6 asks for a clear startup |

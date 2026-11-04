@@ -27,7 +27,7 @@ listed below.
 | AC-2.8 no `database is locked` | pass |
 | AC-2.9 reader blocks writer across mounts | writer waited 1443 ms, then committed |
 | AC-2.10 no immediate lock error | pass |
-| AC-2.11 pending byte holds a new reader | `pread` EAGAIN while the writer waited 3599 ms |
+| AC-2.11 pending byte holds a new reader | unverified: the run used `fcntl` probes, not concurrent SQLite processes |
 | AC-2.12 no stall beyond `busy_timeout` plus 2 s | pass |
 | AC-2.13 `SIGINT` returns `EINTR` | `fcntl: Interrupted system call` |
 | AC-2.14 no stale lock after the interrupt | next `try` was granted |
@@ -105,9 +105,10 @@ client 01a1a0eb-0744-7000-9ae8-9abf51c1d422.gPkW0KDWQHv9vNqOEcb-GP1jz46ufV6R-V1B
 ## Defect found while proving it
 
 The mount-level interrupt first leaked a write lock: a parked `setlkw` was
-granted after the caller's open had already been released. The server now
-checks that the handle still exists after a grant, unlocks the range and
-returns `EINTR` when it is gone. The rerun above shows no stale lock.
+granted after the caller's open had already been released. The rerun above
+shows no stale lock in that run, but the fix it claims is not in the code: the
+bind has no post-grant validation, unlock, or `EINTR`, so the race is open.
+Tracked in #27.
 
 ## Commands
 
@@ -121,6 +122,13 @@ sqlite3 <mount>/db "PRAGMA busy_timeout=5000; BEGIN IMMEDIATE; ..."
 Mount-level probe programs live in `/tmp`, not the repository. The repository
 builds no test harness for this; `AGENTS.md` says a real mount is a checklist,
 not a unit test.
+
+The commands above are placeholders. The run used one-off probe programs under
+`/tmp` and recorded no exit codes, so a reviewer cannot rerun them. Treat the
+numbers as observations, not a reproducible suite.
+
+`certification.json` binds `eb5dd86`; the index lists `daa9689` as the goal
+commit, so the certification is not bound to the indexed commit.
 
 ## Limits
 

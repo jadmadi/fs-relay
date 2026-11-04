@@ -11,8 +11,8 @@ code, tests and docs only.
   - Files: `internal/local/tree.go`, `internal/local/path.go`,
     `internal/local/local_test.go`.
   - Requirements:
-    1. Add `func (t *Tree) Prepare() error`: `os.MkdirAll(root, 0o755)`, then
-       `os.Stat` and require a directory.
+    1. Add `func (t *Tree) Prepare() error`: `os.Stat` first, so a file path
+       returns `ENOTDIR` directly, then `os.MkdirAll(root, 0o755)`.
     2. Remove `os.MkdirAll(root/ns)` from `abs`.
     3. Add `func (t *Tree) OpenNamespace(ns string) error`: `CheckNS`, stat
        `root/ns`, require a directory, cache a hit, never cache a miss.
@@ -30,8 +30,9 @@ code, tests and docs only.
   - Requirements:
     1. Call `tree.Prepare()` before listening.
     2. Log the resolved absolute data path beside the listen URL.
-    3. In `serve`, `serveJoin` and `serveWS`, call `OpenNamespace`; on
-       `ENOENT`, answer HTTP 404 `namespace <ns> does not exist`.
+    3. `Call` uses `OpenNamespace`. Join and websocket admission use an
+       uncached `CheckNamespace`; on `ENOENT` they answer HTTP 404
+       `namespace <ns> does not exist`.
     4. Do not change the token or envelope paths.
   - Acceptance:
     - AC-2.1: `fs-relay -data <file>` exits 1 before listening.

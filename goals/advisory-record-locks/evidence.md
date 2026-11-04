@@ -14,8 +14,9 @@ Scope: `internal/wire`, `internal/local`, `internal/client`, `cmd/fs-relay`,
    overflow list for any other range, and a per-owner span list so a partial
    unlock splits correctly.
 3. `cmd/fs-relay`: `setlkw` parks in the server, wakes on any release in the
-   namespace, and reports `pending` first on the websocket. A client that
-   does not rejoin loses its locks when the 8s hold expires.
+   namespace, and reports `pending` first on the websocket. Superseded by T12:
+   both transports now return `EAGAIN` and the mount waits and retries. A
+   client that does not rejoin loses its locks when the 8s hold expires.
 4. `cmd/fs-relay-bind`: `Getlk`, `Setlk`, `Setlkw`, `EnableLocks`, `flock` as
    a whole-file entry, and `context.Canceled` mapped to `EINTR`.
 5. `internal/client`: each transport carries its signed client id, and a
@@ -26,7 +27,7 @@ Scope: `internal/wire`, `internal/local`, `internal/client`, `cmd/fs-relay`,
 | Check | Result |
 |-------|--------|
 | AC-1.1 `SPEC.md` has no "does not hold" | pass |
-| AC-1.2 `SPEC.md` states any-close | pass |
+| AC-1.2 `SPEC.md` states any-close | superseded: `SPEC.md` now states the limit, a second open that never locked cannot drop the process's locks |
 | AC-2.1 `go test ./internal/wire` | pass |
 | AC-2.2 setlk/setlkw/getlk round trip | `TestLockRoundTrip`, `TestLockResult` |
 | AC-2.3 `just flatc` reproduces the file | pass, flatc 25.12.19 |

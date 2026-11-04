@@ -19,8 +19,8 @@
 ### Server
 
 - `fs-relay` creates the `-data` root at startup if it is missing.
-- It fails at startup when the path exists and is not a directory, or is not
-  writable.
+- It fails at startup when the path exists and is not a directory. It does not
+  test writability; a read-only root fails on the first write.
 - It logs the resolved absolute data path beside the listen URL.
 - It never creates `data/<namespace>`.
 - A `join`, a websocket, or a `/fs/` call for a namespace whose directory is

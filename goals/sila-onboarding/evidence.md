@@ -32,6 +32,9 @@ Agent: opencode (session sess-db2a7f53c5ac1dc6a1d4a34e33963505)
 | `sila onboard check --strict` | exit 0, 13 pass, 0 warn |
 | `just check` | exit 0 on the synced `main` |
 
+The `sila onboard check --strict` result applies to commit `e991617`. The
+wiring it checked is in `AGENTS.md` at that commit, which the index records.
+
 ## Commands
 
 ```

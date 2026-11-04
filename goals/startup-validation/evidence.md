@@ -8,8 +8,9 @@ Issues: #6, #12, #14
 
 1. `local.Prepare` creates the data root and rejects a path that is not a
    directory. `abs` no longer creates `data/<namespace>`.
-2. `local.OpenNamespace` stats a namespace, caches a hit, and never caches a
-   miss. `Call` checks it before dispatch.
+2. `local.OpenNamespace` stats a namespace on every call and writes a hit to
+   `t.dirs`, which nothing reads, so `Call` stats on every request. That does
+   not match the intended cache; tracked in #28.
 3. `fs-relay` calls `Prepare` before listening and logs the resolved data
    path. `join`, `/ws/` and `/raw/` answer 404 for a missing namespace.
 4. `fs-relay-bind` checks the mountpoint before dialing. A missing path, a
@@ -56,8 +57,9 @@ fs-relay-bind ... -force-existing-mnt ...
 
 - A missing namespace now fails at the join, so the mount stops before it
   can issue calls. The client surfaces the HTTP 404.
-- A read-only data root fails when the first namespace is opened, not at
-  startup. `Prepare` only creates and checks the root.
+- A read-only data root passes the namespace check, which only stats. It fails
+  later, on the first write. `Prepare` creates the root and checks that it is a
+  directory; it does not test writability.
 - `sila facts verify` exits 1 because the ledger already carries hash
   mismatches from other projects; the goal evidence is intact.
 

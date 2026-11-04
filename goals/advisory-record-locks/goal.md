@@ -34,7 +34,10 @@ describes a table that does not exist.
 
 ## Success looks like
 
-1. Two mounts of one namespace cannot both hold a conflicting byte range.
+1. Two mounts of one namespace cannot both hold a conflicting byte range while
+   the server recognizes the lock. After the 8-second hold expires, a mount
+   that lost its stream can still write through an open handle, so exclusion
+   is not unconditional.
 2. One mount behaves exactly as it does today: SQLite rollback journal still
    works, single-mount `flock` still works, no new failure on any lock call.
 3. `getlk`, `setlk` and `setlkw` round-trip over both transports, POST and
@@ -55,9 +58,9 @@ and a `SPEC.md` edit in the same change.
 
 | Decision | Value | Reason |
 |----------|-------|--------|
-| Wait model | Server holds the call | One state machine for both transports; `pending` already exists in the wire; the request context gives interrupt semantics for free |
-| POST wait | The response is held until grant | One POST is one exchange, so there is no second reply |
-| Websocket wait | Send `pending` with a ticket, then the final reply with the same id | `wire.MarshalPending` and `Reply.Pending` already define this |
+| Wait model | ~~Server holds the call~~ Superseded by T12: `EAGAIN` and a client retry | One state machine for both transports; `pending` already exists in the wire; the request context gives interrupt semantics for free |
+| POST wait | ~~The response is held until grant~~ Superseded by T12: returns `EAGAIN` at once | One POST is one exchange, so there is no second reply |
+| Websocket wait | ~~Send `pending` with a ticket~~ Superseded by T12: returns `EAGAIN` at once | `wire.MarshalPending` and `Reply.Pending` already define this |
 | Owner key | `(client id, kernel owner id)` | The scrambled 64-bit owner is not unique across machines |
 | Close semantics | A `release` names a handle or an owner. A read-only handle records the owners that locked through it; its close drops only those | Never drop by client: a `cat` must not take a worker's locks |
 | Partial unlock | Split, keep the remainder on the overflow list, decrement the canonical count | Counts stay honest; no silent coverage loss |

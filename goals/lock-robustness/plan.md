@@ -23,6 +23,8 @@ Read `facts.md`. Work on `main`, then publish from a clean branch.
 
 - [x] **T3 - Any close drops the owner**
   - Goal: closing one of two writable descriptors drops the process owner.
+    A second open that never locked cannot, because FUSE release carries no
+    lock owner; `SPEC.md` records that limit.
   - Files: `internal/local/lock.go`, tests.
   - Requirements: an owner keeps two handles inline plus an overflow slice;
     `dropFH` removes the owner on any matching handle; no allocation on the
