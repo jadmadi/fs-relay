@@ -427,24 +427,27 @@ func release(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 		}
 		return wire.Result{}, nil
 	}
+	ino := p.Inode
+	if ino == 0 {
+		ino, _ = t.inoOf(p.Fh)
+	}
+	dropLocks := func() { t.DropFH(p.Namespace, ino, p.Fh) }
 	if len(p.Data) > 0 {
 		n, err := writeAt(t, p, "release")
 		if err != nil || n != len(p.Data) {
 			_ = t.dropFH(p.Fh)
+			dropLocks()
 			if err != nil {
 				return wire.Result{}, err
 			}
 			return wire.Result{}, wrap("release", io.ErrShortWrite)
 		}
 	}
-	ino := p.Inode
-	if ino == 0 {
-		ino, _ = t.inoOf(p.Fh)
-	}
 	if err := t.dropFH(p.Fh); err != nil {
+		dropLocks()
 		return wire.Result{}, wrap("release", err)
 	}
-	t.DropFH(p.Namespace, ino, p.Fh)
+	dropLocks()
 	return wire.Result{}, nil
 }
 

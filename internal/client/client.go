@@ -23,11 +23,11 @@ type Client struct {
 	Token string
 	HTTP  *http.Client
 
-	once     sync.Once
-	evicts   chan wire.Change
-	releases chan string
-	mu       sync.Mutex
-	id       string
+	once   sync.Once
+	evicts chan wire.Change
+	rel    chan struct{}
+	mu     sync.Mutex
+	id     string
 }
 
 func (c *Client) setID(id string) {
@@ -54,14 +54,30 @@ func (c *Client) Events() <-chan wire.Change {
 func (c *Client) ensure() {
 	c.once.Do(func() {
 		c.evicts = make(chan wire.Change, 32)
-		c.releases = make(chan string, 32)
 	})
 }
 
-// Releases receives lock-release events from the join stream.
-func (c *Client) Releases() <-chan string {
+// Releases returns the current release broadcast. A release closes it and
+// installs a new one, so every waiter wakes and the reader never blocks.
+func (c *Client) Releases() <-chan struct{} {
 	c.ensure()
-	return c.releases
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.rel == nil {
+		c.rel = make(chan struct{})
+	}
+	return c.rel
+}
+
+func (c *Client) notifyRelease() {
+	c.ensure()
+	c.mu.Lock()
+	ch := c.rel
+	c.rel = make(chan struct{})
+	c.mu.Unlock()
+	if ch != nil {
+		close(ch)
+	}
 }
 
 // Call posts method and returns the result. A filesystem failure is *wire.Error.

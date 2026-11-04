@@ -268,3 +268,17 @@ func TestLockPendingDowngrade(t *testing.T) {
 	call(t, tr, wire.Setlk, lp(ino, fh, "A", 1, wire.LockUnlock, pendingByte, 1))
 	call(t, tr, wire.Setlk, lp(ino, fh, "B", 2, wire.LockWrite, pendingByte, 1))
 }
+
+func TestLockAnyCloseDropsOwner(t *testing.T) {
+	tr, _ := newTree(t)
+	ino, fh1 := lockFile(t, tr, "a")
+	second := call(t, tr, wire.Open, wire.Params{Inode: ino, Flags: syscall.O_RDWR})
+	call(t, tr, wire.Setlk, lp(ino, fh1, "A", 1, wire.LockWrite, 100, 1))
+	call(t, tr, wire.Setlk, lp(ino, second.Fh, "A", 1, wire.LockWrite, 200, 1))
+
+	if !tr.DropFH("demo", ino, fh1) {
+		t.Fatal("drop reported no change")
+	}
+	call(t, tr, wire.Setlk, lp(ino, 0, "B", 2, wire.LockWrite, 100, 1))
+	call(t, tr, wire.Setlk, lp(ino, 0, "B", 2, wire.LockWrite, 200, 1))
+}

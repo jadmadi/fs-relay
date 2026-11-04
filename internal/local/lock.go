@@ -33,9 +33,37 @@ type lockSpan struct {
 
 type lockOwner struct {
 	key   lockKey
-	fh    uint64
+	fh    [2]uint64
+	nfh   uint8
+	more  []uint64
 	flock uint32
 	spans []lockSpan
+}
+
+func (o *lockOwner) addFH(fh uint64) {
+	if fh == 0 || o.hasFH(fh) {
+		return
+	}
+	if o.nfh < uint8(len(o.fh)) {
+		o.fh[o.nfh] = fh
+		o.nfh++
+		return
+	}
+	o.more = append(o.more, fh)
+}
+
+func (o *lockOwner) hasFH(fh uint64) bool {
+	for i := uint8(0); i < o.nfh; i++ {
+		if o.fh[i] == fh {
+			return true
+		}
+	}
+	for _, x := range o.more {
+		if x == fh {
+			return true
+		}
+	}
+	return false
 }
 
 // lockRec is one inode's lock state. It is allocated on the first lock and
@@ -82,7 +110,7 @@ func (r *lockRec) find(key lockKey) *lockOwner {
 
 func (r *lockRec) owner(key lockKey, fh uint64) *lockOwner {
 	if o := r.find(key); o != nil {
-		o.fh = fh
+		o.addFH(fh)
 		return o
 	}
 	var spans []lockSpan
@@ -90,7 +118,9 @@ func (r *lockRec) owner(key lockKey, fh uint64) *lockOwner {
 		spans = r.pool[n-1][:0]
 		r.pool = r.pool[:n-1]
 	}
-	r.owners = append(r.owners, lockOwner{key: key, fh: fh, spans: spans})
+	o := lockOwner{key: key, spans: spans}
+	o.addFH(fh)
+	r.owners = append(r.owners, o)
 	return &r.owners[len(r.owners)-1]
 }
 
@@ -332,7 +362,7 @@ func (r *lockRec) flockSet(key lockKey, fh uint64, typ uint32) error {
 func (r *lockRec) dropFH(fh uint64) bool {
 	changed := false
 	for i := len(r.owners) - 1; i >= 0; i-- {
-		if r.owners[i].fh != fh {
+		if !r.owners[i].hasFH(fh) {
 			continue
 		}
 		r.remove(r.owners[i].key)
