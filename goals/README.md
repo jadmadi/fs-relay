@@ -42,6 +42,6 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | [`advisory-record-locks`](advisory-record-locks/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `c84e4b2` |
 | [`cli-review-fixes`](cli-review-fixes/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `a69607e` |
 | [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `12bcc6e` |
-| [`lock-robustness`](lock-robustness/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `146793f` |
+| [`lock-robustness`](lock-robustness/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `7399591` |
 | [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `e991617` |
 | [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | unbound ○ | Git Commit | `daa9689` |
