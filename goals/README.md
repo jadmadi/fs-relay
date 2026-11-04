@@ -27,11 +27,20 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 6. **Auto-Reconciliation**: Run `sila goals` to scan commits, mark 🟢 **Implemented**, and clear the claim lock.
 
 ## Summary
-- **Total Goals**: 7
-- 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
+- **Total Goals**: 9
+- 🟡 **Ready to Execute (Pending)**: 2 (2 independent ⚡, 0 unblocked 🔗)
 - 🟢 **Implemented**: 7 (2 verified 📜, 5 unbound ○, 0 unverified)
-- 🎯 **By Tier**: 0 immediate (Tier 1), 7 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 45/45 completed (100%)
+- 🎯 **By Tier**: 0 immediate (Tier 1), 9 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
+- 📋 **Execution Tasks Progress**: 45/53 completed (84%)
+
+---
+
+## 🟡 Ready to Execute (Pending Goals)
+
+| Goal Package | Tier | Mode & Sequence | Dependencies | Focus & Description | Launch Command |
+| :--- | :---: | :---: | :--- | :--- | :--- |
+| [`namespace-cache`](namespace-cache/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⚡ Independent (#5)` | - | Drop the namespace cache that nothing reads — OpenNamespace writes t.dirs on every call and never reads it, so Call stats the ... | `/goal goals/namespace-cache/goal.md` |
+| [`bind-grant-race`](bind-grant-race/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⚡ Independent (#6)` | - | Stop a granted lock outliving its handle — A read-only handle can grant a lock after Release took its owners, leaving a loc... | `/goal goals/bind-grant-race/goal.md` |
 
 ---
 
@@ -43,6 +52,6 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | [`cli-review-fixes`](cli-review-fixes/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `a69607e` |
 | [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `12bcc6e` |
 | [`lock-robustness`](lock-robustness/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `7399591` |
-| [`ci-race`](ci-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `6e4d9b2` |
+| [`ci-race`](ci-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `8740b26` |
 | [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `e991617` |
 | [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | unbound ○ | Git Commit | `daa9689` |
