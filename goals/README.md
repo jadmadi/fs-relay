@@ -28,19 +28,10 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 ## Summary
 - **Total Goals**: 9
-- 🟡 **Ready to Execute (Pending)**: 2 (2 independent ⚡, 0 unblocked 🔗)
-- 🟢 **Implemented**: 7 (2 verified 📜, 5 unbound ○, 0 unverified)
+- 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
+- 🟢 **Implemented**: 9 (4 verified 📜, 5 unbound ○, 0 unverified)
 - 🎯 **By Tier**: 0 immediate (Tier 1), 9 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 45/53 completed (84%)
-
----
-
-## 🟡 Ready to Execute (Pending Goals)
-
-| Goal Package | Tier | Mode & Sequence | Dependencies | Focus & Description | Launch Command |
-| :--- | :---: | :---: | :--- | :--- | :--- |
-| [`namespace-cache`](namespace-cache/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⚡ Independent (#5)` | - | Drop the namespace cache that nothing reads — OpenNamespace writes t.dirs on every call and never reads it, so Call stats the ... | `/goal goals/namespace-cache/goal.md` |
-| [`bind-grant-race`](bind-grant-race/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⚡ Independent (#6)` | - | Stop a granted lock outliving its handle — A read-only handle can grant a lock after Release took its owners, leaving a loc... | `/goal goals/bind-grant-race/goal.md` |
+- 📋 **Execution Tasks Progress**: 52/52 completed (100%)
 
 ---
 
@@ -53,5 +44,7 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `12bcc6e` |
 | [`lock-robustness`](lock-robustness/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `7399591` |
 | [`ci-race`](ci-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `8740b26` |
+| [`namespace-cache`](namespace-cache/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `f5e6f13` |
+| [`bind-grant-race`](bind-grant-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Evidence (evidence.md) | `f5e6f13` |
 | [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `e991617` |
 | [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | unbound ○ | Git Commit | `daa9689` |

@@ -1,0 +1,26 @@
+{
+  "goal_slug": "namespace-cache",
+  "certified_at": "2026-11-04T17:58:32.446102826Z",
+  "certified_by": "agent",
+  "evidence_file": "goals/namespace-cache/evidence.md",
+  "note": "certified from review document: evidence.md",
+  "verified": true,
+  "facts_passed": 1,
+  "facts_total": 1,
+  "evidence_kind": "review_document",
+  "commit_sha": "f5e6f13a6c82829e8d815c5bd77d7ca6103ef235",
+  "memory_required": true,
+  "memory_waived": true,
+  "memory_waiver_reason": "facts ledger has pre-existing hash mismatches",
+  "memory": {
+    "required": true,
+    "status": "waived",
+    "prime": false,
+    "recall": false,
+    "writes": false,
+    "facts": false,
+    "handoff": false,
+    "waived": true,
+    "waiver_reason": "facts ledger has pre-existing hash mismatches"
+  }
+}

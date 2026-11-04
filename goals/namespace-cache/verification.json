@@ -1,0 +1,47 @@
+{
+  "version": "sila/verification/v2",
+  "goal_slug": "namespace-cache",
+  "level": "L1",
+  "outcome": "passed",
+  "method": "evidence",
+  "spec_hash": "c0292e367b91a778c2aa456c74985136779fa3075118591a99b0602673c24bd4",
+  "subject": {
+    "algorithm": "sha256",
+    "hash": "e88971fc97c7de7d13d446f8354969ba049b4dbce3b9a7e06011f25d6668d0a7",
+    "paths": [
+      {
+        "path": "go.mod",
+        "kind": "file",
+        "hash": "ec75fb5a26908b423a649d514ea7674daa4e6e6ab1d92d51b27d2a145f2d3d47"
+      },
+      {
+        "path": "go.sum",
+        "kind": "file",
+        "hash": "22f46fc43dfdf65a599cc8bb6e67c2ff8553eba4a7aa31f1b73725f5ef12df21"
+      },
+      {
+        "path": "go.work",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "go.work.sum",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "internal/local/tree.go",
+        "kind": "file",
+        "hash": "8e1236113c05f9eaa93a7d3a7b471eef2ebef3d58437b7a66f9a4664116e5bab"
+      }
+    ]
+  },
+  "environment": {
+    "go_version": "go1.27.2",
+    "os": "linux",
+    "arch": "amd64",
+    "sila_version": "dev+f41b5eac",
+    "bwrap": "bubblewrap 0.12.0"
+  },
+  "verified_at": "2026-11-04T17:58:32Z"
+}
