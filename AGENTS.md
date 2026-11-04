@@ -76,6 +76,7 @@ Standard library first. Expected: `go-fuse`, `github.com/google/flatbuffers`, an
 ## Done means
 
 - `gofmt -l .` is empty; `go vet ./...` and `go test ./...` are clean.
+- `go test -race ./...` is clean. CI runs it in its own job.
 - New exported identifiers have doc comments; a new operation has a `local` test and a golden case in `wire`.
 - The run that produced a published benchmark number is recorded in `ROADMAP.md`. The README states the comparison.
 - A behavior change updates `SPEC.md` and `ROADMAP.md` in the same change.

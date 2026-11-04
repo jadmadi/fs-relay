@@ -12,6 +12,10 @@ build:
 test:
     go test ./...
 
+# unit tests under the race detector
+race:
+    go test -race ./...
+
 # gofmt, vet, and unit tests
 check:
     files="$(gofmt -l .)"; test -z "$files" || { printf '%s\n' "$files"; exit 1; }
