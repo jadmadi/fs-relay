@@ -9,9 +9,10 @@ import (
 )
 
 type health struct {
-	Status string `json:"status"`
-	TimeMS int64  `json:"time_ms"`
-	Time   string `json:"time"`
+	Status  string `json:"status"`
+	Version string `json:"version"`
+	TimeMS  int64  `json:"time_ms"`
+	Time    string `json:"time"`
 }
 
 const landingPage = `<!DOCTYPE html>
@@ -78,7 +79,7 @@ const landingPage = `<!DOCTYPE html>
 <main>
   <h1>Welcome to fs-relay server</h1>
   <p>A fast network filesystem. Mount it with fs-relay-bind.</p>
-  <p>Pass the server's token to the mount with -token-file, or -token if you accept that ps shows it.</p>
+  <p>Pass the server's token to the mount with -token.</p>
 </main>
 </body>
 </html>
@@ -96,9 +97,10 @@ func serveRoot(w http.ResponseWriter, r *http.Request) {
 
 func writeHealth(w http.ResponseWriter, now time.Time) {
 	body, err := json.Marshal(health{
-		Status: "ok",
-		TimeMS: now.UnixMilli(),
-		Time:   now.Format(time.RFC3339),
+		Status:  "ok",
+		Version: buildVersion(),
+		TimeMS:  now.UnixMilli(),
+		Time:    now.Format(time.RFC3339),
 	})
 	if err != nil {
 		http.Error(w, "health", http.StatusInternalServerError)

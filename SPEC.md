@@ -17,6 +17,10 @@ A third connection, described under Large transfers, carries only large reads an
 
 The path segment after `/fs/` is the namespace: `[A-Za-z0-9_-]+`, non-empty, at most 64 bytes. It selects the directory under `data/` and nothing else. There is no shard level, because there is one directory tree. Anything outside the grammar is refused before any file is touched.
 
+## Command line
+
+`fs-relay -version` prints the binary name, the build version and the revision when known, then exits 0. `-h` prints the purpose, usage, example, version and flags to stdout, then exits 0. A flag after the mountpoint prints `flags must come before the mountpoint: <flag>` and the usage to stderr, then exits 2. `fs-relay-bind` follows the same rules.
+
 ## Token
 
 Every connection except `GET /` carries one shared secret. The header is `Authorization: Bearer <token>`. The secret is at least 8 characters from `[A-Za-z0-9_-]`. Capitals are distinct. That alphabet needs no encoding in a header or a URL. The server does not write the secret into a response, a client id, or a URL.

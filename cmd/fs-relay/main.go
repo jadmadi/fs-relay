@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -15,22 +16,42 @@ import (
 	"fs-relay/internal/local"
 )
 
+var errUsage = errors.New("usage")
+
 func main() {
 	if err := run(); err != nil {
+		if errors.Is(err, errUsage) {
+			os.Exit(2)
+		}
 		fmt.Fprintf(os.Stderr, "fs-relay: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func run() error {
-	listen := flag.String("listen", "127.0.0.1:8080", "address to listen on")
-	data := flag.String("data", "data", "directory that holds one folder per namespace")
-	given := flag.String("token", "", "shared secret; printed when omitted")
-	file := flag.String("token-file", "", "read the shared secret from this file (mode 600)")
-	flag.Parse()
+	flags := flag.NewFlagSet("fs-relay", flag.ContinueOnError)
+	listen := flags.String("listen", "127.0.0.1:8080", "address to listen on")
+	data := flags.String("data", "data", "directory that holds one folder per namespace")
+	given := flags.String("token", "", "shared secret; printed when omitted")
+	file := flags.String("token-file", "", "read the shared secret from this file (mode 600)")
+	showVersion := flags.Bool("version", false, "print the version and exit")
+	flags.SetOutput(os.Stderr)
+	flags.Usage = func() {}
+	if err := flags.Parse(os.Args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fmt.Print(usageText(flags))
+			return nil
+		}
+		fmt.Fprint(os.Stderr, usageText(flags))
+		return errUsage
+	}
+	if *showVersion {
+		fmt.Println(versionLine("fs-relay"))
+		return nil
+	}
 
 	var tokenSet, fileSet bool
-	flag.Visit(func(f *flag.Flag) {
+	flags.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "token":
 			tokenSet = true

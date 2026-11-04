@@ -1,6 +1,7 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
-ldflags := "-s -w"
+version := `git describe --tags --always --dirty 2>/dev/null || echo devel`
+ldflags := "-s -w -X main.version=" + version
 
 # production binaries in this directory
 build:

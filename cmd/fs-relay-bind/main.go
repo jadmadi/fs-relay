@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -17,28 +18,50 @@ import (
 	"github.com/hanwen/go-fuse/v2/fuse"
 )
 
+var errUsage = errors.New("usage")
+
 func main() {
 	if err := run(); err != nil {
+		if errors.Is(err, errUsage) {
+			os.Exit(2)
+		}
 		fmt.Fprintf(os.Stderr, "fs-relay-bind: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func run() error {
-	url := flag.String("url", "http://127.0.0.1:8080", "fs-relay base URL")
-	ns := flag.String("ns", "default", "namespace")
-	post := flag.Bool("post", false, "send each operation as its own POST")
-	useWS := flag.Bool("ws", false, "one connection for the mount (the default)")
-	allowOther := flag.Bool("allow-other", false, "allow other users to access the mount")
-	useRaw := flag.Bool("raw", true, "carry large reads and writes on a separate connection")
-	debug := flag.Bool("debug", false, "enable FUSE debug logging")
-	token := flag.String("token", "", "secret printed by fs-relay")
-	tokenFile := flag.String("token-file", "", "read the secret from this file (mode 600)")
-	flag.Parse()
-	if flag.NArg() != 1 {
-		fmt.Fprintf(os.Stderr, "usage: %s [flags] <mountpoint>\n", os.Args[0])
-		flag.PrintDefaults()
-		os.Exit(2)
+	flags := flag.NewFlagSet("fs-relay-bind", flag.ContinueOnError)
+	url := flags.String("url", "http://127.0.0.1:8080", "fs-relay base URL")
+	ns := flags.String("ns", "default", "namespace")
+	post := flags.Bool("post", false, "send each operation as its own POST")
+	useWS := flags.Bool("ws", false, "one connection for the mount (the default)")
+	allowOther := flags.Bool("allow-other", false, "allow other users to access the mount")
+	useRaw := flags.Bool("raw", true, "carry large reads and writes on a separate connection")
+	debug := flags.Bool("debug", false, "enable FUSE debug logging")
+	token := flags.String("token", "", "secret printed by fs-relay")
+	tokenFile := flags.String("token-file", "", "read the secret from this file (mode 600)")
+	showVersion := flags.Bool("version", false, "print the version and exit")
+	flags.SetOutput(os.Stderr)
+	flags.Usage = func() {}
+	if err := flags.Parse(os.Args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fmt.Print(usageText(flags))
+			return nil
+		}
+		fmt.Fprint(os.Stderr, usageText(flags))
+		return errUsage
+	}
+	if *showVersion {
+		fmt.Println(versionLine("fs-relay-bind"))
+		return nil
+	}
+	if flags.NArg() != 1 {
+		if bad := misplacedFlag(flags.Args()); bad != "" {
+			fmt.Fprintf(os.Stderr, "flags must come before the mountpoint: %s\n", bad)
+		}
+		fmt.Fprint(os.Stderr, usageText(flags))
+		return errUsage
 	}
 	if *post && *useWS {
 		return fmt.Errorf("pass -post or -ws, not both")
@@ -48,7 +71,7 @@ func run() error {
 	}
 	base := normalizeURL(*url)
 	var tokenSet, fileSet bool
-	flag.Visit(func(f *flag.Flag) {
+	flags.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "token":
 			tokenSet = true
@@ -89,11 +112,11 @@ func run() error {
 	go k.loop(ctx, events)
 	root := &node{c: c, k: k, ino: 1}
 	defer attachRaw(root, base, *ns, tk, *useRaw)()
-	server, err := fs.Mount(flag.Arg(0), root, mountOptions(*allowOther, *debug))
+	server, err := fs.Mount(flags.Arg(0), root, mountOptions(*allowOther, *debug))
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)
 	}
-	log.Printf("fs-relay-bind: mounted on %s, namespace %s, %s, %s", flag.Arg(0), *ns, mode, base)
+	log.Printf("fs-relay-bind: mounted on %s, namespace %s, %s, %s", flags.Arg(0), *ns, mode, base)
 	go unmountOnSignal(server)
 	server.Wait()
 	return nil
