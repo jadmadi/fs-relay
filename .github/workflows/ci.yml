@@ -22,3 +22,17 @@ jobs:
 
       - name: Build
         run: just build
+
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: extractions/setup-just@v3
+
+      - name: Race
+        run: just race
