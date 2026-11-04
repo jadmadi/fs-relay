@@ -1,7 +1,39 @@
 # Plan: Stop a granted lock outliving its handle
 
+Read `facts.md`. Work on `main`, then publish from a clean branch.
+
 ## Execution Steps
-- [ ] **Phase 1 — Contracts & Schemas**: Define models, data structures, and signatures.
-- [ ] **Phase 2 — Core Implementation**: Implement business logic, routes, and error handling.
-- [ ] **Phase 3 — Verification & Evidence**: Write unit tests, run end-to-end verification, and write markdown evidence with an explicit standalone `Verdict: PASS` declaration (or `## Verdict` followed by `PASS`) to satisfy `EVIDENCE_VERDICT_REQUIRED`.
-- [ ] **Phase 4 — Attribution & Registry Closure**: (1) check all completed tasks in `goals/bind-grant-race/plan.md`; (2) commit with `(goals/bind-grant-race/goal.md)` or `[goal: bind-grant-race]` using a `feat:`, `fix:`, `refactor:`, `perf:`, or `chore:` subject (docs/test commits are ignored); (3) certify via `sila goals certify bind-grant-race --evidence=goals/bind-grant-race/evidence.md` (with `Verdict: PASS`) or `sila goals audit bind-grant-race`; (4) reconcile via `sila goals` and commit the updated `goals/README.md` and certification receipts; verify `sila goals --json` reports `unverified_count: 0` for delivered goals.
+
+- [x] **T1 - Mark the handle closed**
+  - Goal: a grant can tell that its handle is gone.
+  - Files: `cmd/fs-relay-bind/handle.go`.
+  - Requirements: `Release` sets a `closed` flag under `omu` before it takes
+    owners or sends anything; `markClosed` and `isClosed` are the only access.
+  - Acceptance: `TestGrantAfterReleaseIsUndone` sees the flag.
+
+- [x] **T2 - Undo a late grant**
+  - Goal: no lock survives its handle.
+  - Files: `cmd/fs-relay-bind/lock.go`.
+  - Requirements: after a successful grant, if the handle is closed, send
+    `setlk` with `LockUnlock` for the same owner and range and return `EINTR`.
+    Applies to read-only and writable handles.
+  - Acceptance: the test finds the unlock record and gets `EINTR`.
+
+- [x] **T3 - Release owners on a failed close**
+  - Goal: a sticky writeback error does not keep locks.
+  - Files: `cmd/fs-relay-bind/handle.go`.
+  - Requirements: the read-only release path always calls `releaseOwners`; the
+    sticky error still wins the return value.
+  - Acceptance: `TestReleaseWithErrorStillDropsOwners` passes.
+
+- [x] **T4 - Tests, SPEC and evidence**
+  - Files: the tests above, `SPEC.md`, `goals/bind-grant-race/evidence.md`.
+  - Acceptance: `gofmt -l .` empty, vet, test and race pass; evidence has
+    `Verdict: PASS`.
+
+## Definition of done
+
+```
+just check
+just race
+```

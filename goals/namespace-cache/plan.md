@@ -1,7 +1,32 @@
 # Plan: Drop the namespace cache that nothing reads
 
+Read `facts.md`. Work on `main`, then publish from a clean branch.
+
 ## Execution Steps
-- [ ] **Phase 1 — Contracts & Schemas**: Define models, data structures, and signatures.
-- [ ] **Phase 2 — Core Implementation**: Implement business logic, routes, and error handling.
-- [ ] **Phase 3 — Verification & Evidence**: Write unit tests, run end-to-end verification, and write markdown evidence with an explicit standalone `Verdict: PASS` declaration (or `## Verdict` followed by `PASS`) to satisfy `EVIDENCE_VERDICT_REQUIRED`.
-- [ ] **Phase 4 — Attribution & Registry Closure**: (1) check all completed tasks in `goals/namespace-cache/plan.md`; (2) commit with `(goals/namespace-cache/goal.md)` or `[goal: namespace-cache]` using a `feat:`, `fix:`, `refactor:`, `perf:`, or `chore:` subject (docs/test commits are ignored); (3) certify via `sila goals certify namespace-cache --evidence=goals/namespace-cache/evidence.md` (with `Verdict: PASS`) or `sila goals audit namespace-cache`; (4) reconcile via `sila goals` and commit the updated `goals/README.md` and certification receipts; verify `sila goals --json` reports `unverified_count: 0` for delivered goals.
+
+- [x] **T1 - Remove the dead map**
+  - Goal: `Call` checks the namespace on every request, as the code already does.
+  - Files: `internal/local/tree.go`.
+  - Requirements: delete the `dirs` field and its initializer; delete
+    `OpenNamespace`, which becomes a one-call wrapper; `Call` calls
+    `CheckNamespace`; the doc comment says why the stat runs every time.
+  - Acceptance: no reference to `dirs` or `OpenNamespace` remains.
+
+- [x] **T2 - Prove the check runs per call**
+  - Files: `internal/local/local_test.go`.
+  - Requirements: a call succeeds, the namespace directory is removed, and the
+    next call fails with `ENOENT`.
+  - Acceptance: `TestCallChecksNamespaceEveryTime` passes; the old wrapper test
+    becomes `TestCheckNamespace`.
+
+- [x] **T3 - Evidence**
+  - Files: `goals/namespace-cache/evidence.md`.
+  - Acceptance: `gofmt -l .` empty, vet, test and race pass; evidence has
+    `Verdict: PASS`.
+
+## Definition of done
+
+```
+just check
+just race
+```
