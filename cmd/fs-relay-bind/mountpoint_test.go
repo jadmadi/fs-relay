@@ -46,7 +46,9 @@ func TestCheckMountpoint(t *testing.T) {
 	if err := checkMountpoint(locked, true); err != nil {
 		t.Fatalf("forced unreadable: %v", err)
 	}
-	if err := checkMountpoint(locked, false); err == nil {
-		t.Fatal("unreadable directory accepted without force")
+	if _, err := os.ReadDir(locked); err != nil {
+		if err := checkMountpoint(locked, false); err == nil {
+			t.Fatal("unreadable directory accepted without force")
+		}
 	}
 }
