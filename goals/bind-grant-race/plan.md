@@ -11,13 +11,18 @@ Read `facts.md`. Work on `main`, then publish from a clean branch.
     owners or sends anything; `markClosed` and `isClosed` are the only access.
   - Acceptance: `TestGrantAfterReleaseIsUndone` sees the flag.
 
-- [x] **T2 - Undo a late grant**
-  - Goal: no lock survives its handle.
-  - Files: `cmd/fs-relay-bind/lock.go`.
-  - Requirements: after a successful grant, if the handle is closed, send
-    `setlk` with `LockUnlock` for the same owner and range and return `EINTR`.
-    Applies to read-only and writable handles.
-  - Acceptance: the test finds the unlock record and gets `EINTR`.
+- [x] **T2 - Wait for in-flight grants**
+  - Goal: no grant lands after the release that follows a close.
+  - Files: `cmd/fs-relay-bind/lock.go`, `cmd/fs-relay-bind/handle.go`.
+  - Requirements: a grant registers as in flight; a grant that starts after
+    the close is refused with `EINTR` without a call; `Release` waits for the
+    in-flight grants, then releases.
+  - Acceptance: `TestReleaseWaitsForInFlightGrant` and
+    `TestGrantAfterCloseIsRefused` pass.
+
+  A rollback unlock was rejected: it names the owner and range, and the server
+  has no grant identity, so it could drop a newer grant from another handle of
+  the same process.
 
 - [x] **T3 - Release owners on a failed close**
   - Goal: a sticky writeback error does not keep locks.

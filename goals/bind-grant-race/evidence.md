@@ -3,7 +3,7 @@
 Date: 2026-11-04
 Goal: `bind-grant-race`
 Issue: #27
-Branch: `fix/bind-grant-race`, commit `54f4a47`
+Branch: `fix/bind-grant-race`, commit `a599e16`
 
 ## Finding
 
@@ -19,19 +19,22 @@ A `setlk` can be in flight when its handle closes.
 
 | Change | File |
 |--------|------|
-| `Release` marks the handle closed before it does anything else | `cmd/fs-relay-bind/handle.go` |
-| After a grant, a closed handle means the range is unlocked and `EINTR` returned | `cmd/fs-relay-bind/lock.go` |
+| `Release` marks the handle closed, then waits for the grants in flight | `cmd/fs-relay-bind/handle.go` |
+| A grant that starts after the close is refused with `EINTR`, with no call | `cmd/fs-relay-bind/lock.go` |
 | The read-only path releases its owners even when a sticky error is returned | `cmd/fs-relay-bind/handle.go` |
 | The rule is written down | `SPEC.md` |
 
-The check covers a read-only handle, which names owners, and a writable handle,
-which names its server file handle.
+A rollback unlock was rejected. It names the owner and range, and the server
+has no grant identity, so under the shared-owner model it could drop a newer
+grant from another handle of the same process. Waiting closes the window and
+sends no extra call.
 
 ## Tests
 
-- `TestGrantAfterReleaseIsUndone`: holds the grant until `Release` has run, for
-  a read-only and a writable handle, then asserts the unlock record and
-  `EINTR`.
+- `TestReleaseWaitsForInFlightGrant`: holds a grant, then asserts the release
+  is not sent until it finishes, for a read-only and a writable handle.
+- `TestGrantAfterCloseIsRefused`: a grant after the close returns `EINTR` and
+  sends no call.
 - `TestReleaseWithErrorStillDropsOwners`: a sticky `EIO` still releases the
   owner and still wins the return value.
 
