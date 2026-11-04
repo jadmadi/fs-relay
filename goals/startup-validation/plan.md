@@ -12,7 +12,8 @@ code, tests and docs only.
     `internal/local/local_test.go`.
   - Requirements:
     1. Add `func (t *Tree) Prepare() error`: `os.Stat` first, so a file path
-       returns `ENOTDIR` directly, then `os.MkdirAll(root, 0o755)`.
+       returns `data directory <path> is not a directory`, then
+       `os.MkdirAll(root, 0o755)`.
     2. Remove `os.MkdirAll(root/ns)` from `abs`.
     3. Add `func (t *Tree) OpenNamespace(ns string) error`: `CheckNS`, stat
        `root/ns`, require a directory, cache a hit, never cache a miss.

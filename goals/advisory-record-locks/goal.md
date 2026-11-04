@@ -58,7 +58,7 @@ and a `SPEC.md` edit in the same change.
 
 | Decision | Value | Reason |
 |----------|-------|--------|
-| Wait model | ~~Server holds the call~~ Superseded by T12: `EAGAIN` and a client retry | One state machine for both transports; `pending` already exists in the wire; the request context gives interrupt semantics for free |
+| Wait model | ~~Server holds the call~~ Superseded by T12: `EAGAIN` and a client retry | Historical: one state machine was the plan. T12 replaced it with `EAGAIN`, a client retry and a replayed release. |
 | POST wait | ~~The response is held until grant~~ Superseded by T12: returns `EAGAIN` at once | One POST is one exchange, so there is no second reply |
 | Websocket wait | ~~Send `pending` with a ticket~~ Superseded by T12: returns `EAGAIN` at once | `wire.MarshalPending` and `Reply.Pending` already define this |
 | Owner key | `(client id, kernel owner id)` | The scrambled 64-bit owner is not unique across machines |

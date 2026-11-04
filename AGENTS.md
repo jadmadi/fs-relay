@@ -121,7 +121,7 @@ Memory writes are required by the goal contract and enforced by `sila gate`.
 
 ## Stack-Specific Standards (Go)
 
-- 1. Code Review & Hygiene: maintain pure Go standard library with zero third-party dependencies, Pure-Go CGO-Free Portability with CGO_ENABLED=0, and hard file ceilings under 1,000 LOC.
+- 1. Code Review & Hygiene: prefer the standard library; the modules already in `go.mod` are allowed. Keep CGO off so the build stays pure Go, and keep files under 1,000 lines, generated files excluded.
 - 2. Goroutine & Context Safety: require context.Context on all background routines; declare defer cancel() immediately after timeout context creation; ensure goroutine leak prevention.
 - 3. Goal Scaffolding: break findings into discrete single-outcome packages under goals/<slug>/ with goal.md, facts.md, plan.md, and explicit dependencies.
 - 4. Test-Driven Implementation: claim goal locks before editing; write table-driven tests verifying both acceptance assertions and negative rejection paths.
