@@ -1,0 +1,26 @@
+{
+  "goal_slug": "startup-validation",
+  "certified_at": "2026-11-03T16:08:55.408058745Z",
+  "certified_by": "agent",
+  "evidence_file": "goals/startup-validation/evidence.md",
+  "note": "certified from review document: evidence.md",
+  "verified": true,
+  "facts_passed": 1,
+  "facts_total": 1,
+  "evidence_kind": "review_document",
+  "commit_sha": "66dff170c5ed37165c65d03195450ea377f44799",
+  "memory_required": true,
+  "memory_waived": true,
+  "memory_waiver_reason": "facts ledger has pre-existing hash mismatches from other projects",
+  "memory": {
+    "required": true,
+    "status": "waived",
+    "prime": false,
+    "recall": false,
+    "writes": false,
+    "facts": false,
+    "handoff": false,
+    "waived": true,
+    "waiver_reason": "facts ledger has pre-existing hash mismatches from other projects"
+  }
+}

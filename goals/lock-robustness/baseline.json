@@ -1,0 +1,7 @@
+{
+  "goal_slug": "lock-robustness",
+  "patch_id": "42d247aab7d98cdd1cdb5672db53e7df3be971bf",
+  "base_ref": "main",
+  "recorded_at": "2026-11-04T13:06:34.683755153Z",
+  "certified_by": "initial-certification"
+}

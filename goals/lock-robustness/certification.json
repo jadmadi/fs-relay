@@ -1,0 +1,26 @@
+{
+  "goal_slug": "lock-robustness",
+  "certified_at": "2026-11-04T13:06:43.535475435Z",
+  "certified_by": "agent",
+  "evidence_file": "goals/lock-robustness/evidence.md",
+  "note": "certified from review document: evidence.md",
+  "verified": true,
+  "facts_passed": 1,
+  "facts_total": 1,
+  "evidence_kind": "review_document",
+  "commit_sha": "146793f138e63377600c8ad0e2f899a67b13b777",
+  "memory_required": true,
+  "memory_waived": true,
+  "memory_waiver_reason": "facts ledger has pre-existing hash mismatches from other projects",
+  "memory": {
+    "required": true,
+    "status": "waived",
+    "prime": false,
+    "recall": false,
+    "writes": false,
+    "facts": false,
+    "handoff": false,
+    "waived": true,
+    "waiver_reason": "facts ledger has pre-existing hash mismatches from other projects"
+  }
+}
