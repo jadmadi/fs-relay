@@ -29,18 +29,9 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 ## Summary
 - **Total Goals**: 6
 - 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
-- 🔵 **In Progress (Claimed)**: 1
-- 🟢 **Implemented**: 5 (0 verified 📜, 5 unbound ○, 0 unverified)
+- 🟢 **Implemented**: 6 (1 verified 📜, 5 unbound ○, 0 unverified)
 - 🎯 **By Tier**: 0 immediate (Tier 1), 6 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 38/42 completed (90%)
-
----
-
-## 🔵 In Progress (Claimed Goals)
-
-| Goal Package | Tier | Mode | Agent | Status & Note | Started |
-| :--- | :---: | :---: | :--- | :--- | :--- |
-| [`lock-robustness`](lock-robustness/goal.md) | `🗺️ Roadmap` | `⚡ Indep` | `@opencode` | in progress | 0s ago |
+- 📋 **Execution Tasks Progress**: 42/42 completed (100%)
 
 ---
 
@@ -51,5 +42,6 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | [`advisory-record-locks`](advisory-record-locks/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `c84e4b2` |
 | [`cli-review-fixes`](cli-review-fixes/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `a69607e` |
 | [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `12bcc6e` |
+| [`lock-robustness`](lock-robustness/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `146793f` |
 | [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `e991617` |
 | [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | unbound ○ | Git Commit | `daa9689` |
