@@ -48,12 +48,13 @@ func (n *node) Setlk(ctx context.Context, f fs.FileHandle, owner uint64, lk *fus
 // a rejoin, and a one-second retry bounds anything that is missed.
 func (n *node) Setlkw(ctx context.Context, f fs.FileHandle, owner uint64, lk *fuse.FileLock, flags uint32) syscall.Errno {
 	for {
+		released := n.c.Releases()
 		_, errno := n.lock(ctx, wire.Setlkw, f, owner, lk, flags)
 		if errno != syscall.EAGAIN {
 			return errno
 		}
 		select {
-		case <-n.c.Releases():
+		case <-released:
 		case <-ctx.Done():
 			return syscall.EINTR
 		case <-time.After(time.Second):

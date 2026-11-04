@@ -86,6 +86,11 @@ func writeNamespaceErr(w http.ResponseWriter, ns string, err error) {
 
 func publishCall(h *hub, tree *local.Tree, ns, method string, p wire.Params, err error) {
 	if err != nil {
+		if method == wire.Release {
+			if ino, ok := tree.TookWake(ns, p); ok && h.clearWaiting(ns, ino) {
+				h.releaseAll(ns)
+			}
+		}
 		return
 	}
 	h.evict(ns, tree.Changed(method, p))

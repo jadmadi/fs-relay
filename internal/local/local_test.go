@@ -583,3 +583,23 @@ func TestCheckNamespaceAfterDelete(t *testing.T) {
 		t.Fatalf("deleted namespace: %v", err)
 	}
 }
+
+func TestReleaseFailureDropsLocks(t *testing.T) {
+	tr, _ := newTree(t)
+	ino, fh := lockFile(t, tr, "a")
+	call(t, tr, wire.Setlk, lp(ino, fh, "A", 1, wire.LockWrite, 100, 1))
+
+	tr.fmu.Lock()
+	f := tr.files[fh].f
+	tr.fmu.Unlock()
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_, err := tr.Call(context.Background(), wire.Release, wire.Params{
+		Namespace: "demo", Inode: ino, Fh: fh, Data: []byte("x"),
+	})
+	if err == nil {
+		t.Fatal("release with a closed file succeeded")
+	}
+	call(t, tr, wire.Setlk, lp(ino, 0, "B", 2, wire.LockWrite, 100, 1))
+}
