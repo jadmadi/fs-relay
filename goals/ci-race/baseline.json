@@ -1,0 +1,7 @@
+{
+  "goal_slug": "ci-race",
+  "patch_id": "dcc65b3c0fe99452e24c4905dd7b4063db8776bd",
+  "base_ref": "main",
+  "recorded_at": "2026-11-04T13:50:21.964712392Z",
+  "certified_by": "initial-certification"
+}
