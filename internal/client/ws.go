@@ -31,7 +31,7 @@ type Socket struct {
 	next     uint64
 	waiters  map[uint64]chan wire.Reply
 	evicts   chan wire.Change
-	releases chan string
+	rel      chan struct{}
 	dead     chan struct{}
 	stopped  chan struct{}
 	joined   chan struct{}
@@ -64,7 +64,6 @@ func Dial(ctx context.Context, baseURL, ns, token string) (*Socket, error) {
 		token:    token,
 		waiters:  map[uint64]chan wire.Reply{},
 		evicts:   make(chan wire.Change, 32),
-		releases: make(chan string, 32),
 		dead:     make(chan struct{}),
 		stopped:  make(chan struct{}),
 		joined:   make(chan struct{}),
@@ -117,9 +116,25 @@ func (s *Socket) noteFail(err error) {
 }
 
 // Events receives cache evictions pushed on this socket.
-// Releases receives lock-release events from the socket.
-func (s *Socket) Releases() <-chan string {
-	return s.releases
+// Releases returns the current release broadcast. A release closes it and
+// installs a new one, so every waiter wakes and the reader never blocks.
+func (s *Socket) Releases() <-chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.rel == nil {
+		s.rel = make(chan struct{})
+	}
+	return s.rel
+}
+
+func (s *Socket) notifyRelease() {
+	s.mu.Lock()
+	ch := s.rel
+	s.rel = make(chan struct{})
+	s.mu.Unlock()
+	if ch != nil {
+		close(ch)
+	}
 }
 
 func (s *Socket) Events() <-chan wire.Change {
@@ -372,11 +387,7 @@ func (s *Socket) loop(again bool) (bool, error) {
 			continue
 		}
 		if rp.Release != "" {
-			select {
-			case s.releases <- rp.Release:
-			case <-s.dead:
-				return named, errors.New("connection lost")
-			}
+			s.notifyRelease()
 			continue
 		}
 		if rp.Evict != nil {

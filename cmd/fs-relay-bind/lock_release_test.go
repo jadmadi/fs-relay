@@ -19,10 +19,11 @@ type callRecord struct {
 }
 
 type fakeCaller struct {
-	mu       sync.Mutex
-	calls    []callRecord
-	releases chan string
-	deny     bool
+	mu    sync.Mutex
+	calls []callRecord
+	rel   chan struct{}
+	relMu sync.Mutex
+	deny  bool
 }
 
 func (f *fakeCaller) Call(ctx context.Context, method string, p wire.Params) (wire.Result, error) {
@@ -36,11 +37,23 @@ func (f *fakeCaller) Call(ctx context.Context, method string, p wire.Params) (wi
 	return wire.Result{}, nil
 }
 
-func (f *fakeCaller) Releases() <-chan string {
-	if f.releases == nil {
-		f.releases = make(chan string, 1)
+func (f *fakeCaller) Releases() <-chan struct{} {
+	f.relMu.Lock()
+	defer f.relMu.Unlock()
+	if f.rel == nil {
+		f.rel = make(chan struct{})
 	}
-	return f.releases
+	return f.rel
+}
+
+func (f *fakeCaller) release() {
+	f.relMu.Lock()
+	ch := f.rel
+	f.rel = make(chan struct{})
+	f.relMu.Unlock()
+	if ch != nil {
+		close(ch)
+	}
 }
 
 func (f *fakeCaller) setDeny(v bool) {
@@ -148,7 +161,7 @@ func TestGetlkRecordsNoOwner(t *testing.T) {
 }
 
 func TestSetlkwRetriesOnRelease(t *testing.T) {
-	f := &fakeCaller{releases: make(chan string, 1)}
+	f := &fakeCaller{}
 	n := &node{c: f, ino: 5}
 	h := &handle{c: f, n: n, ino: 5, local: true}
 	lk := &fuse.FileLock{Start: 0, End: 0, Typ: syscall.F_RDLCK}
@@ -165,7 +178,7 @@ func TestSetlkwRetriesOnRelease(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	f.setDeny(false)
-	f.releases <- "lock-1"
+	f.release()
 
 	select {
 	case errno := <-done:

@@ -86,12 +86,13 @@ func TestPostSetlkwReturnsEAGAINAndReleaseWakesClient(t *testing.T) {
 		t.Fatal("setlkw did not return at once")
 	}
 
+	released := b.Releases()
 	pa.Lock = wire.LockUnlock
 	if _, err := a.c.Call(context.Background(), wire.Setlk, pa); err != nil {
 		t.Fatal(err)
 	}
 	select {
-	case <-b.Releases():
+	case <-released:
 	case <-time.After(2 * time.Second):
 		t.Fatal("release event not received")
 	}

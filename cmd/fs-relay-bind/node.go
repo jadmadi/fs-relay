@@ -15,7 +15,7 @@ import (
 // caller is the mount's transport. HTTP posts and the websocket both implement it.
 type caller interface {
 	Call(ctx context.Context, method string, p wire.Params) (wire.Result, error)
-	Releases() <-chan string
+	Releases() <-chan struct{}
 }
 
 // node is one protocol inode. Every method is one call.

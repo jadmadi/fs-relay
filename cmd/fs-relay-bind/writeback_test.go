@@ -15,7 +15,7 @@ type countCaller struct {
 	fail   error
 }
 
-func (c *countCaller) Releases() <-chan string { return nil }
+func (c *countCaller) Releases() <-chan struct{} { return nil }
 
 func (c *countCaller) Call(_ context.Context, method string, p wire.Params) (wire.Result, error) {
 	if method == wire.Write || method == wire.Release {
