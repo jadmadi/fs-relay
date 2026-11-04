@@ -10,16 +10,13 @@ import (
 	"testing"
 
 	"fs-relay/internal/client"
-	"fs-relay/internal/local"
 	"fs-relay/internal/wire"
 
 	"net/http/httptest"
 )
 
 func TestWSMkdir(t *testing.T) {
-	dir := t.TempDir()
-	tree := local.New(dir)
-	t.Cleanup(func() { _ = tree.Close() })
+	tree, dir := newTestTreeDir(t)
 	srv := httptest.NewServer(newHandler(tree, testToken))
 	t.Cleanup(srv.Close)
 	sock, err := client.Dial(context.Background(), srv.URL, "demo", testToken)

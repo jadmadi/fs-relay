@@ -74,12 +74,12 @@ There is no cross dependency between the two and there is no problem if you put 
 For simplicity, we are running the binaries relative to their build directory.
 
 ```bash
-mkdir -p data /mnt/fs-relay
+mkdir -p data/demo /mnt/fs-relay
 ./fs-relay -listen 127.0.0.1:8080 -data data -token local-demo
 ./fs-relay-bind -url http://127.0.0.1:8080 -ns demo -token local-demo /mnt/fs-relay
 ```
 
-`-version` prints the build version and exits, and `-h` prints the usage. `-listen` defaults to `127.0.0.1:8080` and `-data` to `data`. Each name under `data` is one independent tree. `-url` defaults to `http://127.0.0.1:8080` and `-ns` to `default`. A bare `host:port` is accepted and means `http://host:port`, as it does in `curl`. Leave `-token` off the server and it prints a secret on its error stream; copy that value onto every mount. A secret you pass yourself must be at least 8 characters, using letters, digits, hyphens, and underscores, and capitals count as different characters. The mount sends it with each connection. A missing or wrong secret is refused, and the mount stops instead of trying again. The server records the machine and the reason. A restarted server that was not given `-token` prints a new secret. The welcome page does not use the secret, and the server never sends it back.
+`-version` prints the build version and exits, and `-h` prints the usage. `-listen` defaults to `127.0.0.1:8080` and `-data` to `data`. Each name under `data` is one independent tree. `-url` defaults to `http://127.0.0.1:8080` and `-ns` to `default`. A bare `host:port` is accepted and gets the `http` scheme, as it does in `curl`. Leave `-token` off the server and it prints a secret on its error stream; copy that value onto every mount. A secret you pass yourself must be at least 8 characters, using letters, digits, hyphens, and underscores, and capitals count as different characters. The mount sends it with each connection. A missing or wrong secret is refused, and the mount stops instead of trying again. The server records the machine and the reason. A restarted server that was not given `-token` prints a new secret. The welcome page does not use the secret, and the server never sends it back.
 
 Generate the token once and keep it in a file only you can read:
 
@@ -93,6 +93,12 @@ install -d -m 700 ~/.config/fs-relay
 `-token-file` reads a regular file, and the process stops if another user can
 read it, so keep the file at mode 600. `-token` still works, but the value
 sits in the process list (`ps aux`), which every local user can read.
+
+The server creates the `-data` directory if it is missing, but it never
+creates `data/<namespace>`. Create each namespace directory before a mount
+joins it; a missing namespace is refused with HTTP 404. The mount checks its
+mountpoint before connecting, refuses a missing or non-directory path, and
+refuses a non-empty directory unless `-force-existing-mnt` is passed.
 
 Add `-post` to send each operation as its own request. `-raw=false` sends large reads and writes on the main connection. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
 

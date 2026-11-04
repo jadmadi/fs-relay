@@ -2,7 +2,6 @@ package local
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -42,9 +41,6 @@ func (t *Tree) abs(ns, rel string) (string, error) {
 		return "", syscall.EINVAL
 	}
 	dir := filepath.Join(t.root, ns)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", wrap("namespace", err)
-	}
 	if rel == "" {
 		return dir, nil
 	}

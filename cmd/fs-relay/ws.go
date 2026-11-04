@@ -20,6 +20,10 @@ func serveWS(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad namespace", http.StatusBadRequest)
 		return
 	}
+	if err := tree.CheckNamespace(ns); err != nil {
+		writeNamespaceErr(w, ns, err)
+		return
+	}
 	client := r.URL.Query().Get("client")
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true,

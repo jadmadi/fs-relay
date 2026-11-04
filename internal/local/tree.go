@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -24,6 +25,8 @@ type Tree struct {
 	fmu    sync.Mutex
 	files  map[uint64]*openFile
 	nextFH uint64
+
+	dirs map[string]bool
 }
 
 type entry struct {
@@ -51,7 +54,60 @@ func New(root string) *Tree {
 		ns:     map[string]*names{},
 		files:  map[uint64]*openFile{},
 		nextFH: 1,
+		dirs:   map[string]bool{},
 	}
+}
+
+// Prepare creates the data root if needed and verifies it is a directory.
+// It does not create a namespace.
+func (t *Tree) Prepare() error {
+	abs, err := filepath.Abs(t.root)
+	if err != nil {
+		return fmt.Errorf("data directory %s: %w", t.root, err)
+	}
+	t.root = abs
+	info, err := os.Stat(abs)
+	switch {
+	case err == nil:
+		if !info.IsDir() {
+			return fmt.Errorf("data directory %s is not a directory", abs)
+		}
+	case errors.Is(err, os.ErrNotExist):
+		if err := os.MkdirAll(abs, 0o755); err != nil {
+			return fmt.Errorf("data directory %s: %w", abs, err)
+		}
+	default:
+		return fmt.Errorf("data directory %s: %w", abs, err)
+	}
+	return nil
+}
+
+// CheckNamespace stats data/<ns> every time. Connections use it so a
+// namespace that was removed is refused.
+func (t *Tree) CheckNamespace(ns string) error {
+	if err := wire.CheckNS(ns); err != nil {
+		return err
+	}
+	info, err := os.Stat(filepath.Join(t.root, ns))
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return syscall.ENOTDIR
+	}
+	return nil
+}
+
+// OpenNamespace checks that data/<ns> is an existing directory. A hit is
+// cached; a miss is not, so creating the directory later works.
+func (t *Tree) OpenNamespace(ns string) error {
+	if err := t.CheckNamespace(ns); err != nil {
+		return err
+	}
+	t.mu.Lock()
+	t.dirs[ns] = true
+	t.mu.Unlock()
+	return nil
 }
 
 // BlockSize is the data directory's preferred I/O size, read once at startup.
@@ -85,6 +141,9 @@ func (t *Tree) Call(ctx context.Context, method string, p wire.Params) (wire.Res
 		return wire.Result{}, err
 	}
 	if err := wire.CheckNS(p.Namespace); err != nil {
+		return wire.Result{}, err
+	}
+	if err := t.OpenNamespace(p.Namespace); err != nil {
 		return wire.Result{}, err
 	}
 	fn, ok := operations[method]

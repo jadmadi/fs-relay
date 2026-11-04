@@ -3,18 +3,21 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"fs-relay/internal/client"
-	"fs-relay/internal/local"
 	"fs-relay/internal/wire"
 )
 
 func TestJoinEvictAndRejoin(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { _ = tree.Close() })
 	h := newHub(testToken)
 	hnd, _ := handler(tree, h)
@@ -111,7 +114,7 @@ func TestHoldExpires(t *testing.T) {
 }
 
 func TestWSEvict(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { _ = tree.Close() })
 	hnd, _ := handler(tree, newHub(testToken))
 	srv := httptest.NewServer(hnd)
@@ -218,7 +221,7 @@ func recv(events <-chan wire.Change) <-chan wire.Pub {
 }
 
 func TestReleaseAllReplayedOnRejoin(t *testing.T) {
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { _ = tree.Close() })
 	h := newHub(testToken)
 	hnd, _ := handler(tree, h)
@@ -250,5 +253,70 @@ func TestReleaseAllReplayedOnRejoin(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("rejoin missed the release")
+	}
+}
+
+func TestJoinMissingNamespace(t *testing.T) {
+	tree := newTestTree(t)
+	h := newHub(testToken)
+	hnd, _ := handler(tree, h)
+	srv := httptest.NewServer(hnd)
+	t.Cleanup(srv.Close)
+
+	body, err := wire.MarshalRequest(wire.Join, wire.Params{Namespace: "missing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/fs/missing", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", wire.ContentType)
+	req.Header.Set(wire.TokenHeader, wire.TokenScheme+" "+testToken)
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	text, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(text), "does not exist") {
+		t.Fatalf("body %q", text)
+	}
+}
+
+func TestJoinNamespaceIsFile(t *testing.T) {
+	tree, dir := newTestTreeDir(t)
+	if err := os.WriteFile(filepath.Join(dir, "bad"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := newHub(testToken)
+	hnd, _ := handler(tree, h)
+	srv := httptest.NewServer(hnd)
+	t.Cleanup(srv.Close)
+
+	body, err := wire.MarshalRequest(wire.Join, wire.Params{Namespace: "bad"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/fs/bad", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", wire.ContentType)
+	req.Header.Set(wire.TokenHeader, wire.TokenScheme+" "+testToken)
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	text, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(text), "not a directory") {
+		t.Fatalf("body %q", text)
 	}
 }

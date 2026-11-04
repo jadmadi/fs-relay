@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"fs-relay/internal/local"
 	"fs-relay/internal/wire"
 
 	"golang.org/x/sys/unix"
@@ -66,7 +65,7 @@ func TestRejectToken(t *testing.T) {
 
 func TestTokenGate(t *testing.T) {
 	logs := captureLog(t)
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { _ = tree.Close() })
 	srv := httptest.NewServer(newHandler(tree, testToken))
 	t.Cleanup(srv.Close)
@@ -98,7 +97,7 @@ func TestTokenGate(t *testing.T) {
 
 func TestForgedClient(t *testing.T) {
 	logs := captureLog(t)
-	tree := local.New(t.TempDir())
+	tree := newTestTree(t)
 	t.Cleanup(func() { _ = tree.Close() })
 	srv := httptest.NewServer(newHandler(tree, testToken))
 	t.Cleanup(srv.Close)
