@@ -547,19 +547,32 @@ func TestPrepareRejectsFile(t *testing.T) {
 	}
 }
 
-func TestOpenNamespace(t *testing.T) {
+func TestCheckNamespace(t *testing.T) {
 	tr, dir := newTree(t)
-	if err := tr.OpenNamespace("demo"); err != nil {
+	if err := tr.CheckNamespace("demo"); err != nil {
 		t.Fatal(err)
 	}
-	if err := tr.OpenNamespace("missing"); !errors.Is(err, os.ErrNotExist) {
+	if err := tr.CheckNamespace("missing"); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("missing: %v", err)
 	}
 	if err := os.Mkdir(filepath.Join(dir, "later"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := tr.OpenNamespace("later"); err != nil {
+	if err := tr.CheckNamespace("later"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCallChecksNamespaceEveryTime(t *testing.T) {
+	tr, dir := newTree(t)
+	if _, err := tr.Call(context.Background(), wire.Getattr, wire.Params{Namespace: "demo", Inode: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(dir, "demo")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr.Call(context.Background(), wire.Getattr, wire.Params{Namespace: "demo", Inode: 1}); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("call after delete: %v", err)
 	}
 }
 
