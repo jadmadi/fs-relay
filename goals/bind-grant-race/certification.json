@@ -1,6 +1,6 @@
 {
   "goal_slug": "bind-grant-race",
-  "certified_at": "2026-11-04T17:58:32.635486438Z",
+  "certified_at": "2026-11-04T18:09:16.423810211Z",
   "certified_by": "agent",
   "evidence_file": "goals/bind-grant-race/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "f5e6f13a6c82829e8d815c5bd77d7ca6103ef235",
+  "commit_sha": "fd97655c4ff79eb236c15b34bc4f7b9cf76ceb84",
   "memory_required": true,
   "memory_waived": true,
   "memory_waiver_reason": "facts ledger has pre-existing hash mismatches",
