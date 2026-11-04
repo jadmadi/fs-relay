@@ -67,8 +67,15 @@ func (n *node) lock(ctx context.Context, method string, f fs.FileHandle, owner u
 	if errno != 0 {
 		return wire.Result{}, errno
 	}
-	if h, ok := f.(*handle); ok && h != nil && h.fh == 0 &&
-		method != wire.Getlk && p.Lock != wire.LockUnlock {
+	h, _ := f.(*handle)
+	grant := method != wire.Getlk && p.Lock != wire.LockUnlock
+	if h != nil && grant {
+		if !h.beginOp() {
+			return wire.Result{}, syscall.EINTR
+		}
+		defer h.endOp()
+	}
+	if h != nil && h.fh == 0 && grant {
 		h.addOwner(owner)
 	}
 	res, err := n.c.Call(ctx, method, p)

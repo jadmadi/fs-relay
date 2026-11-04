@@ -19,8 +19,10 @@ type handle struct {
 	local bool
 	wb    pending
 
-	omu    sync.Mutex
-	owners map[uint64]struct{}
+	omu      sync.Mutex
+	owners   map[uint64]struct{}
+	closed   bool
+	inflight sync.WaitGroup
 }
 
 var (
@@ -103,6 +105,8 @@ func (h *handle) Fsync(ctx context.Context, _ uint32) syscall.Errno {
 }
 
 func (h *handle) Release(ctx context.Context) syscall.Errno {
+	h.markClosed()
+	h.inflight.Wait()
 	h.wb.mu.Lock()
 	sticky := h.takeErr()
 	off := h.wb.off
@@ -115,10 +119,11 @@ func (h *handle) Release(ctx context.Context) syscall.Errno {
 	h.wb.mu.Unlock()
 	h.releaseBuf()
 	if h.fh == 0 {
+		errno := h.releaseOwners(ctx)
 		if sticky != 0 {
 			return sticky
 		}
-		return h.releaseOwners(ctx)
+		return errno
 	}
 	parent, name := uint64(0), ""
 	if len(data) > 0 && h.n != nil {
@@ -286,6 +291,30 @@ func (d *dirHandle) Releasedir(context.Context, uint32) {
 // addOwner remembers a kernel owner that locked through this handle. A
 // read-only handle has no server fh, so its close drops exactly these owners
 // instead of every lock the mount holds on the inode.
+// markClosed stops new grants. Release then waits for the ones in flight, so
+// no grant can land after the release that follows.
+func (h *handle) markClosed() {
+	h.omu.Lock()
+	h.closed = true
+	h.omu.Unlock()
+}
+
+// beginOp registers a lock grant that is in flight. It fails once Release has
+// started. The caller must call endOp when the call returns.
+func (h *handle) beginOp() bool {
+	h.omu.Lock()
+	defer h.omu.Unlock()
+	if h.closed {
+		return false
+	}
+	h.inflight.Add(1)
+	return true
+}
+
+func (h *handle) endOp() {
+	h.inflight.Done()
+}
+
 func (h *handle) addOwner(owner uint64) {
 	h.omu.Lock()
 	if h.owners == nil {

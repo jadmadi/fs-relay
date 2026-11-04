@@ -19,18 +19,23 @@ type callRecord struct {
 }
 
 type fakeCaller struct {
-	mu    sync.Mutex
-	calls []callRecord
-	rel   chan struct{}
-	relMu sync.Mutex
-	deny  bool
+	mu     sync.Mutex
+	calls  []callRecord
+	rel    chan struct{}
+	relMu  sync.Mutex
+	deny   bool
+	before func(method string, p wire.Params)
 }
 
 func (f *fakeCaller) Call(ctx context.Context, method string, p wire.Params) (wire.Result, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, callRecord{method: method, p: p})
 	deny := f.deny && (method == wire.Setlk || method == wire.Setlkw)
+	before := f.before
 	f.mu.Unlock()
+	if before != nil {
+		before(method, p)
+	}
 	if deny {
 		return wire.Result{}, &wire.Error{Code: uint32(syscall.EAGAIN)}
 	}
@@ -54,6 +59,12 @@ func (f *fakeCaller) release() {
 	if ch != nil {
 		close(ch)
 	}
+}
+
+func (f *fakeCaller) setBefore(fn func(method string, p wire.Params)) {
+	f.mu.Lock()
+	f.before = fn
+	f.mu.Unlock()
 }
 
 func (f *fakeCaller) setDeny(v bool) {
@@ -204,5 +215,95 @@ func TestSetlkwCancelReturnsEINTR(t *testing.T) {
 	defer cancel()
 	if errno := n.Setlkw(ctx, h, 7, lk, 0); errno != syscall.EINTR {
 		t.Fatalf("cancel: %v", errno)
+	}
+}
+
+func TestReleaseWaitsForInFlightGrant(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		fh   uint64
+	}{
+		{"read-only", 0},
+		{"writable", 11},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &fakeCaller{}
+			n := &node{c: f, ino: 5}
+			h := &handle{c: f, n: n, ino: 5, fh: tc.fh}
+			lk := &fuse.FileLock{Start: 0, End: 9, Typ: syscall.F_RDLCK}
+
+			granting := make(chan struct{})
+			finish := make(chan struct{})
+			var once sync.Once
+			f.setBefore(func(method string, p wire.Params) {
+				switch method {
+				case wire.Setlk:
+					once.Do(func() { close(granting) })
+					<-finish
+				case wire.Release:
+					select {
+					case <-finish:
+					default:
+						t.Error("release sent while a grant was in flight")
+					}
+				}
+			})
+
+			grant := make(chan syscall.Errno, 1)
+			go func() { grant <- n.Setlk(context.Background(), h, 7, lk, 0) }()
+			<-granting
+
+			released := make(chan syscall.Errno, 1)
+			go func() { released <- h.Release(context.Background()) }()
+			close(finish)
+
+			if errno := <-grant; errno != 0 {
+				t.Fatalf("setlk: %v", errno)
+			}
+			if errno := <-released; errno != 0 {
+				t.Fatalf("release: %v", errno)
+			}
+			if n := f.count(wire.Release); n != 1 {
+				t.Fatalf("release calls: %d", n)
+			}
+		})
+	}
+}
+
+func TestGrantAfterCloseIsRefused(t *testing.T) {
+	f := &fakeCaller{}
+	n := &node{c: f, ino: 5}
+	h := &handle{c: f, n: n, ino: 5, local: true}
+	h.markClosed()
+	lk := &fuse.FileLock{Start: 0, End: 9, Typ: syscall.F_RDLCK}
+	if errno := n.Setlk(context.Background(), h, 7, lk, 0); errno != syscall.EINTR {
+		t.Fatalf("setlk after close: %v", errno)
+	}
+	if n := f.count(wire.Setlk); n != 0 {
+		t.Fatalf("setlk calls after close: %d", n)
+	}
+}
+
+func TestReleaseWithErrorStillDropsOwners(t *testing.T) {
+	f := &fakeCaller{}
+	n := &node{c: f, ino: 5}
+	h := &handle{c: f, n: n, ino: 5, local: true}
+	read := &fuse.FileLock{Start: 0, End: 9, Typ: syscall.F_RDLCK}
+	if errno := n.Setlk(context.Background(), h, 7, read, 0); errno != 0 {
+		t.Fatalf("setlk: %v", errno)
+	}
+	h.wb.err = syscall.EIO
+
+	if errno := h.Release(context.Background()); errno != syscall.EIO {
+		t.Fatalf("release: %v", errno)
+	}
+	var released bool
+	for _, c := range f.records() {
+		if c.method == wire.Release && c.p.Owner == 7 {
+			released = true
+		}
+	}
+	if !released {
+		t.Fatal("owners kept after a failed close")
 	}
 }
