@@ -221,24 +221,17 @@ nav a.brand {
 main {
   max-width: var(--shell-sm);
   margin: 0 auto;
-  padding: clamp(var(--space-lg), 5vh, var(--space-2xl))
+  padding: clamp(var(--space-xl), 6vh, var(--space-3xl))
     clamp(var(--space-md), 4vw, var(--space-xl))
     var(--space-3xl);
 }
 
-@media (min-width: 64rem) {
-  main { max-width: var(--shell-lg); }
-  h1 { font-size: clamp(var(--text-5xl), 1rem + 4.2vw, 4.5rem); max-width: 22ch; }
-  .lede { max-width: 54ch; }
-  .verdict { max-width: none; }
-}
-
-main > * + * { margin-top: var(--space-md); }
+main > * + * { margin-top: var(--space-lg); }
 main > h2 { margin-top: var(--space-2xl); }
 main > h2 + * { margin-top: var(--space-sm); }
 main > h3 { margin-top: var(--space-xl); }
 main > h3 + * { margin-top: var(--space-sm); }
-main > h1 + .lede { margin-top: var(--space-sm); }
+main > h1 + .lede { margin-top: var(--space-lg); }
 
 h1, h2, h3 {
   font-family: var(--font-display);
@@ -250,9 +243,10 @@ h1, h2, h3 {
 h1 {
   font-size: clamp(var(--text-4xl), 7vw, var(--text-5xl));
   font-weight: var(--font-bold);
+  line-height: 1.15;
   letter-spacing: var(--tracking-display);
   margin: 0;
-  max-width: 20ch;
+  max-width: 26ch;
 }
 
 h2 {
@@ -270,17 +264,29 @@ h3 {
 }
 
 .lede {
-  font-size: var(--text-xl);
-  color: var(--text-primary);
-  line-height: var(--leading-normal);
-  max-width: 44ch;
+  font-size: clamp(var(--text-lg), 1.35vw, var(--text-2xl));
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+  max-width: 60ch;
 }
 
 p { max-width: var(--measure); margin-bottom: 0; text-wrap: pretty; }
 li { max-width: var(--measure); text-wrap: pretty; }
 
+@media (min-width: 64rem) {
+  main { max-width: var(--shell-lg); }
+  h1 {
+    font-size: clamp(2.5rem, 0.9rem + 2.5vw, 3.25rem);
+    max-width: none;
+    text-wrap: pretty;
+  }
+  .lede { max-width: none; }
+  p, li { max-width: none; }
+  .verdict { max-width: none; }
+}
+
 ul, ol { padding-inline-start: var(--space-lg); }
-li + li { margin-top: var(--space-xs); }
+li + li { margin-top: var(--space-sm); }
 
 a {
   color: var(--accent-soft);
@@ -446,7 +452,8 @@ th.num { text-align: right; }
   border-radius: var(--radius-lg);
   background: var(--verdict-bg);
   box-shadow: var(--ring-subtle), var(--shadow-raised);
-  padding: var(--space-md) var(--space-lg);
+  margin-top: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl);
   font-size: var(--text-lg);
 }
 
