@@ -4,10 +4,10 @@
   "level": "L3",
   "outcome": "passed",
   "method": "audit",
-  "spec_hash": "002642cf468caba7513a5f02c9d062b465fa64d2a5a65857e211a782a089a182",
+  "spec_hash": "220ab9fd89c4745dd1426dc2166709f1d4cb73d199f3c44eda31cbdf7e8cde71",
   "subject": {
     "algorithm": "sha256",
-    "hash": "83dfa3ad234660259da6a38ec10c9a537000e761c6f31c1994a581975adbbacf",
+    "hash": "b27883eb938aa6d8cba8bbfca3b41dc8ffd01e7288314d0a98932b640e1a5d9b",
     "paths": [
       {
         "path": ".ui-craft/brief.md",
@@ -67,17 +67,17 @@
       {
         "path": "html-prototypes/explainer.css",
         "kind": "file",
-        "hash": "fbe2700a7299e036001fa61ea2160e9954028fbcceb8af64d4b386623566f798"
+        "hash": "8c3773ee92aabbb368bc911de96357b16e40ba841f447e64d6c9a48736c49bec"
       },
       {
         "path": "html-prototypes/explainer.html",
         "kind": "file",
-        "hash": "558ef40742d09fb517f3c0c3651e0866000cd214895ea81e3145ba265ccee217"
+        "hash": "bc1ad02172fe7b66ba483113cdccb7c25d3e60eae96f4886c1b359cec61083b6"
       },
       {
         "path": "html-prototypes/explainer.js",
         "kind": "file",
-        "hash": "37f3196fc24b4298ade72e00913f33362cee781973b6e3dba9bc21f65c50305f"
+        "hash": "f9f0bd6981b0f592f4b64f8683addbcada0273287dec8524f037c8324222ad05"
       },
       {
         "path": "html-prototypes/index.html",
@@ -120,9 +120,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+5221a92f-dirty",
+    "sila_version": "dev+986d3374-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "51d4b111bd27497c8033856b3090b6b2dfc5bda9d34ebe81323ef752c116de02",
-  "verified_at": "2026-11-05T18:23:48Z"
+  "previous": "ab95f5cdc3e4896efe2d3f3f00dd2e2105a097985b60a194427c1ee49ec67246",
+  "verified_at": "2026-11-05T18:37:03Z"
 }

@@ -1,0 +1,11 @@
+{
+  "goal_slug": "html-prototypes-10x",
+  "reopened_at": "2026-11-05T18:27:52.300191802Z",
+  "reopened_by": "antigravity",
+  "reason": "Upgrade explainer to Option 3 full video emulation",
+  "original_commit": "681adea",
+  "resolved_commit": "112b222",
+  "resolved_at": "2026-11-05T18:36:59.98736259Z",
+  "active": false,
+  "reopen_epoch": 1
+}

@@ -1,0 +1,24 @@
+{
+  "goal_slug": "html-prototypes-10x",
+  "certified_at": "2026-11-05T18:23:44.950282225Z",
+  "certified_by": "agent",
+  "evidence_file": "goals/html-prototypes-10x/evidence.md",
+  "note": "certified from review document: evidence.md",
+  "verified": true,
+  "facts_passed": 1,
+  "facts_total": 1,
+  "evidence_kind": "review_document",
+  "commit_sha": "556401e41b26da9ed7dbf74f970cf49b9f7ed09b",
+  "memory_required": true,
+  "memory_verified": true,
+  "memory": {
+    "required": true,
+    "status": "verified",
+    "prime": true,
+    "recall": true,
+    "writes": true,
+    "facts": true,
+    "handoff": true,
+    "verified": true
+  }
+}
