@@ -1,0 +1,7 @@
+{
+  "goal_slug": "advisory-record-locks",
+  "patch_id": "2f6ac6de2a92f4bb0b29ba1444be1452a53d81af",
+  "base_ref": "main",
+  "recorded_at": "2026-11-03T12:13:32.146814637Z",
+  "certified_by": "re-test-certified"
+}

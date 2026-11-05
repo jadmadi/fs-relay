@@ -1,0 +1,57 @@
+{
+  "version": "sila/verification/v2",
+  "goal_slug": "ci-race",
+  "level": "L1",
+  "outcome": "passed",
+  "method": "evidence",
+  "spec_hash": "44ab3544d018ea3dbf3ec5416c600b109a701e1fff75d12dd0f371d00cecc0ad",
+  "subject": {
+    "algorithm": "sha256",
+    "hash": "391b9da5e72a266cd57ae3efcd19bde9f01a6b97a1ec8ef926315dbe225932fb",
+    "paths": [
+      {
+        "path": ".github/workflows/ci.yml",
+        "kind": "file",
+        "hash": "983cefc890e3e3cb788eb45e7f411c11310efd8af8240f4b1e632e235fd619c2"
+      },
+      {
+        "path": "AGENTS.md",
+        "kind": "file",
+        "hash": "cc08913474d2dc68a8f5a2f45fd2f157459e2a82c505b388fe1a60da1ae1b03e"
+      },
+      {
+        "path": "go.mod",
+        "kind": "file",
+        "hash": "ec75fb5a26908b423a649d514ea7674daa4e6e6ab1d92d51b27d2a145f2d3d47"
+      },
+      {
+        "path": "go.sum",
+        "kind": "file",
+        "hash": "22f46fc43dfdf65a599cc8bb6e67c2ff8553eba4a7aa31f1b73725f5ef12df21"
+      },
+      {
+        "path": "go.work",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "go.work.sum",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "justfile",
+        "kind": "file",
+        "hash": "a811c4bd623d8784b3c08c62d9dd66836101f41d6dbea4a0b476720d9d462252"
+      }
+    ]
+  },
+  "environment": {
+    "go_version": "go1.27.2",
+    "os": "linux",
+    "arch": "amd64",
+    "sila_version": "dev+3040a824-dirty",
+    "bwrap": "bubblewrap 0.12.0"
+  },
+  "verified_at": "2026-11-04T13:50:28Z"
+}
