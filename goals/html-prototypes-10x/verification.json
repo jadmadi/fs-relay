@@ -1,0 +1,128 @@
+{
+  "version": "sila/verification/v2",
+  "goal_slug": "html-prototypes-10x",
+  "level": "L3",
+  "outcome": "passed",
+  "method": "audit",
+  "spec_hash": "002642cf468caba7513a5f02c9d062b465fa64d2a5a65857e211a782a089a182",
+  "subject": {
+    "algorithm": "sha256",
+    "hash": "83dfa3ad234660259da6a38ec10c9a537000e761c6f31c1994a581975adbbacf",
+    "paths": [
+      {
+        "path": ".ui-craft/brief.md",
+        "kind": "file",
+        "hash": "87f087318ba7092d94e3df05872d5eb5e2147e3afeebab5ccdeac1d592945fd7"
+      },
+      {
+        "path": ".ui-craft/tokens.md",
+        "kind": "file",
+        "hash": "4aa8c2e5eafbc0690ba377777775d85212cfbfe689c5a6f8bf7722543ec79ba6"
+      },
+      {
+        "path": "cmd/fs-relay/root.go",
+        "kind": "file",
+        "hash": "917768005f6b0976897c3bc49dfceb4324c0fd9135b1b24a2ee30c4eb4b12b81"
+      },
+      {
+        "path": "cmd/fs-relay/root_test.go",
+        "kind": "file",
+        "hash": "7f0437e89e609ab98e746d6735aa372b79d945ffee97a3cbb493b7d4e5ec01ee"
+      },
+      {
+        "path": "go.mod",
+        "kind": "file",
+        "hash": "ec75fb5a26908b423a649d514ea7674daa4e6e6ab1d92d51b27d2a145f2d3d47"
+      },
+      {
+        "path": "go.sum",
+        "kind": "file",
+        "hash": "22f46fc43dfdf65a599cc8bb6e67c2ff8553eba4a7aa31f1b73725f5ef12df21"
+      },
+      {
+        "path": "go.work",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "go.work.sum",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "html-prototypes/CNAME",
+        "kind": "file",
+        "hash": "bc85429b4bda3a09537963cb0d11725f7ccfce2d0e9be7d6efbf01c0df3931b2"
+      },
+      {
+        "path": "html-prototypes/coherence.html",
+        "kind": "file",
+        "hash": "53b3a394c14e4d6e0359498de8bdf25578cdb93d8bd437e191518b67b991b1ba"
+      },
+      {
+        "path": "html-prototypes/compare.html",
+        "kind": "file",
+        "hash": "a23b7be5fc5585317532a500f6bcb8a0d6e01b77337c07837f92ba98ae667a4f"
+      },
+      {
+        "path": "html-prototypes/explainer.css",
+        "kind": "file",
+        "hash": "fbe2700a7299e036001fa61ea2160e9954028fbcceb8af64d4b386623566f798"
+      },
+      {
+        "path": "html-prototypes/explainer.html",
+        "kind": "file",
+        "hash": "558ef40742d09fb517f3c0c3651e0866000cd214895ea81e3145ba265ccee217"
+      },
+      {
+        "path": "html-prototypes/explainer.js",
+        "kind": "file",
+        "hash": "37f3196fc24b4298ade72e00913f33362cee781973b6e3dba9bc21f65c50305f"
+      },
+      {
+        "path": "html-prototypes/index.html",
+        "kind": "file",
+        "hash": "a6bd69fd0f1a2d1f0c308496e9d6d80434c386a09f7050ba8b975c638c0239ee"
+      },
+      {
+        "path": "html-prototypes/locks.html",
+        "kind": "file",
+        "hash": "d1d63a33114af40c5fdb3a972648fe103836d1c781bed302557f04d92f8e1b49"
+      },
+      {
+        "path": "html-prototypes/raw.html",
+        "kind": "file",
+        "hash": "4c4c7ecd007eb95f3bb260802de785ccd762fe4a8865ae091b0785d261114bd5"
+      },
+      {
+        "path": "html-prototypes/run.html",
+        "kind": "file",
+        "hash": "e72e3c70409f97c6be68e00d705cf91e8a35f193614903324ed20bcec9d37f2f"
+      },
+      {
+        "path": "html-prototypes/style.css",
+        "kind": "file",
+        "hash": "12f0f716fc83b75bad2b50dd9b4b1bff499804c0332bdbf92d983926ec269f85"
+      },
+      {
+        "path": "html-prototypes/ui.js",
+        "kind": "file",
+        "hash": "8d37d61d88710d99cc370a6e503c16a2f34fb0ecf20a34220fcd9d43a87d6f73"
+      },
+      {
+        "path": "html-prototypes/wire.html",
+        "kind": "file",
+        "hash": "d5a134bdcc64542fdb577fa463ea8569c68951de08f0d455f7956bdb56f1652e"
+      }
+    ]
+  },
+  "environment": {
+    "go_version": "go1.27.3",
+    "os": "linux",
+    "arch": "amd64",
+    "sila_version": "dev+5221a92f-dirty",
+    "bwrap": "bubblewrap 0.12.0"
+  },
+  "previous": "51d4b111bd27497c8033856b3090b6b2dfc5bda9d34ebe81323ef752c116de02",
+  "verified_at": "2026-11-05T18:23:48Z"
+}

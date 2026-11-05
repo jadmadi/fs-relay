@@ -1,5 +1,12 @@
 # Goal: Elevate html-prototypes 10x and align server landing page
 
+## Chain of Custody (Isnad)
+- **Registered By**: Pending Registration
+- **Spec Audited By**: Pending Spec Audit
+- **Implemented By**: Pending Implementation
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_html-prototypes-10x_1793903027`
+
+
 ## Goal Description
 Upgrade the eight `html-prototypes/` pages and animated explainer with token-strict styling, GPU-accelerated transitions, pointer-scrubbable playback, non-clipping responsive SVG charts, and progressive-enhancement interactive explorers (`html-prototypes/ui.js`), and synchronize the embedded server welcome page in `cmd/fs-relay/root.go` with the ink-slate and signal-rose design system in `.ui-craft/tokens.md`.
 
