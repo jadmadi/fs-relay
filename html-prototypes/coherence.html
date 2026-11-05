@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coherence — fs-relay, explained</title>
+<link rel="stylesheet" href="style.css">
+<meta name="description" content="How fs-relay mounts stay consistent: caching, evictions, and rejoin.">
+<meta name="theme-color" content="#0d1317">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23f43f5e'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<nav aria-label="Pages">
+  <a class="brand" href="index.html">fs-relay</a>
+  <a href="index.html">Overview</a>
+  <a href="run.html">Run it</a>
+  <a href="compare.html">Compare</a>
+  <a href="wire.html">Wire</a>
+  <a href="coherence.html" class="here">Coherence</a>
+  <a href="locks.html">Locks</a>
+  <a href="raw.html">Raw path</a>
+  <a href="explainer.html">Explainer</a>
+</nav>
+<main id="main">
+  <h1>Coherence</h1>
+  <p class="lede">Every mount caches. The server tells
+  every mount what changed. A mount that misses the news
+  recovers on its own.</p>
+  <p class="verdict"><span class="q">How do mounts stay
+  consistent?</span> <strong>Mounts cache aggressively;
+  the server pushes an eviction on every change; a mount
+  that misses one rejoins and replays.</strong></p>
+
+  <h2>Mounts cache</h2>
+  <h3>Timeouts</h3>
+  <div class="scroll"><table>
+    <tr><th>Cache</th><th>Lifetime</th></tr>
+    <tr><td>attributes and entries</td><td class="num">1 s</td></tr>
+    <tr><td>negative entries</td><td class="num">500 ms</td></tr>
+    <tr><td>read-only open</td><td>keeps the kernel page cache</td></tr>
+    <tr><td>create, any writable open</td><td>bypasses it</td></tr>
+  </table></div>
+
+  <h3>Reads: list once, fetch ahead</h3>
+  <ul class="facts">
+    <li><code>readdir</code> carries each name's
+      attributes. The lookup and getattr that follow are
+      answered locally — until an eviction drops
+      them.</li>
+    <li>After a listing, the mount calls
+      <code>reads</code> for the regular files in it of
+      at most 64 KiB: ≤32 names and 1 MiB per call. A
+      larger file stays a normal <code>read</code>.</li>
+    <li>Bodies are kept until an eviction for that name,
+      and held at most 64 MiB.</li>
+    <li>Child directories are fetched with
+      <code>readdirs</code>, ≤32 per call; a later
+      <code>readdir</code> of one is answered from that.
+      At most 8192 listings are kept.</li>
+    <li>A read-only open takes no server handle:
+      <code>read</code> names the inode, and that open's
+      <code>flush</code> and <code>release</code> stay on
+      the mount. Opening a directory takes none
+      either.</li>
+  </ul>
+
+  <h3>Writes: held, then sent once</h3>
+  <p>A write is acknowledged by the mount and sent
+  when:</p>
+  <ul class="facts">
+    <li>contiguous bytes reach 1 MiB,</li>
+    <li>a write is not contiguous,</li>
+    <li>or on <code>fsync</code>, <code>release</code>, a
+      read, a setattr, or a <code>copyfilerange</code> of
+      that file.</li>
+  </ul>
+  <ul>
+    <li><code>flush</code> reports an earlier send error
+      and does not itself send.</li>
+    <li><code>release</code> sends any bytes still held
+      and closes the server handle in that one call.</li>
+    <li>Closing one descriptor while another of the same
+      file stays open leaves those bytes on the mount
+      until the last <code>release</code> — or one of the
+      sends above.</li>
+    <li>Other mounts see the bytes once they are sent. A
+      failed send is reported by the next write, and by
+      <code>close</code> or <code>fsync</code>.</li>
+  </ul>
+
+  <h2>Server invalidates</h2>
+  <p>The server publishes after a successful
+  <code>create</code>, <code>mkdir</code>,
+  <code>symlink</code>, <code>write</code>,
+  <code>setattr</code>, <code>unlink</code>, or
+  <code>rmdir</code>, after a <code>release</code> that
+  carried file bytes — and after a rename it sends the
+  old name and then the new name. A refused call sends
+  nothing.</p>
+  <figure class="diagram" data-explorer="evict">
+  <svg viewBox="0 0 700 250" role="img"
+    aria-label="One write fans out to every mount of the namespace">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5"
+        markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#f43f5e"></path>
+      </marker>
+    </defs>
+    <g>
+      <rect x="10" y="85" width="140" height="80" class="box" data-role="mutate"/>
+      <text x="80" y="113" class="t-title" data-role="mutate">call succeeds</text>
+      <text x="80" y="135" class="t-small" data-role="mutate">write, create,</text>
+      <text x="80" y="153" class="t-small" data-role="mutate">rename, …</text>
+      <rect x="190" y="85" width="140" height="80" class="box-hi" data-role="mutate other self"/>
+      <text x="260" y="113" class="t-title" data-role="mutate other self">hub</text>
+      <text x="260" y="135" class="t-small" data-role="mutate other self">one event per</text>
+      <text x="260" y="153" class="t-small" data-role="mutate other self">namespace</text>
+      <rect x="370" y="15" width="320" height="100" class="box" data-role="other"/>
+      <text x="530" y="41" class="t-title" data-role="other">every other mount</text>
+      <text x="530" y="63" class="t-small" data-role="other">background loop reads the event</text>
+      <text x="530" y="83" class="t-small" data-role="other">NotifyEntry drops the name,</text>
+      <text x="530" y="101" class="t-small" data-role="other">NotifyContent drops the bytes</text>
+      <rect x="370" y="135" width="320" height="100" class="box" data-role="self"/>
+      <text x="530" y="161" class="t-title" data-role="self">the writing mount</text>
+      <text x="530" y="183" class="t-small" data-role="self">body and listing dropped,</text>
+      <text x="530" y="203" class="t-small" data-role="self">but the name stays —</text>
+      <text x="530" y="221" class="t-small" data-role="self">next lookup is local</text>
+      <line x1="150" y1="125" x2="186" y2="125" class="wire" data-role="mutate"/>
+      <line x1="330" y1="110" x2="366" y2="70" class="wire" data-role="other"/>
+      <line x1="330" y1="140" x2="366" y2="180" class="wire" data-role="self"/>
+    </g>
+  </svg>
+  <figcaption>One event per namespace; each mount's
+  background loop — never a FUSE handler — drops what
+  the kernel cached.</figcaption>
+  <div class="explorer-bar" role="group" aria-label="Step through eviction fan-out">
+    <div class="explorer-steps">
+      <button type="button" class="pill-btn" aria-pressed="true" data-step="all"
+        data-desc="Every successful mutation publishes one namespace event to all mounts.">All</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="mutate"
+        data-desc="1 · Mutation succeeds on server: hub queues one invalidation event (refused calls send nothing).">1 · Mutation</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="other"
+        data-desc="2 · Other mounts: background loop calls NotifyEntry + NotifyContent to drop name and page cache.">2 · Other mounts</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="self"
+        data-desc="3 · Writing mount: drops cached body/listing, but keeps the entry name so its next lookup stays local.">3 · Writing mount</button>
+    </div>
+    <span class="explorer-status" aria-live="polite">Every successful mutation publishes one namespace event to all mounts.</span>
+  </div>
+  </figure>
+  <p>A name this mount itself just created, wrote, or
+  changed is left in place: the saved body is dropped
+  and page cache is invalidated, the listing is dropped,
+  but the name stays. A missed eviction leaves cached
+  bytes stale until the kernel drops the pages; names
+  and attributes recover within the 1s timeout.</p>
+
+  <h2>Drops heal</h2>
+  <figure class="diagram">
+  <svg viewBox="0 0 700 210" role="img"
+    aria-label="Silence for 6 seconds triggers a rejoin; events are held 8 seconds">
+    <defs>
+      <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5"
+        markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#f43f5e"></path>
+      </marker>
+    </defs>
+    <g>
+      <line x1="50" y1="120" x2="660" y2="120" class="lane"/>
+      <line x1="50" y1="112" x2="50" y2="128" class="lane"/>
+      <line x1="170" y1="112" x2="170" y2="128" class="lane"/>
+      <line x1="290" y1="112" x2="290" y2="128" class="lane"/>
+      <line x1="410" y1="105" x2="410" y2="135" class="lane"/>
+      <line x1="530" y1="105" x2="530" y2="135" class="lane"/>
+      <text x="50" y="148" class="t-mono">0s</text>
+      <text x="170" y="148" class="t-mono">2s ♥</text>
+      <text x="290" y="148" class="t-mono">4s ♥</text>
+      <text x="410" y="148" class="t-mono">6s</text>
+      <text x="530" y="148" class="t-mono">8s</text>
+      <text x="170" y="60" class="t-small">heartbeat every 2s</text>
+      <text x="170" y="80" class="t-small">(ping on ws)</text>
+      <text x="410" y="60" class="t-title">6s of silence: stalled</text>
+      <text x="410" y="80" class="t-small">rejoin at once, then +100ms</text>
+      <text x="530" y="180" class="t-small">owed events discarded</text>
+      <text x="240" y="180" class="t-small">rejoin inside the window: replay</text>
+      <text x="240" y="60" class="t-small">1s up clears the wait</text>
+      <line x1="410" y1="95" x2="410" y2="108" class="wire"
+        style="marker-end:url(#arr2)"/>
+    </g>
+  </svg>
+  <figcaption>Quiet is normal for seconds; silence past
+  6s is a stall. Nothing owed survives past 8s.</figcaption>
+  </figure>
+  <ul>
+    <li><strong>POST.</strong> The server writes a
+      heartbeat on the join stream every 2s. A mount
+      that receives nothing for 6s rejoins: the first try
+      runs at once, each try after waits 100ms, and a
+      session that stays up for 1s clears that wait. The
+      server keeps undelivered evictions and lock
+      wake-ups for 8s; a rejoin inside the window
+      receives them.</li>
+    <li><strong>Websocket.</strong> Same heartbeat, plus
+      a ping every 2s answered with a pong. Six seconds
+      of silence, or a dropped socket, fails the calls in
+      flight and dials again. The mount stays up; the
+      retry wait matches POST.</li>
+    <li>A signed id the server has not seen is a new
+      mount. An id whose signature does not match the
+      token is refused. Inodes still die with the server
+      process — a restart means remount.</li>
+  </ul>
+  <footer><a href="wire.html">← Wire</a><a href="locks.html">Locks →</a></footer>
+</main>
+<script src="ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compare — fs-relay, explained</title>
+<link rel="stylesheet" href="style.css">
+<meta name="description" content="fs-relay benchmark charts against kvfs, s3fs, NFS, and S3 itself via DuckDB.">
+<meta name="theme-color" content="#0d1317">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23f43f5e'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<nav aria-label="Pages">
+  <a class="brand" href="index.html">fs-relay</a>
+  <a href="index.html">Overview</a>
+  <a href="run.html">Run it</a>
+  <a href="compare.html" class="here">Compare</a>
+  <a href="wire.html">Wire</a>
+  <a href="coherence.html">Coherence</a>
+  <a href="locks.html">Locks</a>
+  <a href="raw.html">Raw path</a>
+  <a href="explainer.html">Explainer</a>
+</nav>
+<main id="main">
+  <h1>Compare</h1>
+  <p class="lede">On each filesystem: unpack an archive,
+  pack the tree again, copy the archive onto the mount,
+  and list that copy. A local directory is the floor.</p>
+  <p class="verdict"><span class="q">Is it actually
+  faster?</span> <strong>Yes.</strong> On a 5,868-file
+  tree the default mount unpacks 13x faster than s3fs
+  and 7x faster than NFS, and packs 15x and 10.5x
+  faster. On large files the lead is narrower but still
+  clear — and against S3 itself, DuckDB runs 4.5x and
+  45x faster through the mount. The charts below are the
+  evidence.</p>
+  <p>The field: <strong>local directory</strong> (the
+  floor), <strong>kvfs</strong> (our ancestor, an
+  in-memory filesystem on Redis/Valkey),
+  <strong>fs-relay</strong> (the default mount),
+  <strong>fs-relay -post</strong>,
+  <strong>s3fs on rustfs</strong>, and
+  <strong>fuse-nfs</strong> (NFS through FUSE).</p>
+
+  <h2>Many small files: ansible.tar</h2>
+  <div class="chart-controls" id="compare-controls" role="region" aria-label="Chart controls">
+    <span class="ctrl-label">Order:</span>
+    <button type="button" class="pill-btn" data-sort="fastest" aria-pressed="true">Fastest first</button>
+    <button type="button" class="pill-btn" data-sort="table" aria-pressed="false">Table order</button>
+    <span class="ctrl-label" style="margin-inline-start:0.5rem">Compare:</span>
+    <button type="button" class="pill-btn" data-filter="all" aria-pressed="true">All</button>
+    <button type="button" class="pill-btn" data-filter="s3fs" aria-pressed="false">vs s3fs</button>
+    <button type="button" class="pill-btn" data-filter="fuse-nfs" aria-pressed="false">vs fuse-nfs</button>
+    <button type="button" class="pill-btn" data-filter="kvfs" aria-pressed="false">vs kvfs</button>
+    <button type="button" class="pill-btn" data-filter="local" aria-pressed="false">vs local</button>
+  </div>
+  <p>27 MiB, 5,868 files. Shorter is better.</p>
+  <p class="caption">Source: README.md, ansible.tar
+  table.</p>
+
+  <h3>Unpack</h3>
+  <div class="chart">
+    <div class="row floor"><span class="who">local directory</span><span class="track"><span class="bar" style="width:0.5%"></span></span><span class="val">0.14 s</span></div>
+    <div class="row me"><span class="who">fs-relay</span><span class="track"><span class="bar" style="width:7.6%"></span></span><span class="val"><span class="badge-speedup">13× s3fs · 7× NFS</span>15.47 s</span></div>
+    <div class="row post"><span class="who">fs-relay -post</span><span class="track"><span class="bar" style="width:8.9%"></span></span><span class="val">18.11 s</span></div>
+    <div class="row"><span class="who">kvfs</span><span class="track"><span class="bar" style="width:12.7%"></span></span><span class="val">25.76 s</span></div>
+    <div class="row"><span class="who">fuse-nfs</span><span class="track"><span class="bar" style="width:53.0%"></span></span><span class="val">107.89 s</span></div>
+    <div class="row"><span class="who">s3fs on rustfs</span><span class="track"><span class="bar" style="width:100%"></span></span><span class="val">203.56 s</span></div>
+  </div>
+  <p>The default mount unpacks about <strong>thirteen
+  times faster than s3fs</strong> (15.47 s against
+  203.56 s) and about <strong>seven times faster than
+  fuse-nfs</strong> (15.47 s against 107.89 s).</p>
+
+  <h3>Pack</h3>
+  <div class="chart">
+    <div class="row floor"><span class="who">local directory</span><span class="track"><span class="bar" style="width:0.5%"></span></span><span class="val">0.10 s</span></div>
+    <div class="row me"><span class="who">fs-relay</span><span class="track"><span class="bar" style="width:6.5%"></span></span><span class="val"><span class="badge-speedup">15× s3fs · 10.5× NFS</span>3.76 s</span></div>
+    <div class="row post"><span class="who">fs-relay -post</span><span class="track"><span class="bar" style="width:7.3%"></span></span><span class="val">4.18 s</span></div>
+    <div class="row"><span class="who">kvfs</span><span class="track"><span class="bar" style="width:21.9%"></span></span><span class="val">12.58 s</span></div>
+    <div class="row"><span class="who">fuse-nfs</span><span class="track"><span class="bar" style="width:69.0%"></span></span><span class="val">39.68 s</span></div>
+    <div class="row"><span class="who">s3fs on rustfs</span><span class="track"><span class="bar" style="width:100%"></span></span><span class="val">57.53 s</span></div>
+  </div>
+  <p>Packing is about <strong>fifteen times faster than
+  s3fs</strong> (3.76 s against 57.53 s) and about
+  <strong>ten and a half times faster than
+  fuse-nfs</strong> (3.76 s against 39.68 s).</p>
+
+  <h3>Copy the archive</h3>
+  <div class="chart">
+    <div class="row floor"><span class="who">local directory</span><span class="track"><span class="bar" style="width:4.2%"></span></span><span class="val">0.02 s</span></div>
+    <div class="row post"><span class="who">fs-relay -post</span><span class="track"><span class="bar" style="width:22.9%"></span></span><span class="val">0.11 s</span></div>
+    <div class="row me"><span class="who">fs-relay</span><span class="track"><span class="bar" style="width:25.0%"></span></span><span class="val"><span class="badge-speedup">3.8× NFS</span>0.12 s</span></div>
+    <div class="row"><span class="who">s3fs on rustfs</span><span class="track"><span class="bar" style="width:79.2%"></span></span><span class="val">0.38 s</span></div>
+    <div class="row"><span class="who">fuse-nfs</span><span class="track"><span class="bar" style="width:93.8%"></span></span><span class="val">0.45 s</span></div>
+    <div class="row"><span class="who">kvfs</span><span class="track"><span class="bar" style="width:100%"></span></span><span class="val">0.48 s</span></div>
+  </div>
+
+  <h3>List the archive</h3>
+  <div class="chart">
+    <div class="row floor"><span class="who">local directory</span><span class="track"><span class="bar" style="width:3.7%"></span></span><span class="val">0.03 s</span></div>
+    <div class="row me"><span class="who">fs-relay</span><span class="track"><span class="bar" style="width:19.5%"></span></span><span class="val"><span class="badge-speedup">3× NFS</span>0.16 s</span></div>
+    <div class="row"><span class="who">s3fs on rustfs</span><span class="track"><span class="bar" style="width:19.5%"></span></span><span class="val">0.16 s</span></div>
+    <div class="row post"><span class="who">fs-relay -post</span><span class="track"><span class="bar" style="width:23.2%"></span></span><span class="val">0.19 s</span></div>
+    <div class="row"><span class="who">fuse-nfs</span><span class="track"><span class="bar" style="width:58.5%"></span></span><span class="val">0.48 s</span></div>
+    <div class="row"><span class="who">kvfs</span><span class="track"><span class="bar" style="width:100%"></span></span><span class="val">0.82 s</span></div>
+  </div>
+
+  <h2>Few large files: Antigravity.tar.gz</h2>
+  <p>Mostly a few large files, about 500 MiB unpacked.</p>
+  <p class="caption">Source: README.md, Antigravity
+  table.</p>
+
+  <h3>Unpack</h3>
+  <div class="chart">
+    <div class="row floor"><span class="who">local directory</span><span class="track"><span class="bar" style="width:15.5%"></span></span><span class="val">5.60 s</span></div>
+    <div class="row post"><span class="who">fs-relay -post</span><span class="track"><span class="bar" style="width:25.9%"></span></span><span class="val">9.36 s</span></div>
+    <div class="row me"><span class="who">fs-relay</span><span class="track"><span class="bar" style="width:27.1%"></span></span><span class="val"><span class="badge-speedup">2.1× s3fs · 3.7× NFS</span>9.78 s</span></div>
+    <div class="row"><span class="who">s3fs on rustfs</span><span class="track"><span class="bar" style="width:58.1%"></span></span><span class="val">21.01 s</span></div>
+    <div class="row"><span class="who">kvfs</span><span class="track"><span class="bar" style="width:85.0%"></span></span><span class="val">30.71 s</span></div>
+    <div class="row"><span class="who">fuse-nfs</span><span class="track"><span class="bar" style="width:100%"></span></span><span class="val">36.13 s</span></div>
+  </div>
+  <p>The default mount unpacks ahead of s3fs (9.78 s
+  against 21.01 s) and ahead of fuse-nfs (9.78 s against
+  36.13 s).</p>
+
+  <h3>Pack</h3>
+  <div class="chart">
+    <div class="row floor"><span class="who">local directory</span><span class="track"><span class="bar" style="width:2.5%"></span></span><span class="val">0.49 s</span></div>
+    <div class="row me"><span class="who">fs-relay</span><span class="track"><span class="bar" style="width:12.0%"></span></span><span class="val"><span class="badge-speedup">2.2× s3fs · 4.4× NFS</span>2.38 s</span></div>
+    <div class="row post"><span class="who">fs-relay -post</span><span class="track"><span class="bar" style="width:12.1%"></span></span><span class="val">2.40 s</span></div>
+    <div class="row"><span class="who">s3fs on rustfs</span><span class="track"><span class="bar" style="width:26.9%"></span></span><span class="val">5.31 s</span></div>
+    <div class="row"><span class="who">fuse-nfs</span><span class="track"><span class="bar" style="width:52.5%"></span></span><span class="val">10.37 s</span></div>
+    <div class="row"><span class="who">kvfs</span><span class="track"><span class="bar" style="width:100%"></span></span><span class="val">19.77 s</span></div>
+  </div>
+  <p>2.38 s on the default mount, 5.31 s on s3fs, 10.37 s
+  on fuse-nfs.</p>
+
+  <h3>Copy the archive</h3>
+  <div class="chart">
+    <div class="row floor"><span class="who">local directory</span><span class="track"><span class="bar" style="width:4.2%"></span></span><span class="val">0.13 s</span></div>
+    <div class="row me"><span class="who">fs-relay</span><span class="track"><span class="bar" style="width:20.8%"></span></span><span class="val"><span class="badge-speedup">1.8× s3fs · 4.1× NFS</span>0.65 s</span></div>
+    <div class="row post"><span class="who">fs-relay -post</span><span class="track"><span class="bar" style="width:25.3%"></span></span><span class="val">0.79 s</span></div>
+    <div class="row"><span class="who">s3fs on rustfs</span><span class="track"><span class="bar" style="width:36.5%"></span></span><span class="val">1.14 s</span></div>
+    <div class="row"><span class="who">fuse-nfs</span><span class="track"><span class="bar" style="width:84.9%"></span></span><span class="val">2.65 s</span></div>
+    <div class="row"><span class="who">kvfs</span><span class="track"><span class="bar" style="width:100%"></span></span><span class="val">3.12 s</span></div>
+  </div>
+
+  <h3>List the archive</h3>
+  <div class="chart">
+    <div class="row floor"><span class="who">local directory</span><span class="track"><span class="bar" style="width:54.6%"></span></span><span class="val">5.62 s</span></div>
+    <div class="row post"><span class="who">fs-relay -post</span><span class="track"><span class="bar" style="width:59.4%"></span></span><span class="val">6.12 s</span></div>
+    <div class="row me"><span class="who">fs-relay</span><span class="track"><span class="bar" style="width:59.5%"></span></span><span class="val"><span class="badge-speedup">1.7× NFS</span>6.13 s</span></div>
+    <div class="row"><span class="who">s3fs on rustfs</span><span class="track"><span class="bar" style="width:65.4%"></span></span><span class="val">6.74 s</span></div>
+    <div class="row"><span class="who">kvfs</span><span class="track"><span class="bar" style="width:70.0%"></span></span><span class="val">7.21 s</span></div>
+    <div class="row"><span class="who">fuse-nfs</span><span class="track"><span class="bar" style="width:100%"></span></span><span class="val">10.30 s</span></div>
+  </div>
+
+  <h2 id="duckdb">DuckDB over the mount vs S3</h2>
+  <p>Both tables above run fs-relay and s3fs through
+  FUSE. A separate run removes that doubt: DuckDB reads
+  the same partitioned parquet once through the fs-relay
+  mount and once straight from rustfs over S3, with no
+  FUSE on the S3 path. Each query starts cold — fresh
+  DuckDB session, external file cache off, kernel page
+  cache dropped, daemons restarted. The mount is still
+  substantially faster, so the lead is not FUSE overhead
+  on s3fs.</p>
+  <p class="caption">Source: Benchmark.md, DuckDB
+  summary table.</p>
+  <h3>Group by pickup_year</h3>
+  <div class="chart">
+    <div class="row me"><span class="who">fs-relay</span><span class="track"><span class="bar" style="width:22.4%"></span></span><span class="val"><span class="badge-speedup">4.5× S3</span>4.74 s</span></div>
+    <div class="row"><span class="who">rustfs S3</span><span class="track"><span class="bar" style="width:100%"></span></span><span class="val">21.17 s</span></div>
+  </div>
+  <h3>Group by payment_type</h3>
+  <div class="chart">
+    <div class="row me"><span class="who">fs-relay</span><span class="track"><span class="bar" style="width:2.2%"></span></span><span class="val"><span class="badge-speedup">45× S3</span>0.50 s</span></div>
+    <div class="row"><span class="who">rustfs S3</span><span class="track"><span class="bar" style="width:100%"></span></span><span class="val">22.76 s</span></div>
+  </div>
+  <p>4.5x faster on the first query, 45x on the second.
+  The full method is in <code>Benchmark.md</code>.</p>
+
+  <h2>Why it is fast</h2>
+  <p>Zero-copy Linux kernel features, where the bytes
+  skip the allocate, read, copy, write, and free cycle —
+  and on large files a context switch per block:</p>
+  <ul class="facts">
+    <li><code>splice(2)</code>: file to pipe to socket
+      on reads, socket to pipe to file on writes. See
+      <a href="raw.html">Raw path</a>.</li>
+    <li><code>copy_file_range(2)</code>: server-side copy
+      between two open files, one call.</li>
+  </ul>
+
+  <h2>Earlier designs (for developers)</h2>
+  <p>Do not bring these back. They were measured, and
+  they stayed out.</p>
+  <ul>
+    <li><strong>MessagePack</strong> was the first wire
+      format. FlatBuffers replaced it: on the Ansible
+      tree, <code>-ws</code> with FlatBuffers was about
+      15% faster unpacking and 6% faster packing; on
+      Antigravity, 11% faster at both.</li>
+    <li><strong>JSON</strong> can carry file bytes as
+      <code>multipart/form-data</code>: one
+      <code>application/json</code> part for the call,
+      one <code>application/octet-stream</code> part for
+      the bytes. On the Ansible tree that plain-text body
+      kept up with MessagePack and FlatBuffers. It is not
+      in the server — one body shape is the smaller
+      program.</li>
+  </ul>
+  <footer><a href="run.html">← Run it</a><a href="wire.html">Wire →</a></footer>
+</main>
+<script src="ui.js"></script>
+</body>
+</html>

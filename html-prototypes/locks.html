@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locks — fs-relay, explained</title>
+<link rel="stylesheet" href="style.css">
+<meta name="description" content="One server-side lock table per namespace, and what SQLite's rollback journal needs.">
+<meta name="theme-color" content="#0d1317">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23f43f5e'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<nav aria-label="Pages">
+  <a class="brand" href="index.html">fs-relay</a>
+  <a href="index.html">Overview</a>
+  <a href="run.html">Run it</a>
+  <a href="compare.html">Compare</a>
+  <a href="wire.html">Wire</a>
+  <a href="coherence.html">Coherence</a>
+  <a href="locks.html" class="here">Locks</a>
+  <a href="raw.html">Raw path</a>
+  <a href="explainer.html">Explainer</a>
+</nav>
+<main id="main">
+  <h1>Locks</h1>
+  <p class="lede">Advisory byte-range locks with one
+  authority: the server's table. That is what SQLite's
+  rollback journal needs.</p>
+  <p class="verdict"><span class="q">How do two mounts
+  exclude each other?</span> <strong>One server-side
+  lock table per namespace, keyed by mount plus process
+  — so SQLite's rollback journal works across
+  mounts.</strong> Waits never hold a stream; drops
+  heal by replay.</p>
+
+  <h2>Who holds a lock</h2>
+  <ul class="facts">
+    <li>A holder is the mount's client id <em>plus</em>
+      the kernel owner. Classic POSIX locks are per
+      process, so two opens of one process share an
+      owner — but two mounts never do.</li>
+    <li>The mount advertises POSIX locks, so the kernel
+      keeps no lock table of its own: every lock call
+      reaches the server.</li>
+    <li>The server is the only writer under
+      <code>data/</code>. A process opening those files
+      directly is outside the table.</li>
+  </ul>
+
+  <h2>The three bytes SQLite locks</h2>
+  <figure class="diagram" data-explorer="sqlite">
+  <svg viewBox="0 0 700 220" role="img"
+    aria-label="Pending, reserved, and shared byte ranges with an overflow list for the rest">
+    <g>
+      <rect x="20" y="50" width="150" height="46" class="chip" data-role="overflow"/>
+      <text x="95" y="69" class="t-small" data-role="overflow">file bytes</text>
+      <text x="95" y="87" class="t-small" data-role="overflow">0 …</text>
+      <rect x="170" y="50" width="150" height="46" class="chip-hi" data-role="reader writer"/>
+      <text x="245" y="69" class="t-mono" data-role="reader writer">0x40000000</text>
+      <text x="245" y="87" class="t-small" data-role="reader writer">pending byte</text>
+      <rect x="320" y="50" width="150" height="46" class="chip-hi" data-role="writer"/>
+      <text x="395" y="69" class="t-mono" data-role="writer">0x40000001</text>
+      <text x="395" y="87" class="t-small" data-role="writer">reserved byte</text>
+      <rect x="470" y="50" width="210" height="46" class="chip-hi" data-role="reader exclusive"/>
+      <text x="575" y="69" class="t-mono" data-role="reader exclusive">0x40000002 + 510</text>
+      <text x="575" y="87" class="t-small" data-role="reader exclusive">shared range</text>
+      <text x="350" y="130" class="t-title" data-role="reader writer exclusive overflow">one record per locked inode</text>
+      <text x="350" y="152" class="t-small" data-role="reader writer exclusive">counts for pending, reserved, shared —</text>
+      <text x="350" y="172" class="t-small" data-role="overflow">any other range goes on the overflow list,</text>
+      <text x="350" y="192" class="t-small" data-role="overflow">conflicts by overlap</text>
+    </g>
+  </svg>
+  <figcaption>The hot path is three ranges; the overflow
+  list holds everything else.</figcaption>
+  <div class="explorer-bar" role="group" aria-label="Step through SQLite lock ranges">
+    <div class="explorer-steps">
+      <button type="button" class="pill-btn" aria-pressed="true" data-step="all"
+        data-desc="Three hot-path SQLite byte ranges counted in O(1), plus an overflow list for arbitrary ranges.">All ranges</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="reader"
+        data-desc="1 · New reader: read-locks pending (0x40000000), takes shared (0x40000002+510), then drops pending.">1 · Reader</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="writer"
+        data-desc="2 · Writer intent: takes reserved (0x40000001), then pending (0x40000000) to block new readers.">2 · Reserved / Pending</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="exclusive"
+        data-desc="3 · Commit (Exclusive): upgrades its own shared read lock to a write lock on 0x40000002+510.">3 · Exclusive commit</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="overflow"
+        data-desc="4 · Overflow / flock: non-SQLite ranges and partial unlocks live on the overflow list.">4 · Overflow</button>
+    </div>
+    <span class="explorer-status" aria-live="polite">Three hot-path SQLite byte ranges counted in O(1), plus an overflow list for arbitrary ranges.</span>
+  </div>
+  </figure>
+  <ul>
+    <li>A new reader read-locks the pending byte, then
+      the shared range, then unlocks the pending
+      byte.</li>
+    <li>Exclusive is a write lock on the shared range.
+      It upgrades the same owner's own read lock there,
+      without waiting for that owner's pending or
+      reserved lock to clear.</li>
+    <li>A partial unlock of one of those three ranges
+      splits the remaining bytes onto the overflow list,
+      so the counts stay exact.</li>
+    <li><code>flock</code> uses the same record as a
+      whole-file entry. It conflicts with other
+      <code>flock</code> locks and never with a
+      byte-range lock.</li>
+  </ul>
+
+  <h2>Waiting without holding a stream</h2>
+  <figure class="diagram">
+  <svg viewBox="0 0 700 330" role="img"
+    aria-label="Setlkw tries once, waits on the release stream, and retries">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5"
+        markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#f43f5e"></path>
+      </marker>
+    </defs>
+    <g>
+      <rect x="235" y="10" width="230" height="44" class="box"/>
+      <text x="350" y="37" class="t-title">call setlkw</text>
+      <polygon points="350,70 470,115 350,160 230,115" class="box-hi"/>
+      <text x="350" y="110" class="t-title">granted?</text>
+      <text x="350" y="128" class="t-small">conflict is EAGAIN</text>
+      <rect x="495" y="93" width="150" height="44" class="box"/>
+      <text x="570" y="120" class="t-title">done</text>
+      <rect x="235" y="185" width="230" height="60" class="box"/>
+      <text x="350" y="207" class="t-title">wait</text>
+      <text x="350" y="227" class="t-small">release event · cancel · 1s</text>
+      <line x1="350" y1="54" x2="350" y2="66" class="wire"/>
+      <line x1="462" y1="115" x2="491" y2="115" class="wire"/>
+      <text x="486" y="104" class="t-lab">yes</text>
+      <line x1="350" y1="160" x2="350" y2="181" class="wire"/>
+      <text x="368" y="175" class="t-lab">no</text>
+      <line x1="235" y1="215" x2="130" y2="215" class="lane"/>
+      <line x1="130" y1="215" x2="130" y2="37" class="lane"/>
+      <line x1="130" y1="37" x2="231" y2="37" class="lane"/>
+      <text x="130" y="260" class="t-small">retry: the release was replayed</text>
+      <text x="130" y="280" class="t-small">after a rejoin, and the 1s bound</text>
+      <text x="130" y="300" class="t-small">covers anything missed</text>
+    </g>
+  </svg>
+  <figcaption>Try once, wait on the one event stream,
+  try again. No stream is ever held by a wait.</figcaption>
+  </figure>
+  <ul>
+    <li><code>setlk</code> and <code>setlkw</code> both
+      try once and return <code>EAGAIN</code> on a
+      conflict. The mount waits, then calls
+      <code>setlkw</code> again; a release wakes every
+      mount.</li>
+    <li>A release is one event, sent only when a mount is
+      waiting on an inode in that namespace. A commit
+      nobody waits on sends nothing.</li>
+    <li>The wake-up is a coalescing broadcast: a release
+      closes the channel and installs a new one, so every
+      waiter wakes and the reader never blocks.</li>
+    <li><code>getlk</code> reports the first conflicting
+      lock, or <code>F_UNLCK</code> when the range is
+      clear. It never blocks.</li>
+  </ul>
+
+  <h2>How locks are dropped</h2>
+  <div class="scroll"><table>
+    <tr><th>What happens</th><th>What drops</th></tr>
+    <tr><td>close a handle</td>
+      <td>locks taken through that handle — FUSE carries
+        no owner on release, so the handle stands in.
+        A failed close still drops them.</td></tr>
+    <tr><td>release with an fh</td>
+      <td>every lock that handle's owners hold on that
+        inode</td></tr>
+    <tr><td>release with an owner, no fh</td>
+      <td>that owner's locks — a read-only open takes no
+        server handle, so it remembers only the owners
+        that locked through it. A <code>cat</code> cannot
+        drop a worker's locks on the same mount.</td></tr>
+    <tr><td>a mount does not rejoin</td>
+      <td>all its locks, when the 8s hold expires</td></tr>
+  </table></div>
+  <p>An owner tracks up to two handles with an overflow,
+  so any recorded close drops it.</p>
+
+  <h2>Proven with SQLite</h2>
+  <p class="note">Two mounts, four writers split across
+  them, committed 200 rows with four distinct markers,
+  and <code>PRAGMA integrity_check</code> was
+  <code>ok</code> from both mounts. A reader on one
+  mount held a transaction for 2s and a writer on the
+  other waited 1.4s, then committed, with no
+  <code>database is locked</code>. A new reader was held
+  at the pending byte while a writer waited, then
+  granted after it finished. Killing a mount that held a
+  write lock released it after 8s. <code>flock</code>
+  conflicted and released across mounts.</p>
+  <p>WAL stays out: it needs shared memory between
+  processes, which the mount does not provide. The
+  rollback journal is the supported mode.</p>
+  <footer><a href="coherence.html">← Coherence</a><a href="raw.html">Raw path →</a></footer>
+</main>
+<script src="ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raw path — fs-relay, explained</title>
+<link rel="stylesheet" href="style.css">
+<meta name="description" content="The fs-relay raw path: large transfers by kernel splice on a separate connection.">
+<meta name="theme-color" content="#0d1317">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23f43f5e'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<nav aria-label="Pages">
+  <a class="brand" href="index.html">fs-relay</a>
+  <a href="index.html">Overview</a>
+  <a href="run.html">Run it</a>
+  <a href="compare.html">Compare</a>
+  <a href="wire.html">Wire</a>
+  <a href="coherence.html">Coherence</a>
+  <a href="locks.html">Locks</a>
+  <a href="raw.html" class="here">Raw path</a>
+  <a href="explainer.html">Explainer</a>
+</nav>
+<main id="main">
+  <h1>Raw path</h1>
+  <p class="lede">A read or write past a threshold moves
+  its bytes on a separate TCP connection, so the kernel
+  can splice them. Metadata stays on the main
+  connection.</p>
+  <p class="verdict"><span class="q">How do large
+  transfers stay fast?</span> <strong>Bytes inside a
+  size window ride a separate TCP connection, where the
+  kernel splices them without copying through the
+  server process.</strong> Smaller bytes stay on the
+  envelope; a failure retries there once.</p>
+
+  <h2>The size window</h2>
+  <p>Computed once, when the server starts, from the data
+  directory — and sent to the mount on the
+  handshake:</p>
+<pre>Min = clamp(32 × st_blksize, 64 KiB, Max)
+Max = min(1 MiB, pipe size granted), minus 64 KiB
+      when that still leaves at least 64 KiB</pre>
+  <ul class="facts">
+    <li>The mount uses the raw path when the byte count
+      is inside <code>[Min, Max]</code>.</li>
+    <li>Anything smaller — or a server that does not
+      offer the path — stays on the FlatBuffers
+      envelope.</li>
+    <li><code>-raw=false</code> on the mount does not
+      dial it.</li>
+  </ul>
+
+  <h2>Routing</h2>
+  <figure class="diagram" data-raw-router="true">
+  <svg viewBox="0 0 700 480" role="img"
+    aria-label="Reads and writes route to envelope, raw pipe, raw buffer, or raw write">
+    <defs>
+      <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5"
+        markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#f43f5e"></path>
+      </marker>
+    </defs>
+    <g>
+      <rect x="150" y="10" width="200" height="40" class="box" data-route="always"/>
+      <text x="250" y="35" class="t-title" data-route="always">read/write, n bytes</text>
+      <polygon points="250,62 340,100 250,138 160,100" class="box-hi" data-route="always"/>
+      <text x="250" y="105" class="t-title" data-route="always">raw dialed?</text>
+      <polygon points="250,152 340,190 250,228 160,190" class="box-hi" data-route="always"/>
+      <text x="250" y="195" class="t-title" data-route="always">Min ≤ n ≤ Max?</text>
+      <polygon points="250,242 340,280 250,318 160,280" class="box-hi" data-route="raw-write raw-pipe raw-buf"/>
+      <text x="250" y="285" class="t-title" data-route="raw-write raw-pipe raw-buf">write?</text>
+      <polygon points="250,332 340,370 250,408 160,370" class="box-hi" data-route="raw-pipe raw-buf"/>
+      <text x="250" y="375" class="t-title" data-route="raw-pipe raw-buf">fits in a pipe?</text>
+      <rect x="450" y="78" width="200" height="134" class="box" data-route="env outcome"/>
+      <text x="550" y="138" class="t-title" data-route="env">envelope call</text>
+      <text x="550" y="160" class="t-small" data-route="env">small, or no raw path</text>
+      <rect x="450" y="258" width="200" height="44" class="box" data-route="raw-write outcome"/>
+      <text x="550" y="285" class="t-title" data-route="raw-write">raw write</text>
+      <rect x="450" y="348" width="200" height="44" class="box" data-route="raw-pipe outcome"/>
+      <text x="550" y="375" class="t-title" data-route="raw-pipe">raw read → pipe</text>
+      <rect x="150" y="422" width="200" height="44" class="box" data-route="raw-buf outcome"/>
+      <text x="250" y="449" class="t-title" data-route="raw-buf">raw read → buffer</text>
+      <line x1="250" y1="50" x2="250" y2="58" class="wire"
+        style="marker-end:url(#arr2)" data-route="always"/>
+      <line x1="250" y1="138" x2="250" y2="148" class="wire"
+        style="marker-end:url(#arr2)" data-route="always"/>
+      <line x1="250" y1="228" x2="250" y2="238" class="wire"
+        style="marker-end:url(#arr2)" data-route="raw-write raw-pipe raw-buf"/>
+      <line x1="250" y1="318" x2="250" y2="328" class="wire"
+        style="marker-end:url(#arr2)" data-route="raw-pipe raw-buf"/>
+      <line x1="250" y1="408" x2="250" y2="418" class="wire"
+        style="marker-end:url(#arr2)" data-route="raw-buf"/>
+      <line x1="332" y1="100" x2="446" y2="100" class="wire"
+        style="marker-end:url(#arr2)" data-route="env"/>
+      <line x1="332" y1="190" x2="446" y2="190" class="wire"
+        style="marker-end:url(#arr2)" data-route="env"/>
+      <line x1="340" y1="280" x2="446" y2="280" class="wire"
+        style="marker-end:url(#arr2)" data-route="raw-write"/>
+      <line x1="340" y1="370" x2="446" y2="370" class="wire"
+        style="marker-end:url(#arr2)" data-route="raw-pipe"/>
+      <text x="388" y="92" class="t-lab" data-route="env">no</text>
+      <text x="388" y="182" class="t-lab" data-route="env">no</text>
+      <text x="388" y="272" class="t-lab" data-route="raw-write">yes</text>
+      <text x="388" y="362" class="t-lab" data-route="raw-pipe">yes</text>
+      <text x="268" y="132" class="t-lab" data-route="always">yes</text>
+      <text x="268" y="222" class="t-lab" data-route="raw-write raw-pipe raw-buf">yes</text>
+      <text x="268" y="312" class="t-lab" data-route="raw-pipe raw-buf">no</text>
+      <text x="268" y="402" class="t-lab" data-route="raw-buf">no</text>
+    </g>
+  </svg>
+  <figcaption>Size picks the connection; the pipe picks
+  the read shape.</figcaption>
+  <div class="explorer-bar" role="group" aria-label="Simulate transfer routing">
+    <div class="explorer-slider">
+      <label for="raw-size-slider">Transfer size:</label>
+      <input type="range" id="raw-size-slider" min="16" max="1024" step="16" value="256">
+      <span id="raw-size-val">256 KiB</span>
+    </div>
+    <div class="explorer-steps">
+      <button type="button" class="pill-btn" id="raw-op-btn" aria-pressed="false">Op: read</button>
+      <button type="button" class="pill-btn" id="raw-pipe-btn" aria-pressed="false">Pipe: fits</button>
+    </div>
+    <span class="explorer-status" aria-live="polite">256 KiB read fits in pipe → zero-copy splice.</span>
+  </div>
+  </figure>
+
+  <h2>Handshake</h2>
+  <p>The mount opens a TCP connection and upgrades
+  it:</p>
+<pre>GET /raw/&lt;namespace&gt; HTTP/1.1
+Host: &lt;host&gt;
+Connection: Upgrade
+Upgrade: fs-relay-raw/1</pre>
+  <p>The server checks the namespace, hijacks, refuses
+  the connection if any body bytes were already
+  buffered, and answers:</p>
+<pre>HTTP/1.1 101 Switching Protocols
+Connection: Upgrade
+Upgrade: fs-relay-raw/1
+Fsr-Raw-Min: &lt;min&gt;
+Fsr-Raw-Max: &lt;max&gt;</pre>
+  <p>After that the socket is not HTTP. A missing
+  <code>Upgrade</code> header is 400.</p>
+
+  <h2>Headers</h2>
+  <p>Request header, 40 bytes, little-endian. A write
+  request is that header plus exactly
+  <code>length</code> file bytes.</p>
+  <div class="scroll"><table>
+    <tr><th>Offset</th><th>Type</th><th>Field</th></tr>
+    <tr><td class="num">0</td><td>4 bytes</td><td>magic <code>FSRQ</code></td></tr>
+    <tr><td class="num">4</td><td>u16</td><td>op: 1 read, 2 write</td></tr>
+    <tr><td class="num">6</td><td>u16</td><td>reserved, 0</td></tr>
+    <tr><td class="num">8</td><td>u64</td><td>inode, for a read without a handle</td></tr>
+    <tr><td class="num">16</td><td>u64</td><td>fh — always for a write, for a read when set</td></tr>
+    <tr><td class="num">24</td><td>i64</td><td>offset</td></tr>
+    <tr><td class="num">32</td><td>u32</td><td>length, at most Max</td></tr>
+    <tr><td class="num">36</td><td>u32</td><td>reserved, 0</td></tr>
+  </table></div>
+  <p>Reply header, 16 bytes, little-endian. A successful
+  read is followed by exactly <code>length</code> bytes.
+  An errno reply has length 0 and no body.</p>
+  <div class="scroll"><table>
+    <tr><th>Offset</th><th>Type</th><th>Field</th></tr>
+    <tr><td class="num">0</td><td>4 bytes</td><td>magic <code>FSRP</code></td></tr>
+    <tr><td class="num">4</td><td>u32</td><td>errno, 0 on success</td></tr>
+    <tr><td class="num">8</td><td>u32</td><td>length: bytes that follow (read) or were written (write)</td></tr>
+    <tr><td class="num">12</td><td>u32</td><td>reserved, 0</td></tr>
+  </table></div>
+  <p>A bad magic, an unknown op, a nonzero reserved
+  field, a length of 0, or a length above Max closes the
+  connection. A filesystem error does not.</p>
+
+  <h2>One transfer at a time</h2>
+  <figure class="diagram">
+  <svg viewBox="0 0 700 470" role="img"
+    aria-label="Raw read and write move bytes by splice on both ends">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5"
+        markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#f43f5e"></path>
+      </marker>
+    </defs>
+    <g>
+      <line x1="140" y1="30" x2="140" y2="460" class="lane"/>
+      <line x1="560" y1="30" x2="560" y2="460" class="lane"/>
+      <text x="140" y="20" class="t-title">Mount</text>
+      <text x="560" y="20" class="t-title">Server</text>
+      <text x="350" y="62" class="t-mono">GET /raw/ns, Upgrade</text>
+      <line x1="140" y1="70" x2="552" y2="70" class="wire"/>
+      <text x="350" y="108" class="t-mono">101, Fsr-Raw-Min/Max</text>
+      <line x1="560" y1="116" x2="148" y2="116" class="wire"/>
+      <text x="350" y="142" class="t-small">plain TCP from here</text>
+      <text x="350" y="176" class="t-mono">read header, 40 bytes</text>
+      <line x1="140" y1="184" x2="552" y2="184" class="wire"/>
+      <text x="560" y="210" class="t-small">splice file → pipe</text>
+      <text x="350" y="238" class="t-mono">reply header, 16 bytes</text>
+      <line x1="560" y1="246" x2="148" y2="246" class="wire"/>
+      <text x="560" y="272" class="t-small">splice pipe → socket</text>
+      <text x="140" y="300" class="t-small">splice socket → pipe,</text>
+      <text x="140" y="318" class="t-small">then pipe → /dev/fuse</text>
+      <text x="350" y="352" class="t-mono">write header + bytes</text>
+      <line x1="140" y1="360" x2="552" y2="360" class="wire"/>
+      <text x="560" y="386" class="t-small">splice socket → pipe,</text>
+      <text x="560" y="404" class="t-small">then pipe → file at offset</text>
+      <text x="350" y="432" class="t-mono">reply header, written count</text>
+      <line x1="560" y1="440" x2="148" y2="440" class="wire"/>
+    </g>
+  </svg>
+  <figcaption>Reads splice file → pipe → socket →
+  pipe → FUSE. Writes splice socket → pipe →
+  file.</figcaption>
+  </figure>
+  <ul>
+    <li>The server moves a read into a pipe <em>before
+      </em> writing the reply, so a short read at end of
+      file is the length in the header. Then it splices
+      that pipe to the socket.</li>
+    <li>A write is spliced from the socket into a pipe
+      and from the pipe into the file at
+      <code>offset</code>. A host filesystem that refuses
+      the splice into the file is copied from the pipe
+      instead. A successful write publishes the same
+      eviction as <code>write</code>.</li>
+    <li>The mount splices a read reply into a pipe and
+      hands that pipe to FUSE — which splices it on into
+      <code>/dev/fuse</code> — when the pipe can hold the
+      reply. Otherwise it reads the reply into the FUSE
+      buffer.</li>
+    <li>A write the mount sends is one
+      <code>writev</code> of the header and the bytes
+      FUSE already delivered.</li>
+  </ul>
+
+  <h2>Rules of the pool</h2>
+  <ul class="facts">
+    <li>The mount keeps up to eight raw connections. Each
+      handles one transfer at a time.</li>
+    <li>A transport error is retried once on the
+      envelope. A read or write at an offset is safe to
+      repeat.</li>
+    <li><code>copyfilerange</code> is the same family but
+      not this connection: one
+      <code>copy_file_range(2)</code> between two open
+      files at the two offsets, a short count returned as
+      success, the destination name evicted.</li>
+  </ul>
+  <footer><a href="locks.html">← Locks</a><a href="index.html">Overview →</a></footer>
+</main>
+<script src="ui.js"></script>
+</body>
+</html>

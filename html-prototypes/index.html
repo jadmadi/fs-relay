@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fs-relay, explained</title>
+<link rel="stylesheet" href="style.css">
+<meta name="description" content="fs-relay shares a directory over HTTP and mounts it anywhere: what it is, how it fits together, and where to read next.">
+<meta name="theme-color" content="#0d1317">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23f43f5e'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<nav aria-label="Pages">
+  <a class="brand" href="index.html">fs-relay</a>
+  <a href="index.html" class="here">Overview</a>
+  <a href="run.html">Run it</a>
+  <a href="compare.html">Compare</a>
+  <a href="wire.html">Wire</a>
+  <a href="coherence.html">Coherence</a>
+  <a href="locks.html">Locks</a>
+  <a href="raw.html">Raw path</a>
+  <a href="explainer.html">Explainer</a>
+</nav>
+<main id="main">
+  <h1>One directory, mounted anywhere</h1>
+  <p class="lede">fs-relay shares a directory over plain HTTP and
+  mounts it on as many machines as you like, where it behaves
+  like a local filesystem.</p>
+  <p class="verdict"><span class="q">What is it, and why
+  should I care?</span> Sharing a directory usually means
+  NFS or SMB, with root-run daemons and firewall rules.
+  <strong>fs-relay mounts a remote directory as a local
+  filesystem — about 10x faster than the alternatives,
+  with two commands and no root.</strong></p>
+  <ul class="facts">
+    <li><strong>Fast.</strong> About 10x faster than the
+      alternatives on real trees — see
+      <a href="compare.html">Compare</a>.</li>
+    <li><strong>Simple.</strong> Two Go binaries, no
+      runtime needs except FUSE&nbsp;3, an HTTP service
+      on any port — see <a href="run.html">Run it</a>.</li>
+    <li><strong>Safe to operate.</strong> A normal user,
+      no root, no NFS or SMB exposure, no firewall
+      puzzles.</li>
+  </ul>
+
+  <h2>How it fits together</h2>
+  <figure class="diagram" data-explorer="overview">
+  <svg viewBox="0 0 720 340" role="img"
+    aria-label="Two mounts connect to one server, which serves directories under data">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5"
+        markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#f43f5e"></path>
+      </marker>
+    </defs>
+    <g>
+      <rect x="20" y="30" width="200" height="110" class="box" data-role="calls events raw"/>
+      <text x="120" y="58" class="t-title" data-role="calls events raw">mount A</text>
+      <text x="120" y="80" class="t-small" data-role="calls events raw">fs-relay-bind /mnt/a</text>
+      <text x="120" y="100" class="t-small" data-role="calls events">FUSE, one connection</text>
+      <text x="120" y="120" class="t-small" data-role="calls events raw">namespace demo</text>
+      <rect x="20" y="180" width="200" height="110" class="box" data-role="calls events"/>
+      <text x="120" y="208" class="t-title" data-role="calls events">mount B</text>
+      <text x="120" y="230" class="t-small" data-role="calls events">fs-relay-bind /mnt/b</text>
+      <text x="120" y="250" class="t-small" data-role="calls events">FUSE, one connection</text>
+      <text x="120" y="270" class="t-small" data-role="calls events">namespace demo</text>
+      <rect x="300" y="80" width="180" height="160" class="box-hi" data-role="calls events raw"/>
+      <text x="390" y="112" class="t-title" data-role="calls events raw">fs-relay</text>
+      <text x="390" y="134" class="t-small" data-role="calls">HTTP server</text>
+      <text x="390" y="156" class="t-small" data-role="calls">token gate</text>
+      <text x="390" y="178" class="t-small" data-role="events">event fan-out</text>
+      <text x="390" y="200" class="t-small" data-role="calls events">lock table</text>
+      <text x="390" y="222" class="t-small" data-role="raw">raw splice loop</text>
+      <rect x="540" y="80" width="160" height="160" class="box" data-role="calls raw"/>
+      <text x="620" y="112" class="t-title" data-role="calls raw">disk</text>
+      <text x="620" y="136" class="t-small" data-role="calls raw">data/demo/</text>
+      <text x="620" y="158" class="t-small" data-role="calls">data/trips/</text>
+      <text x="620" y="186" class="t-small" data-role="calls raw">plain directories,</text>
+      <text x="620" y="206" class="t-small" data-role="calls raw">one tree per name</text>
+      <line x1="220" y1="85" x2="296" y2="120" class="wire" data-role="calls events raw"/>
+      <line x1="220" y1="235" x2="296" y2="200" class="wire" data-role="calls events"/>
+      <line x1="480" y1="160" x2="536" y2="160" class="wire" data-role="calls raw"/>
+      <text x="258" y="72" class="t-lab" data-role="calls raw">calls</text>
+      <text x="258" y="252" class="t-lab" data-role="calls events">calls / events</text>
+      <text x="508" y="148" class="t-lab" data-role="calls raw">files</text>
+    </g>
+  </svg>
+  <figcaption>Two mounts of one namespace share the same tree
+  through one server.</figcaption>
+  <div class="explorer-bar" role="group" aria-label="Inspect connection paths">
+    <div class="explorer-steps">
+      <button type="button" class="pill-btn" aria-pressed="true" data-step="all"
+        data-desc="All paths active: calls, event fan-out, and raw zero-copy splice.">All paths</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="calls"
+        data-desc="1 · Calls (/ws/ns or /fs/ns): FlatBuffers metadata and small I/O checked by the token gate.">1 · Calls</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="events"
+        data-desc="2 · Events: server hub fans out cache evictions and lock wake-ups to every connected mount.">2 · Events</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="raw"
+        data-desc="3 · Raw (/raw/ns): large reads and writes splice directly between disk and FUSE.">3 · Raw splice</button>
+    </div>
+    <span class="explorer-status" aria-live="polite">All paths active: calls, event fan-out, and raw zero-copy splice.</span>
+  </div>
+  </figure>
+  <p>Each mount keeps one connection to the server. The default
+  carries every call and every event on a single websocket.
+  Large reads and writes move to a separate raw connection,
+  where the kernel splices bytes without copying them through
+  the server process.</p>
+
+  <h2>Three connections, three jobs</h2>
+  <table>
+    <tr><th>Connection</th><th>Carries</th><th>Details</th></tr>
+    <tr><td>websocket <code>/ws/&lt;ns&gt;</code>
+      (or POST <code>/fs/&lt;ns&gt;</code>)</td>
+      <td>every filesystem call and its result</td>
+      <td><a href="wire.html">Wire</a></td></tr>
+    <tr><td>event stream (same socket, or the
+      <code>join</code> reply)</td>
+      <td>cache evictions, lock releases, heartbeat</td>
+      <td><a href="coherence.html">Coherence</a></td></tr>
+    <tr><td>raw <code>/raw/&lt;ns&gt;</code>
+      (upgraded TCP)</td>
+      <td>large reads and writes only</td>
+      <td><a href="raw.html">Raw path</a></td></tr>
+  </table>
+
+  <h2>Good for</h2>
+  <ul>
+    <li>Shared folders: media and content teams instead of
+      SMB/Samba.</li>
+    <li>Shared code space for coding agents.</li>
+    <li>Splitting a data engine from a SQL engine, as in the
+      <a href="compare.html#duckdb">DuckDB benchmark</a>.</li>
+  </ul>
+
+  <h2>Words used on these pages</h2>
+  <table>
+    <tr><th>Word</th><th>Meaning</th></tr>
+    <tr><td>namespace</td>
+      <td>the tenant directory name under <code>data/</code></td></tr>
+    <tr><td>inode</td>
+      <td>the protocol's number for a path, assigned by the
+        server; root is 1</td></tr>
+    <tr><td>fh</td><td>the server's number for an open file</td></tr>
+    <tr><td>method</td>
+      <td>the lowercased FUSE operation named in the envelope</td></tr>
+    <tr><td>relay</td>
+      <td>applying one request to the local tree</td></tr>
+  </table>
+
+  <h2>Keep reading</h2>
+  <ol class="toc">
+    <li><a href="run.html">Run it</a> — build, serve, mount,
+      and the smoke checklists.</li>
+    <li><a href="compare.html">Compare</a> — timings against
+      kvfs, s3fs, and NFS, plus DuckDB.</li>
+    <li><a href="wire.html">Wire</a> — envelope, methods, and
+      the two transports.</li>
+    <li><a href="coherence.html">Coherence</a> — caching,
+      write-back, evictions, rejoin.</li>
+    <li><a href="locks.html">Locks</a> — the lock table and
+      what SQLite needs.</li>
+    <li><a href="raw.html">Raw path</a> — the zero-copy
+      connection for large transfers.</li>
+    <li><a href="explainer.html">Explainer</a> — the
+      whole system in two and a half minutes.</li>
+  </ol>
+  <p class="note">These pages are prototypes. The contracts
+  live in <code>SPEC.md</code>, <code>README.md</code>, and
+  <code>ROADMAP.md</code>.</p>
+  <footer><span>fs-relay, explained</span><a href="run.html">Run it →</a></footer>
+</main>
+<script src="ui.js"></script>
+</body>
+</html>

@@ -58,7 +58,10 @@ func TestRootNegotiates(t *testing.T) {
 				assertHealth(t, body)
 				return
 			}
-			if !strings.Contains(res.Header.Get("Content-Type"), "text/html") || !strings.Contains(string(body), "Welcome to fs-relay server") {
+			if !strings.Contains(res.Header.Get("Content-Type"), "text/html") ||
+				!strings.Contains(string(body), "Welcome to fs-relay server") ||
+				!strings.Contains(string(body), "#0d1317") ||
+				!strings.Contains(string(body), "#f43f5e") {
 				t.Fatalf("html %s", res.Header.Get("Content-Type"))
 			}
 		})

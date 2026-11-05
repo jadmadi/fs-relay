@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wire — fs-relay, explained</title>
+<link rel="stylesheet" href="style.css">
+<meta name="description" content="The fs-relay wire: one FlatBuffers envelope over a websocket or POST transport.">
+<meta name="theme-color" content="#0d1317">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23f43f5e'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<nav aria-label="Pages">
+  <a class="brand" href="index.html">fs-relay</a>
+  <a href="index.html">Overview</a>
+  <a href="run.html">Run it</a>
+  <a href="compare.html">Compare</a>
+  <a href="wire.html" class="here">Wire</a>
+  <a href="coherence.html">Coherence</a>
+  <a href="locks.html">Locks</a>
+  <a href="raw.html">Raw path</a>
+  <a href="explainer.html">Explainer</a>
+</nav>
+<main id="main">
+  <h1>Wire</h1>
+  <p class="lede">FlatBuffers is the only filesystem
+  wire. Method names are the go-fuse methods, lowercased,
+  so a relay is a thin translation.</p>
+  <p class="verdict"><span class="q">How do mount and
+  server talk?</span> <strong>One FlatBuffers envelope
+  over two transports: a single websocket by default, or
+  one POST per call with <code>-post</code>.</strong>
+  Large bytes leave this wire for the
+  <a href="raw.html">raw path</a>.</p>
+
+  <h2>The envelope</h2>
+  <ul class="facts">
+    <li>Content type
+      <code>application/x-flatbuffers</code>, file
+      identifier <code>FSR1</code>. Schema:
+      <code>internal/wire/fsrelay.fbs</code>.</li>
+    <li>One buffer is one envelope. File bytes ride a
+      byte vector; one call carries at most 1 MiB.</li>
+    <li><code>params.namespace</code> must equal the URL
+      segment, or the request is refused.</li>
+    <li>Empty strings and empty byte vectors are absent.
+      A numeric zero is present — and
+      <code>valid</code> still says which setattr fields
+      count, so a size or owner of zero is applied.</li>
+    <li>A name of <code>.</code>, <code>..</code>, or one
+      containing <code>/</code> or NUL is
+      <code>EINVAL</code>.</li>
+    <li>Under <code>FSR1</code>, field identity is
+      declaration order: a table only grows by appending
+      a field. Anything else needs a new identifier.</li>
+  </ul>
+
+  <h2>Websocket transport (default)</h2>
+  <figure class="diagram" data-explorer="ws">
+  <svg viewBox="0 0 700 300" role="img"
+    aria-label="Websocket transport: one socket both directions">
+    <defs>
+      <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5"
+        markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#f43f5e"></path>
+      </marker>
+    </defs>
+    <g>
+      <line x1="140" y1="30" x2="140" y2="290" class="lane" data-role="hello call event"/>
+      <line x1="560" y1="30" x2="560" y2="290" class="lane" data-role="hello call event"/>
+      <text x="140" y="20" class="t-title" data-role="hello call event">Mount</text>
+      <text x="560" y="20" class="t-title" data-role="hello call event">Server</text>
+      <text x="350" y="62" class="t-mono" data-role="hello">GET /ws/ns</text>
+      <line x1="140" y1="70" x2="552" y2="70" class="wire"
+        style="marker-end:url(#arr2)" data-role="hello"/>
+      <text x="350" y="96" class="t-small" data-role="hello">one socket, both directions</text>
+      <text x="350" y="130" class="t-mono" data-role="hello">hello: client id, no call id</text>
+      <line x1="560" y1="138" x2="148" y2="138" class="wire"
+        style="marker-end:url(#arr2)" data-role="hello"/>
+      <text x="350" y="176" class="t-mono" data-role="call">call, id = N</text>
+      <line x1="140" y1="184" x2="552" y2="184" class="wire"
+        style="marker-end:url(#arr2)" data-role="call"/>
+      <text x="350" y="222" class="t-mono" data-role="call">result for id = N</text>
+      <line x1="560" y1="230" x2="148" y2="230" class="wire"
+        style="marker-end:url(#arr2)" data-role="call"/>
+      <text x="350" y="268" class="t-mono" data-role="event">event · ping / pong</text>
+      <line x1="560" y1="276" x2="148" y2="276" class="wire"
+        style="marker-end:url(#arr2)" data-role="event"/>
+    </g>
+  </svg>
+  <figcaption>Every call and every event is one binary
+  message. The frame is the framing — no length
+  prefix.</figcaption>
+  <div class="explorer-bar" role="group" aria-label="Step through websocket exchange">
+    <div class="explorer-steps">
+      <button type="button" class="pill-btn" aria-pressed="true" data-step="all"
+        data-desc="Full websocket lifecycle on a single TCP socket.">All</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="hello"
+        data-desc="1 · Handshake: GET /ws/ns upgrades; server immediately pushes signed client id (call id = 0).">1 · Handshake</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="call"
+        data-desc="2 · Multiplexed call: client sets nonzero id=N; server echoes id=N on result.">2 · Call (id=N)</button>
+      <button type="button" class="pill-btn" aria-pressed="false" data-step="event"
+        data-desc="3 · Push events & 2s ping/pong share the same socket with id=0.">3 · Events & ping</button>
+    </div>
+    <span class="explorer-status" aria-live="polite">Full websocket lifecycle on a single TCP socket.</span>
+  </div>
+  </figure>
+  <ul>
+    <li>The client sets a nonzero <code>id</code> on each
+      call; the server copies it onto every message for
+      that call. Calls overlap.</li>
+    <li>A filesystem failure carries the id and the
+      error. A non-errno fault carries the id and a fault
+      string, and the socket stays up.</li>
+    <li>A body that is not a call, an id of 0, a repeated
+      id, or a namespace mismatch closes the socket.</li>
+    <li>No <code>join</code> call: the server's first
+      message carries the client id. The server pings
+      every 2s; the mount answers.</li>
+  </ul>
+
+  <h2>POST transport (-post)</h2>
+  <figure class="diagram">
+  <svg viewBox="0 0 700 300" role="img"
+    aria-label="POST transport: a join stream plus one POST per call">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5"
+        markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#f43f5e"></path>
+      </marker>
+    </defs>
+    <g>
+      <line x1="140" y1="30" x2="140" y2="290" class="lane"/>
+      <line x1="560" y1="30" x2="560" y2="290" class="lane"/>
+      <text x="140" y="20" class="t-title">Mount</text>
+      <text x="560" y="20" class="t-title">Server</text>
+      <text x="350" y="62" class="t-mono">POST /fs/ns — join</text>
+      <line x1="140" y1="70" x2="552" y2="70" class="wire"/>
+      <text x="350" y="96" class="t-small">response stays open, chunked</text>
+      <text x="350" y="130" class="t-mono">chunk: signed client id</text>
+      <line x1="560" y1="138" x2="148" y2="138" class="wire"/>
+      <text x="350" y="176" class="t-mono">POST /fs/ns — call</text>
+      <line x1="140" y1="184" x2="552" y2="184" class="wire"/>
+      <text x="350" y="222" class="t-mono">result of that POST</text>
+      <line x1="560" y1="230" x2="148" y2="230" class="wire"/>
+      <text x="350" y="268" class="t-mono">chunk: event</text>
+      <line x1="560" y1="276" x2="148" y2="276" class="wire"/>
+    </g>
+  </svg>
+  <figcaption>Calls go up as separate POSTs; events come
+  down the join stream. Never the reverse.</figcaption>
+  </figure>
+  <ul>
+    <li>Each call is its own <code>POST
+      /fs/&lt;namespace&gt;</code>. The response is the
+      result, one envelope, with a
+      <code>Content-Length</code>. No request id — the
+      HTTP exchange is the correlation.</li>
+    <li>The client first sends <code>join</code>. That
+      response stays open for the life of the mount:
+      <code>Content-Type:
+      application/x-flatbuffers</code>, chunked. Each
+      event is one chunk holding a little-endian uint32
+      length and then one envelope.</li>
+    <li>A length above the body limit closes the stream.
+      The first event carries the signed client id; later
+      events are evictions or a lock release.</li>
+  </ul>
+
+  <h2>Methods</h2>
+  <div class="scroll"><table>
+    <tr><th>Method</th><th>Does</th></tr>
+    <tr><td><code>lookup</code></td><td>resolve a name under a parent inode</td></tr>
+    <tr><td><code>getattr</code></td><td>attributes of an inode (or open fh)</td></tr>
+    <tr><td><code>setattr</code></td><td>mode, owner, size, times per <code>valid</code> bits</td></tr>
+    <tr><td><code>access</code></td><td>permission check as the server user</td></tr>
+    <tr><td><code>statfs</code></td><td>filesystem statistics</td></tr>
+    <tr><td><code>mkdir</code></td><td>create a directory</td></tr>
+    <tr><td><code>create</code></td><td>create a file, return attr + fh</td></tr>
+    <tr><td><code>open</code></td><td>open a file, return fh (never with O_APPEND)</td></tr>
+    <tr><td><code>read</code></td><td>bytes at an offset, by fh or inode</td></tr>
+    <tr><td><code>reads</code></td><td>whole bodies of ≤32 small files (≤64 KiB each, ≤1 MiB); skips the rest</td></tr>
+    <tr><td><code>readdirs</code></td><td>list ≤32 directories in one call; skips misses</td></tr>
+    <tr><td><code>write</code></td><td>bytes at an offset on an fh</td></tr>
+    <tr><td><code>flush</code></td><td>no-op on the server; the mount reports earlier errors</td></tr>
+    <tr><td><code>fsync</code></td><td>sync an open file</td></tr>
+    <tr><td><code>release</code></td><td>optionally write trailing bytes, close the fh, drop its locks</td></tr>
+    <tr><td><code>opendir</code></td><td>check a directory opens</td></tr>
+    <tr><td><code>readdir</code></td><td>entries with attributes; assigns inodes</td></tr>
+    <tr><td><code>releasedir</code></td><td>same as release</td></tr>
+    <tr><td><code>unlink</code></td><td>remove a name</td></tr>
+    <tr><td><code>rmdir</code></td><td>remove an empty directory</td></tr>
+    <tr><td><code>rename</code></td><td>rename(2) semantics; RENAME_NOREPLACE honored, EXCHANGE/WHITEOUT are EINVAL</td></tr>
+    <tr><td><code>symlink</code></td><td>create a symlink</td></tr>
+    <tr><td><code>readlink</code></td><td>read a symlink target</td></tr>
+    <tr><td><code>join</code></td><td>not a filesystem call: opens the event stream (POST mode)</td></tr>
+    <tr><td><code>copyfilerange</code></td><td>copy up to <code>size</code> bytes fh→fh_out; short count is success; dest evicted</td></tr>
+    <tr><td><code>getlk</code></td><td>first conflicting lock, or F_UNLCK; never blocks</td></tr>
+    <tr><td><code>setlk</code></td><td>take or drop a lock; conflict is EAGAIN</td></tr>
+    <tr><td><code>setlkw</code></td><td>same try-once call; the mount waits and retries — see <a href="locks.html">Locks</a></td></tr>
+  </table></div>
+
+  <h2>Status codes</h2>
+  <div class="scroll"><table>
+    <tr><th>Status</th><th>Meaning</th></tr>
+    <tr><td class="num">200 + result</td><td>success</td></tr>
+    <tr><td class="num">200 + error</td><td>filesystem failure; <code>code</code> is a Linux errno</td></tr>
+    <tr><td class="num">400</td><td>bad body, unknown method, namespace mismatch, params that do not match the method, bad client id</td></tr>
+    <tr><td class="num">401</td><td><code>{"error":{"code":401,"message":"missing token"}}</code> or <code>"wrong token"</code>; the mount stops, no retry</td></tr>
+    <tr><td class="num">404</td><td>namespace does not exist; the mount stops</td></tr>
+    <tr><td class="num">500</td><td>a fault that is not an errno</td></tr>
+  </table></div>
+
+  <h2>Limits</h2>
+  <div class="scroll"><table>
+    <tr><th>Limit</th><th>Value</th><th>Why</th></tr>
+    <tr><td>one write</td><td class="num">1 MiB</td><td>also the mount's maximum write</td></tr>
+    <tr><td><code>reads</code></td><td class="num">32 inodes, 1 MiB</td><td>one listing's small files</td></tr>
+    <tr><td>prefetchable file</td><td class="num">64 KiB</td><td>bigger stays a normal read</td></tr>
+    <tr><td><code>readdirs</code></td><td class="num">32 dirs</td><td>one listing's child directories</td></tr>
+    <tr><td><code>copyfilerange</code></td><td class="num">1 GiB</td><td>count fits a uint32</td></tr>
+    <tr><td>namespace</td><td class="num">64 bytes</td><td><code>[A-Za-z0-9_-]+</code>, checked before any file is touched</td></tr>
+    <tr><td>token</td><td class="num">≥ 8 chars</td><td>same alphabet; capitals distinct</td></tr>
+  </table></div>
+
+  <h2>Client identity</h2>
+  <p>The server names a mount with a UUIDv7 and returns
+  <code>&lt;uuid&gt;.&lt;signature&gt;</code>. The
+  signature is HMAC-SHA256 of the uuid keyed by the
+  secret, URL-safe base64, no padding. A rejoin presents
+  the whole string; the server re-signs and accepts only
+  a match. Anything else is 400. The secret itself never
+  appears in a response, a client id, or a URL.</p>
+
+  <h2>Refusals</h2>
+  <p>POSIX allows a filesystem to refuse these. The
+  caller gets an error on that call; the rest of the
+  file still reads and writes.</p>
+  <div class="scroll"><table>
+    <tr><th>Not implemented</th><th>Caller sees</th><th>Why it is safe</th></tr>
+    <tr><td>hard links</td><td class="num">EPERM</td><td>SQLite, DuckDB, tar, and rsync continue; <code>ansible.tar</code> has none</td></tr>
+    <tr><td>extended attributes</td><td class="num">EOPNOTSUPP</td><td>default tar, rsync, SQLite, and DuckDB never look</td></tr>
+    <tr><td>ACLs</td><td class="num">EOPNOTSUPP</td><td>one server user; mode bits still apply</td></tr>
+    <tr><td>device nodes</td><td class="num">EPERM</td><td>needs a privilege neither end has — same as a local disk</td></tr>
+    <tr><td>fifos, sockets</td><td class="num">ENOSYS</td><td>local pipes never reach the server</td></tr>
+    <tr><td>fallocate</td><td class="num">EOPNOTSUPP</td><td>callers write the bytes instead</td></tr>
+    <tr><td>RENAME_EXCHANGE / WHITEOUT</td><td class="num">EINVAL</td><td>Linux-only flags; plain <code>mv</code> and NOREPLACE work</td></tr>
+    <tr><td>directory fsync</td><td class="num">ENOSYS</td><td>the server syncs the parent inside rename, create, unlink</td></tr>
+    <tr><td>WAL mode</td><td class="num">fails</td><td>needs shared memory; rollback journal is the supported mode</td></tr>
+  </table></div>
+  <footer><a href="compare.html">← Compare</a><a href="coherence.html">Coherence →</a></footer>
+</main>
+<script src="ui.js"></script>
+</body>
+</html>

@@ -20,55 +20,110 @@ const landingPage = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d1317">
 <title>fs-relay</title>
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --canvas: #0d1317;
+    --raised: #161e23;
+    --sunken: #080d10;
+    --border: #232e34;
+    --text-primary: #eef2f4;
+    --text-secondary: #c3ced4;
+    --text-tertiary: #8b98a1;
+    --accent: #f43f5e;
+    --accent-soft: #fda4af;
+    --accent-deep: #be123c;
+    --accent-wash: #2b1119;
+    --font-display: system-ui, "Segoe UI", "Avenir Next", sans-serif;
+    --font-body: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
   * { box-sizing: border-box; }
-  html { scrollbar-color: #8a5a3a #14110e; }
+  html {
+    scrollbar-color: var(--accent-deep) var(--canvas);
+    -webkit-font-smoothing: antialiased;
+  }
   body {
     margin: 0;
     min-height: 100vh;
     display: grid;
-    align-items: end;
+    align-items: center;
     background:
-      radial-gradient(ellipse 70% 45% at 8% -10%, #4a2a18 0%, transparent 58%),
-      #14110e;
-    color: #f4ecdf;
-    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      radial-gradient(ellipse 70% 35% at 8% 0%, rgb(244 63 94 / 0.10) 0%, transparent 58%),
+      var(--canvas);
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 1.125rem;
+    line-height: 1.65;
   }
-  ::selection { background: #e07a3d; color: #1a120c; }
+  ::selection { background: var(--accent); color: #160509; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   main {
-    padding: clamp(2.5rem, 8vh, 6rem) clamp(1.5rem, 6vw, 7rem) clamp(3rem, 10vh, 7rem);
-    max-width: 46rem;
+    padding: clamp(2rem, 6vh, 4rem) clamp(1.25rem, 5vw, 4rem);
+    max-width: 48rem;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-soft);
+    background: var(--accent-wash);
+    border: 1px solid var(--accent-deep);
+    border-radius: 9999px;
+    padding: 0.2rem 0.65rem;
+    margin-bottom: 1rem;
+  }
+  .badge::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--accent);
   }
   h1 {
     margin: 0;
-    max-width: 11ch;
-    font-size: clamp(3.4rem, 9vw, 6rem);
-    font-weight: 560;
-    line-height: 0.9;
+    max-width: 16ch;
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-weight: 700;
+    line-height: 1.05;
     letter-spacing: -0.035em;
+    color: var(--text-primary);
     text-wrap: balance;
   }
   h1::after {
     content: "";
     display: block;
-    width: 4.75rem;
+    width: 4.5rem;
     height: 3px;
-    margin-top: 1.4rem;
-    background: #e07a3d;
+    margin-top: 1.25rem;
+    background: var(--accent);
     transform-origin: left center;
-    animation: rule 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: rule 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
   p {
-    margin: 1.75rem 0 0;
-    max-width: 34ch;
-    font-family: "Avenir Next", "Segoe UI", sans-serif;
-    font-size: 1.125rem;
-    line-height: 1.45;
-    color: #f0d7c4;
+    margin: 1.25rem 0 0;
+    max-width: 52ch;
+    color: var(--text-secondary);
   }
-  :focus-visible { outline: 2px solid #e07a3d; outline-offset: 3px; }
+  pre {
+    margin: 1.25rem 0 0;
+    padding: 0.9rem 1.15rem;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    border-radius: 0.625rem;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    overflow-x: auto;
+  }
   @keyframes rule { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   @media (prefers-reduced-motion: reduce) {
     h1::after { animation: none; }
@@ -77,9 +132,11 @@ const landingPage = `<!DOCTYPE html>
 </head>
 <body>
 <main>
+  <div class="badge">status: ok</div>
   <h1>Welcome to fs-relay server</h1>
-  <p>A fast network filesystem. Mount it with fs-relay-bind.</p>
-  <p>Pass the server's token to the mount with -token.</p>
+  <p>A fast network filesystem over HTTP — about 10x faster than s3fs and NFS on real directory trees, with no root required.</p>
+  <p>Mount a namespace on any Linux host with fs-relay-bind and pass the server's token with -token or -token-file:</p>
+  <pre>fs-relay-bind -url http://127.0.0.1:8080 -ns default -token-file ~/.config/fs-relay/token /mnt/fs-relay</pre>
 </main>
 </body>
 </html>

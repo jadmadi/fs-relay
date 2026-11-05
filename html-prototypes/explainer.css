@@ -1,0 +1,275 @@
+/* Explainer player. Reuses style.css tokens. Zero motion
+   unless the scene is active; zero JS means stacked
+   scenes with the full script as text. */
+
+.stage {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  background: var(--surface-sunken);
+  box-shadow: var(--ring-subtle), var(--shadow-raised);
+  position: relative;
+  cursor: pointer;
+}
+
+.js .stage {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.scene { display: block; padding: var(--space-md); }
+.js .scene {
+  display: none;
+  height: 100%;
+}
+.js .scene.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scene svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+/* Full script doubles as the no-JS fallback. */
+.script {
+  list-style: none;
+  padding: var(--space-md) 0 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+.js .script { display: none; }
+.script li::before { content: "— "; color: var(--accent); }
+
+/* ---- transport ---- */
+
+.transport { display: none; }
+.js .transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  align-items: center;
+  margin-top: var(--space-md);
+}
+
+.transport button {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-md);
+  cursor: pointer;
+  touch-action: manipulation;
+  outline: 2px solid transparent;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    outline-color var(--duration-fast) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .transport button:hover { background: var(--surface-overlay); }
+}
+
+.transport button:active { transform: scale(0.97); }
+
+.transport button:focus-visible {
+  outline-color: var(--border-focus);
+  outline-offset: 2px;
+}
+
+#btn-play {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+  min-width: 4.5rem;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #btn-play:hover { background: var(--accent-deep); }
+}
+
+.progress {
+  flex: 1 1 10rem;
+  height: var(--space-sm);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  position: relative;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.progress .fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+}
+
+.progress::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--seek-pct, 0%);
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--text-primary);
+  border: 2px solid var(--accent);
+  transform: translate(-50%, -50%) scale(0.9);
+  transition: transform var(--duration-fast) var(--ease-out);
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .progress:hover::after { transform: translate(-50%, -50%) scale(1.15); }
+}
+
+.progress.scrubbing::after { transform: translate(-50%, -50%) scale(1.25); }
+
+.clock {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chapters {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  flex-basis: 100%;
+}
+
+.chapters button {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.chapters button.here {
+  color: var(--text-primary);
+  background: var(--accent-wash);
+  border-color: var(--accent);
+}
+
+#caption {
+  display: none;
+  min-height: 3.3em;
+  margin-top: var(--space-md);
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+  max-width: var(--measure);
+}
+.js #caption { display: block; }
+
+/* ---- scene motion: ambient packet loops & smooth transitions ---- */
+
+.pkt { fill: var(--accent); opacity: 0.9; display: none; }
+.pkt-dim { fill: var(--text-tertiary); opacity: 0.7; display: none; }
+
+.js .scene.active .pkt,
+.js .scene.active .pkt-dim {
+  display: block;
+  animation: drift 2.4s var(--ease-out) infinite;
+}
+
+@keyframes drift {
+  from { offset-distance: 0%; }
+  to { offset-distance: 100%; }
+}
+
+.paused .scene *,
+.paused .scene {
+  animation-play-state: paused !important;
+}
+
+/* JS-driven transitions. Resting states apply only with
+   JS: without it every scene shows fully. */
+.js .grow {
+  transform-box: fill-box;
+  transform-origin: left center;
+  transform: scaleX(0.02);
+}
+
+.js .step {
+  opacity: 0.3;
+  transition: opacity var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+.step.on { opacity: 1; }
+
+.js .flash {
+  opacity: 0;
+  transform: translateY(4px);
+  transform-box: fill-box;
+  transition: opacity var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+.flash.on {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.js .fadeable {
+  opacity: 0;
+  transform: translateY(4px);
+  transform-box: fill-box;
+  transition: opacity var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+.fadeable.on {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tty-caret {
+  fill: var(--accent);
+  animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink { to { opacity: 0; } }
+
+/* Reduced motion: no ambient loops, no caret blink. */
+@media (prefers-reduced-motion: reduce) {
+  .js .scene.active .pkt,
+  .js .scene.active .pkt-dim {
+    display: none;
+    animation: none;
+  }
+  .tty-caret { animation: none; }
+}
+
+@media (max-width: 44rem) {
+  .scene { padding: var(--space-sm); }
+  #caption { font-size: var(--text-base); }
+}
+
+/* Explainer-only diagram pieces. */
+.zone {
+  fill: none;
+  stroke: var(--border-default);
+  stroke-width: 1.5;
+  rx: 8;
+  transition: stroke var(--duration-base) var(--ease-out);
+}
+.zone.on { stroke: var(--accent); }
+
+#sc1 .wire { marker-end: url(#m1); }
+#sc3 .wire { marker-end: url(#m3); }
+#sc4 .wire { marker-end: url(#m4); }
+#sc4 .wire-dim { marker-end: url(#m4dim); }
+#sc6 .wire { marker-end: url(#m6); }
+#sc7 .wire { marker-end: url(#m7); }
+#sc8 .wire { marker-end: url(#m8); }
