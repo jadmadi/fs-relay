@@ -1,6 +1,25 @@
-/* Explainer player. Reuses style.css tokens. Zero motion
-   unless the scene is active; zero JS means stacked
-   scenes with the full script as text. */
+/* Explainer cinema player. Reuses style.css tokens.
+   Zero JS means stacked scenes with the full script as text. */
+
+.player {
+  margin-top: var(--space-md);
+}
+
+.js .player {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  background: var(--surface-sunken);
+  box-shadow: var(--ring-subtle), var(--shadow-overlay);
+  overflow: hidden;
+}
+
+.player:fullscreen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--surface-sunken);
+  padding: var(--space-md);
+}
 
 .stage {
   border: 1px solid var(--border-default);
@@ -8,23 +27,130 @@
   background: var(--surface-sunken);
   box-shadow: var(--ring-subtle), var(--shadow-raised);
   position: relative;
-  cursor: pointer;
 }
 
 .js .stage {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   aspect-ratio: 16 / 9;
   overflow: hidden;
+  cursor: pointer;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(244, 63, 94, 0.08), transparent 68%),
+    linear-gradient(180deg, rgba(20, 29, 34, 0.55) 0%, rgba(9, 13, 16, 0.95) 100%);
 }
 
-.scene { display: block; padding: var(--space-md); }
-.js .scene {
+/* ---- in-stage HUD & play overlay ---- */
+
+.hud-top,
+.play-overlay,
+.caption-wrap {
   display: none;
-  height: 100%;
 }
-.js .scene.active {
+
+.js .hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: absolute;
+  top: var(--space-md);
+  inset-inline: var(--space-md);
+  z-index: 6;
+  pointer-events: none;
+}
+
+.hud-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  background: rgba(9, 13, 16, 0.82);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2xs) var(--space-sm);
+  backdrop-filter: blur(8px);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.paused .hud-dot {
+  background: var(--text-tertiary);
+  box-shadow: none;
+}
+
+.js .play-overlay {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 50%;
+  width: 4.25rem;
+  height: 4.25rem;
+  margin-top: -2.125rem;
+  margin-inline-start: -2.125rem;
+  border-radius: var(--radius-pill);
+  background: rgba(13, 19, 23, 0.86);
+  border: 1.5px solid var(--accent);
+  color: var(--text-primary);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 0 6px var(--accent-wash);
+  cursor: pointer;
+  z-index: 7;
+  opacity: 0;
+  transform: scale(1.1);
+  pointer-events: none;
+  transition: opacity var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+.paused .play-overlay {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .paused .play-overlay:hover {
+    background: var(--accent);
+    color: var(--gray-950);
+    transform: scale(1.06);
+  }
+}
+
+/* ---- scenes & smooth crossfade + camera ---- */
+
+.scene { display: block; padding: var(--space-md); }
+
+.js .scene {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: var(--space-xl) var(--space-lg) 3.75rem;
+  opacity: 0;
+  transform: scale(0.985);
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity var(--duration-slow) var(--ease-out),
+    transform var(--duration-slow) var(--ease-out);
+}
+
+.js .scene.active {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+  z-index: 2;
 }
 
 .scene svg {
@@ -32,6 +158,11 @@
   width: 100%;
   height: 100%;
   max-height: 100%;
+}
+
+.js .cam {
+  transform-origin: 360px 200px;
+  transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Full script doubles as the no-JS fallback. */
@@ -45,26 +176,155 @@
 .js .script { display: none; }
 .script li::before { content: "— "; color: var(--accent); }
 
-/* ---- transport ---- */
+/* ---- lower-third closed captions inside the stage ---- */
+
+.js .caption-wrap {
+  display: flex;
+  justify-content: center;
+  position: absolute;
+  bottom: var(--space-md);
+  inset-inline: var(--space-md);
+  z-index: 6;
+  pointer-events: none;
+}
+
+#caption {
+  margin: 0;
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-body);
+  font-size: clamp(var(--text-sm), 1.8vw, var(--text-lg));
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  background: rgba(9, 13, 16, 0.88);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  text-align: center;
+  max-width: 56ch;
+  transition: opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+#caption:empty { opacity: 0; }
+
+/* ---- attached cinema control deck ---- */
 
 .transport { display: none; }
 .js .transport {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border-default);
+}
+
+.progress {
+  width: 100%;
+  height: 0.5rem;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-pill);
+  position: relative;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.seg-track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 2px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.seg-tick {
+  height: 100%;
+  border-inline-end: 2px solid var(--surface-raised);
+}
+
+.progress .fill {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+  z-index: 1;
+}
+
+.progress::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  inset-inline-start: var(--seek-pct, 0%);
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: var(--radius-pill);
+  background: var(--text-primary);
+  border: 2px solid var(--accent);
+  transform: translate(-50%, -50%) scale(0.9);
+  transition: transform var(--duration-fast) var(--ease-out);
+  pointer-events: none;
+  z-index: 3;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .progress:hover::after { transform: translate(-50%, -50%) scale(1.18); }
+}
+
+.progress.scrubbing::after { transform: translate(-50%, -50%) scale(1.28); }
+
+.scrub-tip {
+  position: absolute;
+  bottom: 1.1rem;
+  inset-inline-start: var(--hover-pct, 0%);
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xs);
+  padding: 2px var(--space-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+  z-index: 5;
+}
+
+.progress:hover .scrub-tip,
+.progress.scrubbing .scrub-tip {
+  opacity: 1;
+}
+
+.ctrl-row {
+  display: flex;
   flex-wrap: wrap;
-  gap: var(--space-sm) var(--space-md);
   align-items: center;
-  margin-top: var(--space-md);
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.ctrl-left,
+.ctrl-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 .transport button {
   font-family: var(--font-display);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   color: var(--text-primary);
-  background: var(--surface-raised);
+  background: var(--surface-sunken);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  padding: var(--space-xs) var(--space-md);
+  padding: var(--space-xs) var(--space-sm);
   cursor: pointer;
   touch-action: manipulation;
   outline: 2px solid transparent;
@@ -85,57 +345,13 @@
   outline-offset: 2px;
 }
 
-#btn-play {
+#btn-play,
+.transport button[aria-pressed="true"] {
   background: var(--accent-wash);
   border-color: var(--accent);
-  min-width: 4.5rem;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  #btn-play:hover { background: var(--accent-deep); }
-}
-
-.progress {
-  flex: 1 1 10rem;
-  height: var(--space-sm);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-pill);
-  position: relative;
-  cursor: pointer;
-  touch-action: none;
-}
-
-.progress .fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 0%;
-  background: var(--accent);
-  border-radius: var(--radius-pill);
-}
-
-.progress::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: var(--seek-pct, 0%);
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: var(--radius-pill);
-  background: var(--text-primary);
-  border: 2px solid var(--accent);
-  transform: translate(-50%, -50%) scale(0.9);
-  transition: transform var(--duration-fast) var(--ease-out);
-  pointer-events: none;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .progress:hover::after { transform: translate(-50%, -50%) scale(1.15); }
-}
-
-.progress.scrubbing::after { transform: translate(-50%, -50%) scale(1.25); }
+#btn-play { min-width: 4.25rem; }
 
 .clock {
   font-family: var(--font-mono);
@@ -143,17 +359,17 @@
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  padding-inline: var(--space-xs);
 }
 
 .chapters {
   display: flex;
   gap: var(--space-xs);
   flex-wrap: wrap;
-  flex-basis: 100%;
 }
 
 .chapters button {
-  padding: var(--space-xs) var(--space-sm);
+  padding: var(--space-2xs) var(--space-sm);
   font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
@@ -164,25 +380,15 @@
   border-color: var(--accent);
 }
 
-#caption {
-  display: none;
-  min-height: 3.3em;
-  margin-top: var(--space-md);
-  font-size: var(--text-lg);
-  color: var(--text-primary);
-  max-width: var(--measure);
-}
-.js #caption { display: block; }
+/* ---- scene motion & packet choreography ---- */
 
-/* ---- scene motion: ambient packet loops & smooth transitions ---- */
-
-.pkt { fill: var(--accent); opacity: 0.9; display: none; }
-.pkt-dim { fill: var(--text-tertiary); opacity: 0.7; display: none; }
+.pkt { fill: var(--accent); opacity: 0.95; display: none; }
+.pkt-dim { fill: var(--text-tertiary); opacity: 0.75; display: none; }
 
 .js .scene.active .pkt,
 .js .scene.active .pkt-dim {
   display: block;
-  animation: drift 2.4s var(--ease-out) infinite;
+  animation: drift 2.2s var(--ease-out) infinite;
 }
 
 @keyframes drift {
@@ -195,8 +401,6 @@
   animation-play-state: paused !important;
 }
 
-/* JS-driven transitions. Resting states apply only with
-   JS: without it every scene shows fully. */
 .js .grow {
   transform-box: fill-box;
   transform-origin: left center;
@@ -204,24 +408,13 @@
 }
 
 .js .step {
-  opacity: 0.3;
+  opacity: 0.28;
   transition: opacity var(--duration-base) var(--ease-out),
     transform var(--duration-base) var(--ease-out);
 }
 .step.on { opacity: 1; }
 
-.js .flash {
-  opacity: 0;
-  transform: translateY(4px);
-  transform-box: fill-box;
-  transition: opacity var(--duration-base) var(--ease-out),
-    transform var(--duration-base) var(--ease-out);
-}
-.flash.on {
-  opacity: 1;
-  transform: translateY(0);
-}
-
+.js .flash,
 .js .fadeable {
   opacity: 0;
   transform: translateY(4px);
@@ -229,6 +422,7 @@
   transition: opacity var(--duration-base) var(--ease-out),
     transform var(--duration-base) var(--ease-out);
 }
+.flash.on,
 .fadeable.on {
   opacity: 1;
   transform: translateY(0);
@@ -241,22 +435,6 @@
 
 @keyframes blink { to { opacity: 0; } }
 
-/* Reduced motion: no ambient loops, no caret blink. */
-@media (prefers-reduced-motion: reduce) {
-  .js .scene.active .pkt,
-  .js .scene.active .pkt-dim {
-    display: none;
-    animation: none;
-  }
-  .tty-caret { animation: none; }
-}
-
-@media (max-width: 44rem) {
-  .scene { padding: var(--space-sm); }
-  #caption { font-size: var(--text-base); }
-}
-
-/* Explainer-only diagram pieces. */
 .zone {
   fill: none;
   stroke: var(--border-default);
@@ -265,6 +443,27 @@
   transition: stroke var(--duration-base) var(--ease-out);
 }
 .zone.on { stroke: var(--accent); }
+
+svg .row-hi {
+  fill: var(--accent-soft) !important;
+  font-weight: var(--font-bold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js .scene.active .pkt,
+  .js .scene.active .pkt-dim {
+    display: none;
+    animation: none;
+  }
+  .tty-caret { animation: none; }
+  .js .cam { transition: none; }
+}
+
+@media (max-width: 44rem) {
+  .js .scene { padding: var(--space-lg) var(--space-xs) 2.75rem; }
+  .hud-tc { display: none; }
+  #caption { font-size: var(--text-xs); padding: 2px var(--space-xs); }
+}
 
 #sc1 .wire { marker-end: url(#m1); }
 #sc3 .wire { marker-end: url(#m3); }
