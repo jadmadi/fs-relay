@@ -49,18 +49,6 @@
 
 <main class="workspace">
   <section class="viewport-wrap" aria-label="Interactive 3D system diagram">
-    <canvas id="canvas3d" tabindex="0" aria-label="Three.js 3D interactive topology of fs-relay. Use mouse to orbit, scroll to zoom, or click any structure to inspect."></canvas>
-
-    <div class="hud-overlay">
-      <div class="hud-badge" id="hud-hover">
-        <span class="dot"></span>
-        <span id="hud-hover-text">Drag to orbit · Scroll to zoom · Click any 3D structure</span>
-      </div>
-      <div class="hud-telemetry" id="hud-telemetry">IDLE · 10 structures online</div>
-    </div>
-
-    <div class="label-layer" id="label-layer" aria-hidden="true"></div>
-
     <aside class="guide-card" id="guide-card" role="region" aria-label="Guided lifecycle walkthrough and tips">
       <div class="guide-top">
         <div class="guide-meta">
@@ -73,8 +61,10 @@
           <button type="button" class="pill-btn" id="btn-guide-next" aria-label="Next step">Next →</button>
         </div>
       </div>
-      <h2 class="guide-title" id="guide-title">1. Mount &amp; WebSocket Handshake</h2>
-      <p class="guide-body" id="guide-body">An unprivileged user runs fs-relay-bind. It opens one persistent WebSocket to the server and receives a UUIDv7 session ID.</p>
+      <div class="guide-copy">
+        <h2 class="guide-title" id="guide-title">1. Mount &amp; WebSocket Handshake</h2>
+        <p class="guide-body" id="guide-body">An unprivileged user runs fs-relay-bind. It opens one persistent WebSocket to the server and receives a UUIDv7 session ID.</p>
+      </div>
       <div class="guide-tip-row">
         <button type="button" class="guide-tip-btn" id="btn-guide-tip">
           <span class="tip-tag">TRY THIS TIP</span>
@@ -82,6 +72,20 @@
         </button>
       </div>
     </aside>
+
+    <div class="canvas-stage" id="canvas-stage">
+      <canvas id="canvas3d" tabindex="0" aria-label="Three.js 3D interactive topology of fs-relay. Use mouse to orbit, scroll to zoom, or click any structure to inspect."></canvas>
+
+      <div class="hud-overlay">
+        <div class="hud-badge" id="hud-hover">
+          <span class="dot"></span>
+          <span id="hud-hover-text">Drag to orbit · Scroll to zoom · Click any 3D structure</span>
+        </div>
+        <div class="hud-telemetry" id="hud-telemetry">IDLE · 10 structures online</div>
+      </div>
+
+      <div class="label-layer" id="label-layer" aria-hidden="true"></div>
+    </div>
 
     <div class="sim-dock" role="region" aria-label="Live protocol simulations">
       <div class="sim-buttons">

@@ -283,7 +283,7 @@ function playTone(freq = 520, dur = 0.06, type = 'sine', gainVal = 0.04) {
 }
 
 // --- Three.js Scene Initialization ---
-const stageEl = document.querySelector('.viewport-wrap');
+const stageEl = document.getElementById('canvas-stage');
 const canvasEl = document.getElementById('canvas3d');
 const labelLayer = document.getElementById('label-layer');
 
@@ -855,6 +855,7 @@ guideToggleBtn.addEventListener('click', () => {
   guideToggleBtn.setAttribute('aria-pressed', String(!hidden));
   guideToggleBtn.textContent = hidden ? 'Guided Tour: Off' : 'Guided Tour: On';
   if (hidden) stopGuideAutoPlay();
+  resizeRenderer();
 });
 
 // --- Raycaster Pointer Interaction ---

@@ -210,7 +210,17 @@ body {
 }
 
 .viewport-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.canvas-stage {
   position: relative;
+  flex: 1;
   min-width: 0;
   min-height: 0;
   background:
@@ -306,19 +316,14 @@ body {
 /* ---- bottom simulation dock ---- */
 
 .sim-dock {
-  position: absolute;
-  bottom: var(--space-md);
-  inset-inline: var(--space-md);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm) var(--space-md);
-  padding: var(--space-sm) var(--space-md);
-  background: rgba(13, 19, 23, 0.90);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  backdrop-filter: blur(10px);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border-default);
   z-index: 10;
 }
 
@@ -612,32 +617,29 @@ body {
 }
 
 .guide-card {
-  position: absolute;
-  top: 3.6rem;
-  inset-inline-start: var(--space-md);
-  width: min(32rem, calc(100% - 2rem));
-  background: rgba(13, 19, 23, 0.90);
-  border: 1px solid var(--accent-700);
-  border-radius: var(--radius-lg);
-  padding: var(--space-sm) var(--space-md);
-  backdrop-filter: blur(10px);
+  display: grid;
+  grid-template-columns: auto minmax(14rem, 1fr) minmax(15rem, 22rem);
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--accent-700);
+  padding: var(--space-xs) var(--space-md);
   z-index: 11;
-  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
 }
 
 .guide-card.hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(0.5rem);
+  display: none;
 }
 
 .guide-top {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-2xs);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2xs);
+}
+
+.guide-copy {
+  min-width: 0;
 }
 
 .guide-meta {
@@ -697,17 +699,17 @@ body {
 
 .guide-title {
   font-family: var(--font-serif);
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.2rem;
+  margin: 0 0 0.15rem;
 }
 
 .guide-body {
-  font-size: 0.82rem;
-  line-height: 1.45;
+  font-size: 0.78rem;
+  line-height: 1.38;
   color: var(--text-secondary);
-  margin: 0 0 var(--space-xs);
+  margin: 0;
 }
 
 .guide-tip-btn {
