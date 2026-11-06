@@ -33,6 +33,7 @@ release:
     mkdir -p dist
     just _pack amd64
     just _pack arm64
+    (cd dist && sha256sum fs-relay-linux-*.tar.gz > checksums.txt)
 
 # regenerate internal/wire/fsrelay_generated.go from the schema
 flatc:

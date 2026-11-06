@@ -56,7 +56,7 @@ func misplacedFlag(args []string) string {
 func usageText(fs *flag.FlagSet) string {
 	var b strings.Builder
 	b.WriteString("fs-relay-bind mounts an fs-relay namespace with FUSE.\n\n")
-	b.WriteString("Usage:\n  fs-relay-bind [flags] <mountpoint>\n\n")
+	b.WriteString("Usage:\n  fs-relay-bind [flags] <mountpoint>\n  fs-relay-bind update\n  fs-relay-bind version\n  fs-relay-bind help\n\n")
 	b.WriteString("Example:\n  fs-relay-bind -url http://127.0.0.1:8080 -ns demo -token local-demo /mnt/fs-relay\n\n")
 	b.WriteString("Version:\n  " + versionLine("fs-relay-bind") + "\n\n")
 	b.WriteString("Flags:\n")
