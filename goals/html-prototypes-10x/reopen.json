@@ -4,7 +4,8 @@
   "reopened_by": "agent",
   "reason": "Add Option 3 combined auto-play guided lifecycle tour and interactive coaching tips to interactive-prototype/",
   "original_commit": "d6e1b64",
-  "resolved_at": "0001-01-01T00:00:00Z",
-  "active": true,
+  "resolved_commit": "1f2a446",
+  "resolved_at": "2026-11-06T00:22:46.312860133Z",
+  "active": false,
   "reopen_epoch": 4
 }

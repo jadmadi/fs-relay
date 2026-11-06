@@ -4,10 +4,10 @@
   "level": "L3",
   "outcome": "passed",
   "method": "audit",
-  "spec_hash": "238657d3a469d291c1addb75c870823ee6c1bd94088c353ce73445b1b8d27d44",
+  "spec_hash": "4f0b3da2e5c168253275e97ca0ea9b4d761091c7ca293747f6089cf3c60551f3",
   "subject": {
     "algorithm": "sha256",
-    "hash": "344814f4a5137d5c30dd97ec43cf12843ffd8954f17466b57ea2257dd7bdcf26",
+    "hash": "bc7f9bf74f919025c40aba2df80c9264864825b85bd3e8e8e20ccf3e92375ee6",
     "paths": [
       {
         "path": ".ui-craft/brief.md",
@@ -117,17 +117,17 @@
       {
         "path": "interactive-prototype/app.js",
         "kind": "file",
-        "hash": "0714656c3dcc9745e0bb52e933b7f95ba36cc67e10144274104c8044795f9515"
+        "hash": "c71cf2cf81a41a99137f386095ba9d0f81bec96cebfceccda6f8df23bbc92b58"
       },
       {
         "path": "interactive-prototype/index.html",
         "kind": "file",
-        "hash": "6c68277611d763881ff0ea37e262c873afd11068d6299c42a06c30b1cea4cda7"
+        "hash": "5333272dd029b1ceb3a2ff9443daabf1e07359c976f269d0695ce6b28ba3af86"
       },
       {
         "path": "interactive-prototype/style.css",
         "kind": "file",
-        "hash": "561af30253ac63538efbb467d085d8d9090126ea33d7cdf9bbc94d50ea95d959"
+        "hash": "59a78de1a35d97d7f8b6fc9ebb37fcb54f2dcb857eeb5f6d25d15c723d41577e"
       },
       {
         "path": "interactive-prototype/vendor/controls/OrbitControls.js",
@@ -148,6 +148,6 @@
     "sila_version": "dev+b8acfdcc-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "58a87d56dce6e9a52fdebe4e22b7cf86ee91ce6dfab5f199e52946d5de14d819",
-  "verified_at": "2026-11-06T00:08:53Z"
+  "previous": "84b8f9f0924f95861f55b9bb52b7fdc632413083461a6955d451879c4e5706c5",
+  "verified_at": "2026-11-06T00:22:50Z"
 }
