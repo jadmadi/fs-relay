@@ -7,12 +7,12 @@
   "spec_hash": "7637aa59c9579c5a1adf4bddc29b936e6fc36f0c5f1a515c7669dcf1a5067a60",
   "subject": {
     "algorithm": "sha256",
-    "hash": "5e1bbf1e9e2af7d7d89552d91a3cb64bee49c627a4407a9cfa3fac13d511b906",
+    "hash": "f2a84894c76cbea9e6dd2805a56576a35a550597f9038dc4ec44f04620b94fdd",
     "paths": [
       {
         "path": "cmd/fs-relay",
         "kind": "dir",
-        "hash": "de6d228f1d18235eb082a29e6c21949f0bde2a5be18153702d9d009cfef2d383"
+        "hash": "4f5edad4209b9441c5fe3386c37e7c50ef9f59a53b5ef857f71ea156220fce25"
       },
       {
         "path": "cmd/fs-relay-bind",
@@ -50,9 +50,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+1e4a5d73-dirty",
+    "sila_version": "dev+b77059ef-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "b357e1ae93595e423485abec00f3f5afd9ea970f6d233e3b43fa32061ed48b5b",
-  "verified_at": "2026-11-06T19:15:21Z"
+  "previous": "3481e7ad68e473da7bda101102675360c27d6fe5c49ae0e82a7ff5c647c05598",
+  "verified_at": "2026-11-06T20:41:38Z"
 }

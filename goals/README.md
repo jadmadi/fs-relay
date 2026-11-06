@@ -54,5 +54,5 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `daa9689` |
 | [`lock-wake-races`](lock-wake-races/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `63427fd` |
 | [`bind-sigint-busy`](bind-sigint-busy/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `532649e` |
-| [`single-serve-data-lock`](single-serve-data-lock/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `adb1ce1` |
+| [`single-serve-data-lock`](single-serve-data-lock/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `b202259` |
 | [`self-update-and-version-check`](self-update-and-version-check/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `2f082aa` |

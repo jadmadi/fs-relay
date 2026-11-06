@@ -4,10 +4,10 @@
   "level": "L1",
   "outcome": "passed",
   "method": "evidence",
-  "spec_hash": "ace98c3362917bb76788d62103fe36932eeb892e5f9c6762e92f676d34e8ab24",
+  "spec_hash": "b7848b430abe3ae2fafa503333c6e7985dee5529bfa6195fdc5675109f7919d0",
   "subject": {
     "algorithm": "sha256",
-    "hash": "d2858d7c0b931d79a095d8309d118d4fe001dfeecc1ebc71eb7420b67f20cbc0",
+    "hash": "5c884b309f86f5ac61ab7a1bd3806d757dbd2e8677bd986ac20dfd457d11902b",
     "paths": [
       {
         "path": "ROADMAP.md",
@@ -27,7 +27,7 @@
       {
         "path": "cmd/fs-relay/main.go",
         "kind": "file",
-        "hash": "6ef5089622b06738e80407e8c3c610e2a902af987eb29f6a2d26f73575bedb5f"
+        "hash": "19dbecf58a4a68b8666b804504ec3844f05f8892d78b922362f46efadd9868d7"
       },
       {
         "path": "go.mod",
@@ -50,19 +50,24 @@
         "hash": ""
       },
       {
+        "path": "internal/local/file.go",
+        "kind": "file",
+        "hash": "60cbcf57ed98a179feb1f768c57b43e87da15377cc7c2d6ef7af15bf4f502825"
+      },
+      {
         "path": "internal/local/local_test.go",
         "kind": "file",
-        "hash": "29e002a548496bb1eaae12c43adbf5789d1c9ddc9789d17ce0f111f0570931b1"
+        "hash": "a396f7551802c866e3d7d517c61a8767202f16ec51b5d072637062723e0d6014"
       },
       {
         "path": "internal/local/path.go",
         "kind": "file",
-        "hash": "76ca0fce57107bd0fd53f35dc876fab56e6f2ec7e32bb04d30fb5c8282699458"
+        "hash": "e01ac1e2d8a9c134c0c64d51e65440b5ad19b92c003e4e00d53ef4f05e682807"
       },
       {
         "path": "internal/local/tree.go",
         "kind": "file",
-        "hash": "247d03f5c46fa0b0f59f6e2eaa6ada7062d06dacc172324738c15c8135c402fc"
+        "hash": "e658644d76b498d2c6516fee71bd8f708ba1da9e882b97cf88bda88426837b1f"
       }
     ]
   },
@@ -70,9 +75,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+1e4a5d73-dirty",
+    "sila_version": "dev+b77059ef-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "8d4ab103575116942b1600e4a76bfd59007c73e9300a48dde6b562328622c239",
-  "verified_at": "2026-11-06T19:15:29Z"
+  "previous": "7488ff0e41a946b6e8c68cbaa18d084dbf91e3bbd133004282041fa8488ad536",
+  "verified_at": "2026-11-06T20:41:47Z"
 }

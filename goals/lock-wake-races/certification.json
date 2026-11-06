@@ -1,6 +1,6 @@
 {
   "goal_slug": "lock-wake-races",
-  "certified_at": "2026-11-06T19:15:25.177229217Z",
+  "certified_at": "2026-11-06T20:41:42.236294253Z",
   "certified_by": "agent",
   "evidence_file": "goals/lock-wake-races/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "b38d3de69bad4e7c5cd57ed92089a73f03384e90",
+  "commit_sha": "48f58e210c24a251d56d8b6ad077ba9328ca3263",
   "memory_required": true,
   "memory_verified": true,
   "memory": {

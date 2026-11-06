@@ -7,7 +7,7 @@
   "spec_hash": "c3bf24bfbb9b331bad4517b0ab1b09f180d80c5921da9bd6b193020ad76d197d",
   "subject": {
     "algorithm": "sha256",
-    "hash": "2ddc7b9b79afa048b991ee8ce6f2c6f644872fe86864215e46444ba31a16109d",
+    "hash": "ad4d140181cf48507f4a80a4d2bd0b13d5a5f2eb8013f3fe89235cb859dc04bc",
     "paths": [
       {
         "path": ".github/workflows/release.yml",
@@ -42,7 +42,7 @@
       {
         "path": "cmd/fs-relay/main.go",
         "kind": "file",
-        "hash": "6ef5089622b06738e80407e8c3c610e2a902af987eb29f6a2d26f73575bedb5f"
+        "hash": "19dbecf58a4a68b8666b804504ec3844f05f8892d78b922362f46efadd9868d7"
       },
       {
         "path": "cmd/fs-relay/update.go",
@@ -85,9 +85,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+1e4a5d73-dirty",
+    "sila_version": "dev+b77059ef-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "032d6a7eb17d925c95ffd5362f7ac7ef7ecb7cb38ce011f3dc9b18ce4dbf80d2",
-  "verified_at": "2026-11-06T19:15:28Z"
+  "previous": "0bf3b46b714a6fabb384bfbead0af32e918a3c2d044ce2e4ee82fe4c18159e24",
+  "verified_at": "2026-11-06T20:41:45Z"
 }

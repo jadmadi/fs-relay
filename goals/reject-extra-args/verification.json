@@ -7,7 +7,7 @@
   "spec_hash": "5f52b2a1348ce1a5ea17897a6803c46d284f56eb5d8b8e8aa9650f39cf547020",
   "subject": {
     "algorithm": "sha256",
-    "hash": "cdc7e04eb5294e688dd50dee3130ffde99be8793dafaa94b02eaa3206df27398",
+    "hash": "4fdf3cd8ca46c33079fe384cf4d698f46a6565a271eade8142b24208dedd5db4",
     "paths": [
       {
         "path": "cmd/fs-relay/cli.go",
@@ -22,7 +22,7 @@
       {
         "path": "cmd/fs-relay/main.go",
         "kind": "file",
-        "hash": "6ef5089622b06738e80407e8c3c610e2a902af987eb29f6a2d26f73575bedb5f"
+        "hash": "19dbecf58a4a68b8666b804504ec3844f05f8892d78b922362f46efadd9868d7"
       },
       {
         "path": "go.mod",
@@ -50,9 +50,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+1e4a5d73-dirty",
+    "sila_version": "dev+b77059ef-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "dc1924945d602ab077de123225297151e7d45888daf7a5b44ca5c97b1b76ce49",
-  "verified_at": "2026-11-06T19:15:27Z"
+  "previous": "01943844a377d8e1bf0481f7647a506faf3f8528ed4fa68713eb5f1c595c2092",
+  "verified_at": "2026-11-06T20:41:44Z"
 }
