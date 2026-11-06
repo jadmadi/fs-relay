@@ -48,6 +48,19 @@ func (t *Tree) abs(ns, rel string) (string, error) {
 	if !inside(dir, full) {
 		return "", syscall.EINVAL
 	}
+	if parentDir := filepath.Dir(full); parentDir != dir {
+		realDir, err := filepath.EvalSymlinks(dir)
+		if err != nil {
+			return "", err
+		}
+		realParent, err := filepath.EvalSymlinks(parentDir)
+		if err != nil {
+			return "", err
+		}
+		if !inside(realDir, realParent) {
+			return "", syscall.EINVAL
+		}
+	}
 	return full, nil
 }
 

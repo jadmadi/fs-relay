@@ -35,11 +35,13 @@ type Tree struct {
 ## File & Interface Contracts
 - `internal/local/tree.go`:
   - `Tree.lockFile *os.File` guarded by `t.fmu`.
-  - `(*Tree).Lock() error`: opens `<root>/.fs-relay.lock` (`0600`), calls `unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB)`, writes `<pid>\n`, and saves `t.lockFile` under `t.fmu`.
+  - `(*Tree).Lock() error`: opens `<root>/.fs-relay.lock` (`0600`) with `os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW`, verifies `info, err := f.Stat()` has `info.Mode().IsRegular()` before truncation, calls `unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB)`, writes `<pid>\n`, and saves `t.lockFile` under `t.fmu`.
   - `(*Tree).Close() error`: swaps `t.lockFile` to `nil` under `t.fmu` and closes it via `errors.Join`.
-- `cmd/fs-relay/main.go`:
-  - Registers `-force-multi-serve` (`false` by default) and calls `tree.Lock()` when `!*forceMulti`.
+- `internal/local/path.go`:
+  - `(*Tree).abs(ns, rel string) (string, error)`: when `filepath.Dir(full) != dir`, resolves `filepath.EvalSymlinks(dir)` and `filepath.EvalSymlinks(filepath.Dir(full))` and rejects any path whose parent directory resolves outside `dir` (`syscall.EINVAL`), preventing namespace symlink traversal to `<root>/.fs-relay.lock`.
+- `cmd/fs-relay/main.go` & `cmd/fs-relay/cli_test.go`:
+  - Registers `-force-multi-serve` (`false` by default), calls `tree.Lock()` when `!*forceMulti`, documents `main` and `run`, and tests `-force-multi-serve` in `TestForceMultiServeFlag`.
 - `internal/local/local_test.go`:
-  - `TestTreeLockRefusesSecondServerAndReleasesOnClose(t *testing.T)` verifies contention failure with PID message and subsequent acquisition after `Close()`.
+  - `TestTreeLockRefusesSecondServerAndReleasesOnClose(t *testing.T)` and `TestTreeLockRejectsSymlinkAndProtectsLockFile(t *testing.T)`.
 - `SPEC.md`, `ROADMAP.md`, `README.md`:
-  - Document the data directory lock and `-force-multi-serve`.
+  - Document the advisory data directory lock, holding PID error, and `-force-multi-serve`.
