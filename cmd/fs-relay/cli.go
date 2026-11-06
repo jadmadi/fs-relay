@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -41,13 +42,22 @@ func versionLine(name string) string {
 	return name + " " + buildVersion()
 }
 
+// checkNoArgs rejects unexpected positional arguments passed to fs-relay.
+func checkNoArgs(args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	return fmt.Errorf("unknown argument %q", args[0])
+}
+
 func usageText(fs *flag.FlagSet) string {
 	var b strings.Builder
 	b.WriteString("fs-relay serves one directory over HTTP for remote FUSE mounts.\n\n")
 	b.WriteString("Usage:\n  fs-relay [-listen addr] [-data dir] [-token secret]\n\n")
 	b.WriteString("Example:\n  fs-relay -listen 127.0.0.1:8080 -data data -token local-demo\n\n")
-	b.WriteString("Version:\n  " + versionLine("fs-relay") + "\n\n")
-	b.WriteString("Flags:\n")
+	b.WriteString("Version:\n  ")
+	b.WriteString(versionLine("fs-relay"))
+	b.WriteString("\n\nFlags:\n")
 	fs.SetOutput(&b)
 	fs.PrintDefaults()
 	fs.SetOutput(os.Stderr)

@@ -50,6 +50,10 @@ func run() error {
 		fmt.Println(versionLine("fs-relay"))
 		return nil
 	}
+	if err := checkNoArgs(flags.Args()); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n\n%s", err, usageText(flags))
+		return errUsage
+	}
 
 	var tokenSet, fileSet bool
 	flags.Visit(func(f *flag.Flag) {
