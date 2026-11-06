@@ -252,46 +252,14 @@ const EDGES = [
 ];
 
 const QUIZ = [
-  {
-    q: 'A 4 MiB file read arrives from Mount A. Which structure bypasses FlatBuffers framing to stream raw bytes above 64 KiB?',
-    target: 'raw-splice',
-    hint: 'Look for the purple bulk bypass cylinder connecting Mount A directly toward the backing store.'
-  },
-  {
-    q: 'Mount A writes to shared file config.db. Which structure broadcasts an unsolicited invalidation frame (id == 0) to Mount B?',
-    target: 'hub-fanout',
-    hint: 'Inspect the cyan torus responsible for per-namespace cache coherence fan-out.'
-  },
-  {
-    q: 'A laptop Wi-Fi connection drops for 3 seconds mid-transaction. Which structure preserves open file handles and POSIX locks for 8 seconds?',
-    target: 'post-join',
-    hint: 'Check the amber octahedron handling UUIDv7 session continuity and HTTP POST fallback.'
-  },
-  {
-    q: 'Two nodes run concurrent SQLite transactions. Which structure coordinates PENDING, RESERVED, and EXCLUSIVE byte-range intervals without holding a mutex while waiting?',
-    target: 'lock-table',
-    hint: 'Find the emerald concentric ring assembly representing byte-range lock intervals.'
-  },
-  {
-    q: 'Which structure enforces the single-function path sandbox under data/<namespace>/ and refuses ../ traversal before any disk syscall runs?',
-    target: 'inode-map',
-    hint: 'Select the amber storage gateway right in front of the Host Backing Directory.'
-  },
-  {
-    q: 'Which component decodes incoming RPC envelopes directly via vtable offsets with zero net/http or os imports?',
-    target: 'wire-codec',
-    hint: 'Locate the central crimson cube between the WebSocket multiplexer and the server subsystems.'
-  },
-  {
-    q: 'Which peer client mount receives unsolicited cache eviction pushes and waits on contended byte-range locks?',
-    target: 'mount-b',
-    hint: 'Select the lower-left cyan client mount node.'
-  },
-  {
-    q: 'Where do files finally rest as ordinary POSIX files and extended attributes with zero proprietary chunking?',
-    target: 'disk-store',
-    hint: 'Click the rightmost slate cylinder representing the host backing directory.'
-  }
+  { q: 'A 4 MiB file read arrives from Mount A. Which structure bypasses FlatBuffers framing to stream raw bytes above 64 KiB?', target: 'raw-splice', hint: 'Look for the purple bulk bypass cylinder connecting Mount A directly toward the backing store.' },
+  { q: 'Mount A writes to shared file config.db. Which structure broadcasts an unsolicited invalidation frame (id == 0) to Mount B?', target: 'hub-fanout', hint: 'Inspect the cyan torus responsible for per-namespace cache coherence fan-out.' },
+  { q: 'A laptop Wi-Fi connection drops for 3 seconds mid-transaction. Which structure preserves open file handles and POSIX locks for 8 seconds?', target: 'post-join', hint: 'Check the amber octahedron handling UUIDv7 session continuity and HTTP POST fallback.' },
+  { q: 'Two nodes run concurrent SQLite transactions. Which structure coordinates PENDING, RESERVED, and EXCLUSIVE byte-range intervals without holding a mutex while waiting?', target: 'lock-table', hint: 'Find the emerald concentric ring assembly representing byte-range lock intervals.' },
+  { q: 'Which structure enforces the single-function path sandbox under data/<namespace>/ and refuses ../ traversal before any disk syscall runs?', target: 'inode-map', hint: 'Select the amber storage gateway right in front of the Host Backing Directory.' },
+  { q: 'Which component decodes incoming RPC envelopes directly via vtable offsets with zero net/http or os imports?', target: 'wire-codec', hint: 'Locate the central crimson cube between the WebSocket multiplexer and the server subsystems.' },
+  { q: 'Which peer client mount receives unsolicited cache eviction pushes and waits on contended byte-range locks?', target: 'mount-b', hint: 'Select the lower-left cyan client mount node.' },
+  { q: 'Where do files finally rest as ordinary POSIX files and extended attributes with zero proprietary chunking?', target: 'disk-store', hint: 'Click the rightmost slate cylinder representing the host backing directory.' }
 ];
 
 // --- Web Audio API Synthesizer (muted by default) ---
@@ -630,6 +598,12 @@ function handleStructureActivated(id) {
   const quizPaneActive = !document.getElementById('tab-quiz').classList.contains('hidden');
   if (currentView === 'quiz' || quizPaneActive) {
     handleQuizAttempt(id);
+    return;
+  }
+  const guideCard = document.getElementById('guide-card');
+  if (guideCard && !guideCard.classList.contains('hidden') && GUIDE_STEPS[guideIdx].nextTarget === id) {
+    stopGuideAutoPlay();
+    applyGuideStep(guideIdx + 1);
   }
 }
 
@@ -777,6 +751,112 @@ document.getElementById('btn-quiz-reset').addEventListener('click', () => {
   updateQuizUI();
 });
 
+// --- Guided Lifecycle Tour & Interactive Coaching Tips (7 Steps) ---
+const GUIDE_STEPS = [
+  { badge: 'STEP 1 OF 7 · MOUNT & HANDSHAKE', title: '1. Mount & WebSocket Handshake', body: 'You run fs-relay-bind on Client Mount A without root. It upgrades a single HTTP connection into a persistent WebSocket and receives a UUIDv7 session ID.', focus: 'mount-a', nextTarget: 'ws-mux', cam: [[-5.8, 5.2, 13.5], [-6.0, 1.8, 1.4]], packets: [['mount-a', 'ws-mux', 0xf43f5e]], tip: 'Click TRN-01 (pulsing badge) or click here to send a FlatBuffers metadata lookup over the WebSocket.' },
+  { badge: 'STEP 2 OF 7 · ZERO-COPY DECODE', title: '2. Multiplexed Lookup & FlatBuffers Decode', body: 'Small metadata calls (stat, readdir, lookup <= 64 KiB) travel over the WebSocket into internal/wire, which reads fields directly from vtable offsets with zero heap allocations.', focus: 'wire-codec', nextTarget: 'inode-map', cam: [[-1.2, 4.8, 12.2], [-1.0, 1.4, 0.2]], packets: [['ws-mux', 'wire-codec', 0xf43f5e], ['wire-codec', 'inode-map', 0xf59e0b]], tip: 'Click LOC-01 (pulsing badge) or click here to resolve the path inside the namespace sandbox.' },
+  { badge: 'STEP 3 OF 7 · SANDBOX & DISK WRITE', title: '3. Sandboxed Path Guard & POSIX Write', body: 'internal/local verifies the path stays inside data/<namespace>/ (refusing any ../ escape), releases its table lock before I/O, and writes to the host backing directory.', focus: 'inode-map', nextTarget: 'hub-fanout', cam: [[5.4, 4.6, 12.5], [5.8, 0.2, -0.4]], packets: [['inode-map', 'disk-store', 0x94a3b8], ['wire-codec', 'hub-fanout', 0x38bdf8]], tip: 'Click COH-01 (pulsing badge) or click here to see how peer Mount B learns about the write.' },
+  { badge: 'STEP 4 OF 7 · PEER CACHE INVALIDATION', title: '4. Unsolicited Broadcast Evicts Stale Cache', body: 'As soon as Mount A mutates a file, the Namespace Fan-out Hub pushes an unsolicited frame (id == 0) to Mount B so Mount B evicts only that inode from its local kernel cache.', focus: 'hub-fanout', nextTarget: 'mount-b', cam: [[-3.2, 4.2, 13.8], [-3.5, -1.8, -1.5]], packets: [['hub-fanout', 'mount-b', 0x38bdf8]], tip: 'Click MNT-02 (pulsing badge) or click here to inspect how Mount B handles cache eviction and lock contention.' },
+  { badge: 'STEP 5 OF 7 · SQLITE BYTE-RANGE LOCKS', title: '5. Multi-Node SQLite Lock Serialization', body: 'When both mounts run SQLite transactions, the Lock Table coordinates PENDING, RESERVED, and EXCLUSIVE byte ranges. Blocked waiters park on a channel holding zero mutexes.', focus: 'lock-table', nextTarget: 'raw-splice', cam: [[2.8, 4.5, 11.8], [2.8, 1.2, 1.2]], packets: [['mount-a', 'ws-mux', 0x34d399], ['ws-mux', 'wire-codec', 0x34d399], ['wire-codec', 'lock-table', 0x34d399]], tip: 'Click SPL-01 (pulsing purple cylinder) or click here to see what happens when payload size exceeds 64 KiB.' },
+  { badge: 'STEP 6 OF 7 · > 64 KIB RAW SPLICE LANE', title: '6. Bulk Streaming Bypasses FlatBuffers', body: 'Reads and writes larger than 64 KiB switch to the HTTP Raw Bulk Splice lane (/raw), streaming bytes straight between the socket and host disk without envelope copies.', focus: 'raw-splice', nextTarget: 'post-join', cam: [[1.2, 3.8, 13.5], [1.2, -0.2, 2.2]], packets: [['mount-a', 'raw-splice', 0xa78bfa], ['raw-splice', 'disk-store', 0xa78bfa]], tip: 'Click TRN-02 (pulsing amber octahedron) or click here to test a Wi-Fi blip during an active transaction.' },
+  { badge: 'STEP 7 OF 7 · 8S HOLD & SESSION REJOIN', title: '7. 8-Second Grace Window & Seamless Rejoin', body: 'If the WebSocket drops, the server freezes your open file handles and SQLite locks for 8 seconds. Reconnecting with X-FS-Relay-Session reclaims them without dropping I/O.', focus: 'post-join', nextTarget: 'mount-a', cam: [[-3.8, 4.0, 13.2], [-3.8, -1.2, 1.2]], packets: [['mount-a', 'post-join', 0xf59e0b], ['post-join', 'wire-codec', 0xf59e0b], ['wire-codec', 'lock-table', 0x34d399]], tip: 'Full cycle complete! Click here to restart from Step 1, or switch to 3 · Self-Test Quiz above.' }
+];
+
+let guideIdx = 0;
+let guideVisited = new Set([0]);
+let guideTimer = null;
+
+const beaconMesh = new THREE.Mesh(
+  new THREE.RingGeometry(1.35, 1.62, 36),
+  new THREE.MeshBasicMaterial({ color: 0xf43f5e, side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
+);
+beaconMesh.rotation.x = Math.PI / 2;
+scene.add(beaconMesh);
+
+function applyGuideStep(idx, moveCam = true) {
+  guideIdx = (idx + GUIDE_STEPS.length) % GUIDE_STEPS.length;
+  guideVisited.add(guideIdx);
+  const step = GUIDE_STEPS[guideIdx];
+
+  document.getElementById('guide-step-badge').textContent = step.badge;
+  document.getElementById('guide-title').textContent = step.title;
+  document.getElementById('guide-body').textContent = step.body;
+  document.getElementById('guide-tip-text').textContent = step.tip;
+
+  const dotsEl = document.getElementById('guide-dots');
+  clearChildren(dotsEl);
+  GUIDE_STEPS.forEach((_, i) => {
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'guide-dot' + (i === guideIdx ? ' active' : (guideVisited.has(i) ? ' done' : ''));
+    dot.textContent = String(i + 1);
+    dot.setAttribute('aria-label', 'Go to step ' + (i + 1));
+    dot.addEventListener('click', () => {
+      stopGuideAutoPlay();
+      applyGuideStep(i, true);
+    });
+    dotsEl.appendChild(dot);
+  });
+
+  STRUCTURES.forEach((s) => {
+    tagMap.get(s.id).classList.toggle('coach-target', s.id === step.nextTarget);
+  });
+
+  selectStructure(step.focus);
+  if (moveCam) moveCameraTo(step.cam[0], step.cam[1], 44);
+  step.packets.forEach(([from, to, col], i) => {
+    setTimeout(() => spawnPacket(from, to, col, 0.022), i * 260);
+  });
+}
+
+function stopGuideAutoPlay() {
+  if (!guideTimer) return;
+  clearInterval(guideTimer);
+  guideTimer = null;
+  const playBtn = document.getElementById('btn-guide-play');
+  playBtn.setAttribute('aria-pressed', 'false');
+  playBtn.textContent = '▶ Auto-Play Cycle';
+}
+
+function toggleGuideAutoPlay() {
+  const playBtn = document.getElementById('btn-guide-play');
+  if (guideTimer) {
+    stopGuideAutoPlay();
+    return;
+  }
+  playBtn.setAttribute('aria-pressed', 'true');
+  playBtn.textContent = '⏸ Pause Cycle';
+  applyGuideStep(guideIdx);
+  guideTimer = setInterval(() => {
+    applyGuideStep(guideIdx + 1);
+  }, 4200);
+}
+
+document.getElementById('btn-guide-play').addEventListener('click', toggleGuideAutoPlay);
+document.getElementById('btn-guide-prev').addEventListener('click', () => {
+  stopGuideAutoPlay();
+  applyGuideStep(guideIdx - 1);
+});
+document.getElementById('btn-guide-next').addEventListener('click', () => {
+  stopGuideAutoPlay();
+  applyGuideStep(guideIdx + 1);
+});
+document.getElementById('btn-guide-tip').addEventListener('click', () => {
+  stopGuideAutoPlay();
+  applyGuideStep(guideIdx + 1);
+});
+
+const guideToggleBtn = document.getElementById('btn-guide-toggle');
+guideToggleBtn.addEventListener('click', () => {
+  const card = document.getElementById('guide-card');
+  const hidden = card.classList.toggle('hidden');
+  beaconMesh.visible = !hidden;
+  guideToggleBtn.classList.toggle('active', !hidden);
+  guideToggleBtn.setAttribute('aria-pressed', String(!hidden));
+  guideToggleBtn.textContent = hidden ? 'Guided Tour: Off' : 'Guided Tour: On';
+  if (hidden) stopGuideAutoPlay();
+});
+
 // --- Raycaster Pointer Interaction ---
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -809,7 +889,7 @@ window.addEventListener('resize', resizeRenderer);
 resizeRenderer();
 
 // --- Initialize & Animate Loop ---
-selectStructure('wire-codec');
+applyGuideStep(0, false);
 updateQuizUI();
 
 const projVec = new THREE.Vector3();
@@ -823,6 +903,16 @@ function animate(now) {
     cameraLerpFrames--;
   }
   controls.update();
+
+  const nextId = GUIDE_STEPS[guideIdx].nextTarget;
+  const nextEntry = meshMap.get(nextId);
+  if (nextEntry && beaconMesh.visible) {
+    beaconMesh.position.copy(nextEntry.group.position);
+    beaconMesh.position.y -= 1.05;
+    const pulse = 1 + Math.sin(t * 4.2) * 0.18;
+    beaconMesh.scale.set(pulse, pulse, 1);
+    beaconMesh.material.opacity = 0.45 + Math.sin(t * 4.2) * 0.3;
+  }
 
   const w = stageEl.clientWidth;
   const h = stageEl.clientHeight;

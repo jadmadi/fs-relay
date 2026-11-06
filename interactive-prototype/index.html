@@ -31,6 +31,7 @@
     <button type="button" class="pill-btn" data-view="quiz" aria-pressed="false" id="btn-quiz-mode">3 · Self-Test Quiz</button>
   </div>
   <div class="top-actions">
+    <button type="button" class="pill-btn active" id="btn-guide-toggle" aria-pressed="true">Guided Tour: On</button>
     <button type="button" class="pill-btn" id="btn-reset-cam" aria-label="Reset 3D camera">Reset Camera</button>
     <button type="button" class="pill-btn" id="btn-audio" aria-pressed="false">Audio: Off</button>
   </div>
@@ -59,6 +60,28 @@
     </div>
 
     <div class="label-layer" id="label-layer" aria-hidden="true"></div>
+
+    <aside class="guide-card" id="guide-card" role="region" aria-label="Guided lifecycle walkthrough and tips">
+      <div class="guide-top">
+        <div class="guide-meta">
+          <span class="guide-step-badge" id="guide-step-badge">STEP 1 OF 7 · MOUNT &amp; HANDSHAKE</span>
+          <div class="guide-dots" id="guide-dots" role="tablist" aria-label="Lifecycle steps"></div>
+        </div>
+        <div class="guide-controls">
+          <button type="button" class="pill-btn guide-play" id="btn-guide-play" aria-pressed="false">▶ Auto-Play Cycle</button>
+          <button type="button" class="pill-btn" id="btn-guide-prev" aria-label="Previous step">← Prev</button>
+          <button type="button" class="pill-btn" id="btn-guide-next" aria-label="Next step">Next →</button>
+        </div>
+      </div>
+      <h2 class="guide-title" id="guide-title">1. Mount &amp; WebSocket Handshake</h2>
+      <p class="guide-body" id="guide-body">An unprivileged user runs fs-relay-bind. It opens one persistent WebSocket to the server and receives a UUIDv7 session ID.</p>
+      <div class="guide-tip-row">
+        <button type="button" class="guide-tip-btn" id="btn-guide-tip">
+          <span class="tip-tag">TRY THIS TIP</span>
+          <span id="guide-tip-text">Click the pulsing MNT-01 badge in 3D (or click here) to send the handshake packet and advance.</span>
+        </button>
+      </div>
+    </aside>
 
     <div class="sim-dock" role="region" aria-label="Live protocol simulations">
       <div class="sim-buttons">

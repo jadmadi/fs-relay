@@ -35,8 +35,10 @@ Scope: `.ui-craft`, `html-prototypes`, `cmd/fs-relay/root.go`,
    `v0.170.0` (`OrbitControls`) and the Claude Interactive Diagram pattern
    (macro topology vs cutaway view switcher, 6 subsystem filters, 10 clickable
    3D structures with concentric SQLite byte-range lock rings and curved 3D
-   tubes, 4 live protocol simulations, payload size router, and 8-question
-   self-test quiz with muted-by-default Web Audio synth).
+   tubes, 4 live protocol simulations, payload size router, 7-step Option 3
+   Guided Lifecycle Tour with auto-play, pulsing 3D beacon ring, and interactive
+   coaching tips, plus an 8-question self-test quiz with muted-by-default Web
+   Audio synth).
 
 ## Acceptance results
 

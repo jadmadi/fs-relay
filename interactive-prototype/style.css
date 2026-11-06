@@ -592,6 +592,156 @@ body {
   gap: var(--space-xs);
 }
 
+/* ---- guided lifecycle walkthrough & interactive coach tips ---- */
+
+@keyframes coachPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.75), 0 0 0 4px rgba(244, 63, 94, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.35), 0 0 0 10px rgba(244, 63, 94, 0);
+  }
+}
+
+.node-tag.coach-target {
+  border-color: var(--accent-300);
+  background: var(--accent-wash);
+  color: var(--text-primary);
+  animation: coachPulse 1.6s infinite var(--ease-out);
+  z-index: 9;
+}
+
+.guide-card {
+  position: absolute;
+  top: 3.6rem;
+  inset-inline-start: var(--space-md);
+  width: min(32rem, calc(100% - 2rem));
+  background: rgba(13, 19, 23, 0.90);
+  border: 1px solid var(--accent-700);
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm) var(--space-md);
+  backdrop-filter: blur(10px);
+  z-index: 11;
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+
+.guide-card.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.5rem);
+}
+
+.guide-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-2xs);
+}
+
+.guide-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.guide-step-badge {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--accent-300);
+}
+
+.guide-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.guide-dot {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background: var(--surface-raised);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+}
+
+.guide-dot.active {
+  background: var(--accent-500);
+  border-color: var(--accent-300);
+  color: var(--text-primary);
+}
+
+.guide-dot.done {
+  border-color: var(--emerald-500);
+  color: var(--text-primary);
+}
+
+.guide-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+.guide-controls .pill-btn {
+  font-size: 0.72rem;
+  padding: 0.24rem 0.55rem;
+}
+
+.guide-title {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.2rem;
+}
+
+.guide-body {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-xs);
+}
+
+.guide-tip-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  text-align: start;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px dashed var(--accent-500);
+  border-radius: var(--radius-md);
+  padding: 0.38rem 0.6rem;
+  cursor: pointer;
+}
+
+.guide-tip-btn:hover {
+  background: rgba(244, 63, 94, 0.22);
+}
+
+.tip-tag {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: var(--accent-500);
+  color: var(--text-primary);
+  border-radius: var(--radius-xs);
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
 @media (max-width: 64rem) {
   body { overflow: auto; }
   .workspace {

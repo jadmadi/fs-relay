@@ -1,11 +1,10 @@
 {
   "goal_slug": "html-prototypes-10x",
-  "reopened_at": "2026-11-05T23:53:16.795754967Z",
-  "reopened_by": "antigravity",
-  "reason": "Build interactive Three.js 3D reference explorer in interactive-prototype/",
-  "original_commit": "8af6de3",
-  "resolved_commit": "d6e1b64",
-  "resolved_at": "2026-11-06T00:08:49.179581797Z",
-  "active": false,
-  "reopen_epoch": 3
+  "reopened_at": "2026-11-06T00:17:03.713447872Z",
+  "reopened_by": "agent",
+  "reason": "Add Option 3 combined auto-play guided lifecycle tour and interactive coaching tips to interactive-prototype/",
+  "original_commit": "d6e1b64",
+  "resolved_at": "0001-01-01T00:00:00Z",
+  "active": true,
+  "reopen_epoch": 4
 }
