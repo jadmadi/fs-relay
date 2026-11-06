@@ -35,6 +35,7 @@ func run() error {
 	data := flags.String("data", "data", "directory that holds one folder per namespace")
 	given := flags.String("token", "", "shared secret; printed when omitted")
 	file := flags.String("token-file", "", "read the shared secret from this file (mode 600)")
+	forceMulti := flags.Bool("force-multi-serve", false, "serve a data directory that another fs-relay is already using")
 	showVersion := flags.Bool("version", false, "print the version and exit")
 	flags.SetOutput(os.Stderr)
 	flags.Usage = func() {}
@@ -77,6 +78,11 @@ func run() error {
 	defer tree.Close()
 	if err := tree.Prepare(); err != nil {
 		return err
+	}
+	if !*forceMulti {
+		if err := tree.Lock(); err != nil {
+			return err
+		}
 	}
 	abs, err := filepath.Abs(*data)
 	if err != nil {

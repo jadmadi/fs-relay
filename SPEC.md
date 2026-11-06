@@ -35,7 +35,7 @@ The server names a mount with a UUIDv7 and returns `<uuid>.<signature>`. The sig
 
 ## Clients
 
-A namespace is an existing directory under the data root. The server creates the data root at startup but never a namespace. A `join` for a missing namespace is HTTP 404, and the mount stops.
+A namespace is an existing directory under the data root. The server creates the data root at startup, locks it against a second fs-relay process unless `-force-multi-serve` is passed, and never creates a namespace. A `join` for a missing namespace is HTTP 404, and the mount stops.
 
 A mount is one of two clients. Both speak the same envelope. They differ in how calls and events travel. The mount defaults to the websocket. `-post` selects the other. `-ws` is the same as the default. Passing both flags is an error.
 
@@ -235,6 +235,7 @@ Built. The server's table is the authority for POSIX byte-range locks.
 - A release closes the mount's wake-up channel and installs a new one. Every waiter wakes, and the socket or join reader never blocks.
 - FUSE does not carry the lock owner on release, so a close drops the locks taken through that handle. A second open that never locked cannot drop the process's locks; those stay until the locking handle closes or the mount dies. A read-only close releases its tracked owners even when it returns a sticky writeback error.
 - A close waits for the lock grants already in flight, then releases them with the handle. A grant that starts after the close is refused with `EINTR` and never reaches the server. Without that, a close racing a grant would leave a lock with no holder.
+- Unlocking a file drains held write-behind bytes for that inode before sending the unlock, and still sends the unlock when the drain fails. A lock grant drops the mount's cached attributes and prefetched file body for that inode.
 - A `release` names either the `fh` or the `owner`. With an `fh`, it drops every lock that handle's owners hold on that inode. With an `owner` and no `fh`, it drops that owner's locks. A read-only open takes no server handle; its handle remembers the owners that locked through it, so closing it cannot drop another process's locks on the same mount.
 - `getlk` reports the first conflicting lock, or `F_UNLCK` when the range is clear. It never blocks.
 - Before sending an unlock (`setlk` or `setlkw` with `F_UNLCK`), the mount drains any buffered writes for that inode; if draining fails, the unlock is still sent and the drain error is returned when the unlock succeeds. A lock grant drops the cached attributes and any prefetched file body for that inode.
