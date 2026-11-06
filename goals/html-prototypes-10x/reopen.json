@@ -4,7 +4,8 @@
   "reopened_by": "agent",
   "reason": "Auto-switch to System Topology on simulation click and expand Everyday View with more machines and AI agent nodes",
   "original_commit": "619ab52",
-  "resolved_at": "0001-01-01T00:00:00Z",
-  "active": true,
+  "resolved_commit": "b6464f2",
+  "resolved_at": "2026-11-06T00:56:40.637658832Z",
+  "active": false,
   "reopen_epoch": 7
 }
