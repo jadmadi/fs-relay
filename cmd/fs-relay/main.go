@@ -21,6 +21,13 @@ var errUsage = errors.New("usage")
 
 // main runs the fs-relay command and exits with a status code on error.
 func main() {
+	if done, err := dispatchCLI(os.Args[1:]); done {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "fs-relay: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(); err != nil {
 		if errors.Is(err, errUsage) {
 			os.Exit(2)

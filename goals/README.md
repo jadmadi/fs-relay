@@ -27,11 +27,20 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 6. **Auto-Reconciliation**: Run `sila goals` to scan commits, mark 🟢 **Implemented**, and clear the claim lock.
 
 ## Summary
-- **Total Goals**: 16
+- **Total Goals**: 17
 - 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
+- 🔵 **In Progress (Claimed)**: 1
 - 🟢 **Implemented**: 16 (16 verified 📜, 0 unverified)
-- 🎯 **By Tier**: 0 immediate (Tier 1), 16 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 77/77 completed (100%)
+- 🎯 **By Tier**: 0 immediate (Tier 1), 17 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
+- 📋 **Execution Tasks Progress**: 77/80 completed (96%)
+
+---
+
+## 🔵 In Progress (Claimed Goals)
+
+| Goal Package | Tier | Mode | Agent | Status & Note | Started |
+| :--- | :---: | :---: | :--- | :--- | :--- |
+| [`self-update-and-version-check`](self-update-and-version-check/goal.md) | `🗺️ Roadmap` | `🔗 Dep` | `@agent` | in progress | 0s ago |
 
 ---
 
@@ -54,4 +63,4 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `daa9689` |
 | [`lock-wake-races`](lock-wake-races/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `63427fd` |
 | [`bind-sigint-busy`](bind-sigint-busy/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `532649e` |
-| [`single-serve-data-lock`](single-serve-data-lock/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `e47322c` |
+| [`single-serve-data-lock`](single-serve-data-lock/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `adb1ce1` |
