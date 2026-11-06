@@ -282,3 +282,117 @@ func TestLockAnyCloseDropsOwner(t *testing.T) {
 	call(t, tr, wire.Setlk, lp(ino, 0, "B", 2, wire.LockWrite, 100, 1))
 	call(t, tr, wire.Setlk, lp(ino, 0, "B", 2, wire.LockWrite, 200, 1))
 }
+
+// TestLockDowngradeWakesWaitingReader verifies write-to-read downgrades wake waiting readers.
+func TestLockDowngradeWakesWaitingReader(t *testing.T) {
+	cases := []struct {
+		name  string
+		start uint64
+		size  uint64
+		flags uint32
+	}{
+		{name: "canonical-shared", start: sharedStart, size: 510},
+		{name: "canonical-pending", start: pendingByte, size: 1},
+		{name: "non-canonical-range", start: 100, size: 50},
+		{name: "flock", start: 0, size: 0, flags: wire.FlagFlock},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tr, _ := newTree(t)
+			ino, fh := lockFile(t, tr, "a")
+
+			writeA := lp(ino, fh, "A", 1, wire.LockWrite, tc.start, tc.size)
+			writeA.Flags = tc.flags
+			call(t, tr, wire.Setlk, writeA)
+
+			readA := lp(ino, fh, "A", 1, wire.LockRead, tc.start, tc.size)
+			readA.Flags = tc.flags
+			call(t, tr, wire.Setlk, readA)
+			if gotIno, ok := tr.TookWake("demo", readA); ok || gotIno != 0 {
+				t.Fatalf("TookWake without waiter = (%d, %v), want (0, false)", gotIno, ok)
+			}
+
+			call(t, tr, wire.Setlk, writeA)
+
+			readB := lp(ino, fh, "B", 2, wire.LockRead, tc.start, tc.size)
+			readB.Flags = tc.flags
+			_, err := tr.Call(t.Context(), wire.Setlkw, readB)
+			wantErrno(t, err, syscall.EAGAIN)
+
+			call(t, tr, wire.Setlk, readA)
+			if gotIno, ok := tr.TookWake("demo", readA); !ok || gotIno != ino {
+				t.Fatalf("TookWake with waiting reader = (%d, %v), want (%d, true)", gotIno, ok, ino)
+			}
+
+			call(t, tr, wire.Setlkw, readB)
+			if tr.AnyWaiting("demo") {
+				t.Fatal("AnyWaiting true after waiter acquired lock")
+			}
+		})
+	}
+}
+
+// TestSameOwnerDifferentRangeKeepsWaiter verifies partial overlaps, disjoint ranges,
+// and shared-reader unlocks keep pending waiters registered until satisfied.
+func TestSameOwnerDifferentRangeKeepsWaiter(t *testing.T) {
+	tr, _ := newTree(t)
+	ino, fh1 := lockFile(t, tr, "a")
+	fh2 := call(t, tr, wire.Open, wire.Params{Inode: ino, Flags: syscall.O_RDWR}).Fh
+
+	call(t, tr, wire.Setlk, lp(ino, fh1, "A", 1, wire.LockWrite, 10, 10))
+	_, err := tr.Call(t.Context(), wire.Setlkw, lp(ino, fh1, "B", 2, wire.LockWrite, 0, 10))
+	if err != nil {
+		t.Fatalf("unexpected conflict on [0, 9]: %v", err)
+	}
+	call(t, tr, wire.Setlk, lp(ino, fh1, "B", 2, wire.LockUnlock, 0, 10))
+
+	call(t, tr, wire.Setlk, lp(ino, fh1, "A", 1, wire.LockWrite, 0, 10))
+	_, err = tr.Call(t.Context(), wire.Setlkw, lp(ino, fh1, "B", 2, wire.LockWrite, 0, 10))
+	wantErrno(t, err, syscall.EAGAIN)
+	_, err = tr.Call(t.Context(), wire.Setlkw, lp(ino, fh2, "B", 2, wire.LockWrite, 0, 20))
+	wantErrno(t, err, syscall.EAGAIN)
+
+	// Closing fh1 drops only fh1's waiter; fh2's waiter on [0, 19] stays active.
+	tr.DropFH("demo", ino, fh1)
+	if !tr.AnyWaiting("demo") {
+		t.Fatal("waiter on fh2 was dropped when fh1 closed")
+	}
+
+	// Owner A unlocks [0, 9] while still holding [10, 19]. Owner B acquires [0, 9]
+	// (a partial overlap of its pending [0, 19] wait); the remaining [10, 19] wait stays.
+	call(t, tr, wire.Setlk, lp(ino, fh1, "A", 1, wire.LockUnlock, 0, 10))
+	_, _ = tr.TookWake("demo", lp(ino, fh1, "A", 1, wire.LockUnlock, 0, 10))
+	call(t, tr, wire.Setlk, lp(ino, fh2, "B", 2, wire.LockWrite, 0, 10))
+	if !tr.AnyWaiting("demo") {
+		t.Fatal("waiter on [0, 19] was dropped after partial grant on [0, 9]")
+	}
+
+	// Same owner ("B", 2) locks and unlocks a non-overlapping range [100, 109].
+	call(t, tr, wire.Setlk, lp(ino, fh2, "B", 2, wire.LockWrite, 100, 10))
+	call(t, tr, wire.Setlk, lp(ino, fh2, "B", 2, wire.LockUnlock, 100, 10))
+	if !tr.AnyWaiting("demo") {
+		t.Fatal("waiter was dropped by non-overlapping lock/unlock on [100, 109]")
+	}
+
+	unlockA := lp(ino, fh1, "A", 1, wire.LockUnlock, 10, 10)
+	call(t, tr, wire.Setlk, unlockA)
+	if gotIno, ok := tr.TookWake("demo", unlockA); !ok || gotIno != ino {
+		t.Fatalf("TookWake after partial overlap = (%d, %v), want (%d, true)", gotIno, ok, ino)
+	}
+	call(t, tr, wire.Setlkw, lp(ino, fh2, "B", 2, wire.LockWrite, 0, 20))
+	call(t, tr, wire.Setlk, lp(ino, fh2, "B", 2, wire.LockUnlock, 0, 20))
+
+	// Two readers on [0, 9]; B waits to upgrade to write, then unlocks its read lock
+	// while A still holds read. A's later unlock must still emit a wake.
+	call(t, tr, wire.Setlk, lp(ino, fh1, "A", 1, wire.LockRead, 0, 10))
+	call(t, tr, wire.Setlk, lp(ino, fh2, "B", 2, wire.LockRead, 0, 10))
+	_, err = tr.Call(t.Context(), wire.Setlkw, lp(ino, fh2, "B", 2, wire.LockWrite, 0, 10))
+	wantErrno(t, err, syscall.EAGAIN)
+	call(t, tr, wire.Setlk, lp(ino, fh2, "B", 2, wire.LockUnlock, 0, 10))
+	_, _ = tr.TookWake("demo", lp(ino, fh2, "B", 2, wire.LockUnlock, 0, 10))
+	unlockARead := lp(ino, fh1, "A", 1, wire.LockUnlock, 0, 10)
+	call(t, tr, wire.Setlk, unlockARead)
+	if gotIno, ok := tr.TookWake("demo", unlockARead); !ok || gotIno != ino {
+		t.Fatalf("TookWake after second reader unlock = (%d, %v), want (%d, true)", gotIno, ok, ino)
+	}
+}

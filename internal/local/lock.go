@@ -23,6 +23,15 @@ type lockKey struct {
 	owner  uint64
 }
 
+type lockWaiter struct {
+	key   lockKey
+	fh    uint64
+	start uint64
+	end   uint64
+	typ   uint32
+	flock bool
+}
+
 // lockSpan is one byte range held by one owner. end is inclusive.
 type lockSpan struct {
 	start uint64
@@ -79,6 +88,7 @@ type lockRec struct {
 	flockX    lockKey
 	flockS    uint32
 	owners    []lockOwner
+	waiters   []lockWaiter
 	pool      [][]lockSpan
 	wake      bool
 }
@@ -138,17 +148,68 @@ func (r *lockRec) remove(key lockKey) {
 	}
 }
 
+const maxWaiters = 64
+
+// addWaiter records a waiting setlkw request if not already present,
+// capping per-inode waiter state at maxWaiters.
+func (r *lockRec) addWaiter(w lockWaiter) {
+	if w.key.client == "" {
+		return
+	}
+	for i := range r.waiters {
+		cur := r.waiters[i]
+		if cur.key == w.key && cur.fh == w.fh && cur.typ == w.typ && cur.flock == w.flock &&
+			(cur == w || cur.start >= w.start && cur.end <= w.end) {
+			r.waiters[i] = w
+			return
+		}
+	}
+	if len(r.waiters) >= maxWaiters {
+		r.waiters[0] = w
+		return
+	}
+	r.waiters = append(r.waiters, w)
+}
+
+// keepWaiters retains only waiters for which keep returns true.
+func (r *lockRec) keepWaiters(keep func(lockWaiter) bool) {
+	out := r.waiters[:0]
+	for _, w := range r.waiters {
+		if keep(w) {
+			out = append(out, w)
+		}
+	}
+	clear(r.waiters[len(out):])
+	r.waiters = out
+}
+
+// waiterDone reports whether key applying typ on [start, end] satisfies or cancels w.
+func (r *lockRec) waiterDone(w lockWaiter, key lockKey, start, end uint64, typ uint32) bool {
+	if w.key != key || w.flock || start > w.start || end < w.end {
+		return false
+	}
+	if typ == wire.LockUnlock {
+		return !r.wake || !r.conflicts(w.key, w.start, w.end, w.typ)
+	}
+	return w.typ == wire.LockRead || typ == wire.LockWrite
+}
+
 func (o *lockOwner) empty() bool {
 	return len(o.spans) == 0 && o.flock == 0
 }
 
 // trim removes [start, end] from this owner, keeping any bytes on either side.
-func (o *lockOwner) trim(start, end uint64) {
+// It reports whether any trimmed span was a write lock.
+func (o *lockOwner) trim(start, end uint64) bool {
+	wrote := false
 	out := o.spans[:0]
 	for _, s := range o.spans {
 		if s.end < start || s.start > end {
 			out = append(out, s)
 			continue
+		}
+		if s.typ == wire.LockWrite {
+			wrote = true
 		}
 		if s.start < start {
 			out = append(out, lockSpan{start: s.start, end: start - 1, typ: s.typ, pid: s.pid})
@@ -158,6 +219,7 @@ func (o *lockOwner) trim(start, end uint64) {
 		}
 	}
 	o.spans = out
+	return wrote
 }
 
 // exact returns the type of a span covering exactly [start, end].
@@ -221,11 +283,14 @@ func (r *lockRec) put(key lockKey, fh uint64, start, end uint64, typ uint32, pid
 		r.apply(o, start, end, typ, pid)
 		return
 	}
-	o.trim(start, end)
+	if o.trim(start, end) && typ == wire.LockRead {
+		r.wake = true
+	}
 	o.spans = append(o.spans, lockSpan{start: start, end: end, typ: typ, pid: pid})
 	r.recount()
 }
 
+// apply updates canonical SQLite lock counters in place without a full recount.
 func (r *lockRec) apply(o *lockOwner, start, end uint64, typ uint32, pid uint32) {
 	switch {
 	case start == pendingByte && typ == wire.LockRead:
@@ -237,6 +302,7 @@ func (r *lockRec) apply(o *lockOwner, start, end uint64, typ uint32, pid uint32)
 			}
 			o.spans = append(o.spans, lockSpan{start: start, end: end, typ: typ, pid: pid})
 			r.pendingR++
+			r.wake = true
 			return
 		}
 		if !ok {
@@ -255,6 +321,7 @@ func (r *lockRec) apply(o *lockOwner, start, end uint64, typ uint32, pid uint32)
 		if r.exclusive == o.key {
 			o.trim(start, end)
 			r.exclusive = lockKey{}
+			r.wake = true
 		}
 		if _, ok := o.exact(start, end); !ok {
 			o.spans = append(o.spans, lockSpan{start: start, end: end, typ: typ, pid: pid})
@@ -272,10 +339,20 @@ func (r *lockRec) apply(o *lockOwner, start, end uint64, typ uint32, pid uint32)
 	}
 }
 
+// overlaps reports whether this owner holds any span overlapping [start, end].
+func (o *lockOwner) overlaps(start, end uint64) bool {
+	for _, s := range o.spans {
+		if overlap(s.start, s.end, start, end) {
+			return true
+		}
+	}
+	return false
+}
+
 // unlock drops the range for one owner. It is a no-op for a range not held.
 func (r *lockRec) unlock(key lockKey, start, end uint64) {
 	o := r.find(key)
-	if o == nil {
+	if o == nil || !o.overlaps(start, end) {
 		return
 	}
 	o.trim(start, end)
@@ -329,6 +406,7 @@ func (r *lockRec) recount() {
 	}
 }
 
+// flockSet acquires, downgrades, or releases a whole-file flock lock for key.
 func (r *lockRec) flockSet(key lockKey, fh uint64, typ uint32) error {
 	o := r.owner(key, fh)
 	switch typ {
@@ -340,6 +418,9 @@ func (r *lockRec) flockSet(key lockKey, fh uint64, typ uint32) error {
 			if r.owners[i].key != key && r.owners[i].flock == wire.LockWrite {
 				return syscall.EAGAIN
 			}
+		}
+		if o.flock == wire.LockWrite {
+			r.wake = true
 		}
 		o.flock = wire.LockRead
 	case wire.LockWrite:
@@ -360,6 +441,9 @@ func (r *lockRec) flockSet(key lockKey, fh uint64, typ uint32) error {
 
 // dropFH drops every owner that last named this file handle.
 func (r *lockRec) dropFH(fh uint64) bool {
+	if fh != 0 {
+		r.keepWaiters(func(w lockWaiter) bool { return w.fh != fh })
+	}
 	changed := false
 	for i := len(r.owners) - 1; i >= 0; i-- {
 		if !r.owners[i].hasFH(fh) {
@@ -377,6 +461,7 @@ func (r *lockRec) dropFH(fh uint64) bool {
 
 // dropClient drops every lock one mount holds on this inode.
 func (r *lockRec) dropClient(client string) bool {
+	r.keepWaiters(func(w lockWaiter) bool { return w.key.client != client })
 	changed := false
 	for i := len(r.owners) - 1; i >= 0; i-- {
 		if r.owners[i].key.client != client {
@@ -411,10 +496,11 @@ func (t *Tree) record(e *entry) *lockRec {
 	return e.locks
 }
 
+// lockTarget resolves p to a regular-file inode and composite lock owner key.
 func lockTarget(t *Tree, p wire.Params) (uint64, lockKey, error) {
 	ino := p.Inode
 	if ino == 0 && p.Fh != 0 {
-		if id, ok := t.inoOf(p.Fh); ok {
+		if id, ok := t.InodeOf(p.Fh); ok {
 			ino = id
 		}
 	}
@@ -483,47 +569,93 @@ func getlk(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 	return wire.Result{Lock: &out}, nil
 }
 
-func setlk(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
+// prepLock validates a setlk or setlkw request and resolves its inode, owner key, and byte span.
+func prepLock(ctx context.Context, t *Tree, p wire.Params) (uint64, lockKey, uint64, uint64, error) {
 	if err := ctx.Err(); err != nil {
-		return wire.Result{}, err
+		return 0, lockKey{}, 0, 0, err
 	}
 	ino, key, err := lockTarget(t, p)
 	if err != nil {
-		return wire.Result{}, wrap("setlk", err)
+		return 0, lockKey{}, 0, 0, err
 	}
 	if p.Flags&^wire.FlagFlock != 0 {
-		return wire.Result{}, wrap("setlk", syscall.EINVAL)
+		return 0, lockKey{}, 0, 0, syscall.EINVAL
 	}
-	flock := p.Flags&wire.FlagFlock != 0
 	start, end, err := lockRange(p)
 	if err != nil {
-		return wire.Result{}, wrap("setlk", err)
+		return 0, lockKey{}, 0, 0, err
+	}
+	return ino, key, start, end, nil
+}
+
+// runLock applies one setlk or setlkw change to an inode lock record under t.mu.
+func runLock(rec *lockRec, key lockKey, start, end uint64, p wire.Params) error {
+	if p.Flags&wire.FlagFlock != 0 {
+		if err := rec.flockSet(key, p.Fh, p.Lock); err != nil {
+			return err
+		}
+		rec.keepWaiters(func(w lockWaiter) bool { return w.key != key || !w.flock })
+		return nil
+	}
+	switch p.Lock {
+	case wire.LockUnlock:
+		rec.unlock(key, start, end)
+		rec.keepWaiters(func(w lockWaiter) bool {
+			return !rec.waiterDone(w, key, start, end, p.Lock)
+		})
+	case wire.LockRead, wire.LockWrite:
+		if rec.conflicts(key, start, end, p.Lock) {
+			return syscall.EAGAIN
+		}
+		rec.put(key, p.Fh, start, end, p.Lock, p.Pid)
+		rec.keepWaiters(func(w lockWaiter) bool {
+			return !rec.waiterDone(w, key, start, end, p.Lock)
+		})
+	default:
+		return syscall.EINVAL
+	}
+	return nil
+}
+
+// lockOp executes setlk or setlkw and invokes onWait under t.mu when the lock conflicts.
+func lockOp(ctx context.Context, t *Tree, name string, p wire.Params, onWait func(*lockRec, lockWaiter)) (wire.Result, error) {
+	ino, key, start, end, err := prepLock(ctx, t, p)
+	if err != nil {
+		return wire.Result{}, wrap(name, err)
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	e, ok := t.entry(p.Namespace, ino)
 	if !ok {
-		return wire.Result{}, wrap("setlk", syscall.ENOENT)
+		return wire.Result{}, wrap(name, syscall.ENOENT)
 	}
 	rec := t.record(e)
-	if flock {
-		if err := rec.flockSet(key, p.Fh, p.Lock); err != nil {
-			return wire.Result{}, wrap("setlk", err)
+	if err := runLock(rec, key, start, end, p); err != nil {
+		if err == syscall.EAGAIN && onWait != nil {
+			onWait(rec, lockWaiter{
+				key:   key,
+				fh:    p.Fh,
+				start: start,
+				end:   end,
+				typ:   p.Lock,
+				flock: p.Flags&wire.FlagFlock != 0,
+			})
 		}
-		return wire.Result{}, nil
-	}
-	switch p.Lock {
-	case wire.LockUnlock:
-		rec.unlock(key, start, end)
-	case wire.LockRead, wire.LockWrite:
-		if rec.conflicts(key, start, end, p.Lock) {
-			return wire.Result{}, wrap("setlk", syscall.EAGAIN)
-		}
-		rec.put(key, p.Fh, start, end, p.Lock, p.Pid)
-	default:
-		return wire.Result{}, wrap("setlk", syscall.EINVAL)
+		return wire.Result{}, wrap(name, err)
 	}
 	return wire.Result{}, nil
+}
+
+// setlk acquires or releases a lock without registering a waiter on EAGAIN.
+func setlk(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
+	return lockOp(ctx, t, "setlk", p, nil)
+}
+
+// setlkw acquires or releases a lock and records a waiter under t.mu on EAGAIN.
+func setlkw(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
+	return lockOp(ctx, t, "setlkw", p, func(rec *lockRec, w lockWaiter) {
+		rec.addWaiter(w)
+	})
 }
 
 // DropFH drops the locks an open held on one inode.
@@ -537,7 +669,7 @@ func (t *Tree) DropFH(ns string, ino, fh uint64) bool {
 	return e.locks.dropFH(fh)
 }
 
-// DropClient drops every lock one mount holds on one inode.
+// DropOwner drops one owner's locks on one inode.
 func (t *Tree) DropOwner(ns string, ino uint64, client string, owner uint64) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -546,6 +678,7 @@ func (t *Tree) DropOwner(ns string, ino uint64, client string, owner uint64) boo
 		return false
 	}
 	key := lockKey{client: client, owner: owner}
+	e.locks.keepWaiters(func(w lockWaiter) bool { return w.key != key })
 	if e.locks.find(key) == nil {
 		return false
 	}
@@ -581,8 +714,8 @@ func (t *Tree) InodeOf(fh uint64) (uint64, bool) {
 	return t.inoOf(fh)
 }
 
-// TookWake consumes a pending release wake and returns the inode it
-// happened on.
+// TookWake consumes a pending release wake and returns the inode when at least
+// one client is waiting on it.
 func (t *Tree) TookWake(ns string, p wire.Params) (uint64, bool) {
 	ino := p.Inode
 	if ino == 0 && p.Fh != 0 {
@@ -598,5 +731,24 @@ func (t *Tree) TookWake(ns string, p wire.Params) (uint64, bool) {
 		return 0, false
 	}
 	e.locks.wake = false
+	if len(e.locks.waiters) == 0 {
+		return 0, false
+	}
 	return ino, true
+}
+
+// AnyWaiting reports whether any inode in ns has a waiting lock request.
+func (t *Tree) AnyWaiting(ns string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	st := t.ns[ns]
+	if st == nil {
+		return false
+	}
+	for _, e := range st.byIno {
+		if e.locks != nil && len(e.locks.waiters) > 0 {
+			return true
+		}
+	}
+	return false
 }

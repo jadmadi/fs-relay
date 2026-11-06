@@ -82,6 +82,7 @@ func ping(ctx context.Context, conn *websocket.Conn) {
 	}
 }
 
+// readCalls dispatches incoming WebSocket RPC frames across per-lane goroutines.
 func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Conn, ns, client string, wr *wsWriter, wg *sync.WaitGroup) {
 	var mu sync.Mutex
 	lanes := map[uint64]struct{}{}
@@ -96,9 +97,6 @@ func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Co
 			defer wg.Done()
 			defer release(lanes, &mu, req.ID)
 			res, callErr := tree.Call(ctx, req.Method, req.Params)
-			if req.Method == wire.Setlkw && errors.Is(callErr, syscall.EAGAIN) {
-				h.markWaiting(ns, lockInode(tree, req.Params), req.Params.Client)
-			}
 			publishCall(h, tree, ns, req.Method, req.Params, callErr)
 			b, err := wsBody(req.ID, res, callErr)
 			if err != nil {

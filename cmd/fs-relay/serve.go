@@ -34,6 +34,7 @@ func handler(tree *local.Tree, h *hub) (http.Handler, *rawSet) {
 	return withToken(h.token, mux), set
 }
 
+// serve handles a FlatBuffers RPC POST or long-poll join for a namespace.
 func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 	ns := r.PathValue("ns")
 	if err := wire.CheckNS(ns); err != nil {
@@ -64,9 +65,6 @@ func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := tree.Call(r.Context(), req.Method, req.Params)
-	if req.Method == wire.Setlkw && errors.Is(err, syscall.EAGAIN) {
-		h.markWaiting(ns, lockInode(tree, req.Params), req.Params.Client)
-	}
 	publishCall(h, tree, ns, req.Method, req.Params, err)
 	writeCall(w, res, err)
 }
@@ -84,10 +82,11 @@ func writeNamespaceErr(w http.ResponseWriter, ns string, err error) {
 	}
 }
 
+// publishCall broadcasts directory cache evictions and lock-release wakes after a call.
 func publishCall(h *hub, tree *local.Tree, ns, method string, p wire.Params, err error) {
 	if err != nil {
 		if method == wire.Release {
-			if ino, ok := tree.TookWake(ns, p); ok && h.clearWaiting(ns, ino) {
+			if _, ok := tree.TookWake(ns, p); ok {
 				h.releaseAll(ns)
 			}
 		}
@@ -96,7 +95,7 @@ func publishCall(h *hub, tree *local.Tree, ns, method string, p wire.Params, err
 	h.evict(ns, tree.Changed(method, p))
 	switch method {
 	case wire.Setlk, wire.Setlkw, wire.Release:
-		if ino, ok := tree.TookWake(ns, p); ok && h.clearWaiting(ns, ino) {
+		if _, ok := tree.TookWake(ns, p); ok {
 			h.releaseAll(ns)
 		}
 	}

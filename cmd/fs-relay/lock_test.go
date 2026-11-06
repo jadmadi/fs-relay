@@ -20,6 +20,7 @@ import (
 const (
 	uuidA = "00000000-0000-7000-8000-00000000000a"
 	uuidB = "00000000-0000-7000-8000-00000000000b"
+	uuidC = "00000000-0000-7000-8000-00000000000c"
 )
 
 func lockServer(t *testing.T) (*httptest.Server, *local.Tree, *hub) {
@@ -235,5 +236,137 @@ func TestHoldKeepsLocksOnRejoin(t *testing.T) {
 		Owner: 2, Lock: wire.LockWrite, Offset: 500, Size: 1,
 	}); !errors.Is(err, syscall.EAGAIN) {
 		t.Fatalf("rejoin dropped locks: %v", err)
+	}
+}
+
+// TestThreeWaitersWakeOnSuccessiveUnlocks verifies three contending mounts wake across back-to-back unlocks.
+func TestThreeWaitersWakeOnSuccessiveUnlocks(t *testing.T) {
+	srv, _, _ := lockServer(t)
+	a := lockCaller(t, srv.URL, testToken)
+	b := &client.Client{URL: srv.URL, NS: "demo", Token: testToken}
+	c := &client.Client{URL: srv.URL, NS: "demo", Token: testToken}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = b.Listen(ctx) }()
+	go func() { _ = c.Listen(ctx) }()
+	time.Sleep(50 * time.Millisecond)
+
+	pa := wire.Params{
+		Inode: a.ino, Fh: a.fh, Client: signClient(testToken, uuidA),
+		Owner: 1, Lock: wire.LockWrite, Offset: 600, Size: 1,
+	}
+	if _, err := a.c.Call(ctx, wire.Setlk, pa); err != nil {
+		t.Fatal(err)
+	}
+
+	pb := wire.Params{
+		Inode: a.ino, Client: signClient(testToken, uuidB),
+		Owner: 2, Lock: wire.LockWrite, Offset: 600, Size: 1,
+	}
+	pc := wire.Params{
+		Inode: a.ino, Client: signClient(testToken, uuidC),
+		Owner: 3, Lock: wire.LockWrite, Offset: 600, Size: 1,
+	}
+	for _, tc := range []struct {
+		cl *client.Client
+		p  wire.Params
+	}{{b, pb}, {c, pc}} {
+		_, err := tc.cl.Call(ctx, wire.Setlkw, tc.p)
+		var werr *wire.Error
+		if !errors.As(err, &werr) || werr.Code != uint32(syscall.EAGAIN) {
+			t.Fatalf("initial setlkw: %v", err)
+		}
+	}
+
+	relB := b.Releases()
+	relC1 := c.Releases()
+	pa.Lock = wire.LockUnlock
+	if _, err := a.c.Call(ctx, wire.Setlk, pa); err != nil {
+		t.Fatal(err)
+	}
+	for _, ch := range []<-chan struct{}{relB, relC1} {
+		select {
+		case <-ch:
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("first release event not received")
+		}
+	}
+
+	if _, err := b.Call(ctx, wire.Setlkw, pb); err != nil {
+		t.Fatalf("client B acquire: %v", err)
+	}
+
+	relC2 := c.Releases()
+	pb.Lock = wire.LockUnlock
+	if _, err := b.Call(ctx, wire.Setlk, pb); err != nil {
+		t.Fatalf("client B unlock: %v", err)
+	}
+	select {
+	case <-relC2:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("second release event not sent to remaining waiter C")
+	}
+
+	if _, err := c.Call(ctx, wire.Setlkw, pc); err != nil {
+		t.Fatalf("client C acquire: %v", err)
+	}
+}
+
+// TestConcurrentSetlkwAndUnlockNeverMissesRelease verifies concurrent setlkw and unlock calls never lose a release wake.
+func TestConcurrentSetlkwAndUnlockNeverMissesRelease(t *testing.T) {
+	srv, _, _ := lockServer(t)
+	a := lockCaller(t, srv.URL, testToken)
+	b := &client.Client{URL: srv.URL, NS: "demo", Token: testToken}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = b.Listen(ctx) }()
+	time.Sleep(50 * time.Millisecond)
+
+	idA := signClient(testToken, uuidA)
+	idB := signClient(testToken, uuidB)
+	for i := 0; i < 50; i++ {
+		pa := wire.Params{
+			Inode: a.ino, Fh: a.fh, Client: idA,
+			Owner: 1, Lock: wire.LockWrite, Offset: 700, Size: 1,
+		}
+		if _, err := a.c.Call(ctx, wire.Setlk, pa); err != nil {
+			t.Fatalf("iter %d lock A: %v", i, err)
+		}
+
+		rel := b.Releases()
+		unlockDone := make(chan error, 1)
+		go func() {
+			u := pa
+			u.Lock = wire.LockUnlock
+			_, err := a.c.Call(ctx, wire.Setlk, u)
+			unlockDone <- err
+		}()
+
+		pb := wire.Params{
+			Inode: a.ino, Client: idB,
+			Owner: 2, Lock: wire.LockWrite, Offset: 700, Size: 1,
+		}
+		_, err := b.Call(ctx, wire.Setlkw, pb)
+		if uerr := <-unlockDone; uerr != nil {
+			t.Fatalf("iter %d unlock A: %v", i, uerr)
+		}
+		if err != nil {
+			var werr *wire.Error
+			if !errors.As(err, &werr) || werr.Code != uint32(syscall.EAGAIN) {
+				t.Fatalf("iter %d setlkw B: %v", i, err)
+			}
+			select {
+			case <-rel:
+			case <-time.After(200 * time.Millisecond):
+				t.Fatalf("iter %d missed release after EAGAIN", i)
+			}
+			if _, err := b.Call(ctx, wire.Setlkw, pb); err != nil {
+				t.Fatalf("iter %d retry setlkw B: %v", i, err)
+			}
+		}
+		pb.Lock = wire.LockUnlock
+		if _, err := b.Call(ctx, wire.Setlk, pb); err != nil {
+			t.Fatalf("iter %d unlock B: %v", i, err)
+		}
 	}
 }
