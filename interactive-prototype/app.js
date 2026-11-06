@@ -1,266 +1,7 @@
 // fs-relay 3D Protocol & Topology Lab (Three.js + Claude Interactive Diagram Pattern)
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-const STRUCTURES = [
-  {
-    id: 'mount-a',
-    code: 'MNT-01',
-    name: 'Client Mount A (/mnt/work-a)',
-    system: 'transport',
-    color: 0xf43f5e,
-    pos: { topology: [-8.2, 2.4, 2.2], cutaway: [-9.5, 3.0, 2.5] },
-    geom: 'box',
-    size: [2.3, 1.35, 1.6],
-    tagline: 'Primary user-space FUSE 3 mount with in-process attribute & directory caches.',
-    overview: 'Runs fs-relay-bind as an unprivileged user process. The Linux kernel VFS talks to /dev/fuse; clean metadata hits stay in-process until an invalidation frame arrives.',
-    specs: [
-      ['Process', 'fs-relay-bind (no root)'],
-      ['Kernel bridge', '/dev/fuse (FUSE 3 protocol)'],
-      ['Local cache', 'Inode attr + dentry cache (invalidated on push)'],
-      ['Session ID', 'UUIDv7 assigned on WebSocket handshake']
-    ],
-    guarantees: [
-      'Local stat() and readdir() hits return in sub-millisecond time while no remote writer mutates the inode.',
-      'When disconnected, open handles and POSIX byte-range locks survive inside the 8s reconnect grace window.'
-    ],
-    related: ['ws-mux', 'raw-splice', 'mount-b']
-  },
-  {
-    id: 'mount-b',
-    code: 'MNT-02',
-    name: 'Client Mount B (/mnt/work-b)',
-    system: 'coherence',
-    color: 0x38bdf8,
-    pos: { topology: [-8.2, -2.2, -2.0], cutaway: [-9.5, -2.6, -2.2] },
-    geom: 'box',
-    size: [2.3, 1.35, 1.6],
-    tagline: 'Peer FUSE 3 mount subscribed to broadcast invalidations and lock wakeups.',
-    overview: 'Second machine mounting the same namespace. Receives unsolicited FlatBuffers invalidation frames over its WebSocket whenever Mount A mutates shared inodes.',
-    specs: [
-      ['Peer role', 'Concurrent reader / contender'],
-      ['Invalidation path', 'Unsolicited WS frame (id == 0)'],
-      ['Eviction target', 'Kernel dentry + page cache for target Ino'],
-      ['Lock contention', 'Waits asynchronously on server lock channel']
-    ],
-    guarantees: [
-      'Never serves stale directory entries after a peer write completes and broadcasts.',
-      'Blocked fcntl(F_SETLKW) calls hold zero mutexes while awaiting release notification.'
-    ],
-    related: ['hub-fanout', 'lock-table', 'ws-mux']
-  },
-  {
-    id: 'ws-mux',
-    code: 'TRN-01',
-    name: 'Persistent WebSocket Multiplexer',
-    system: 'transport',
-    color: 0xf43f5e,
-    pos: { topology: [-4.2, 1.6, 0.8], cutaway: [-5.2, 2.2, 1.0] },
-    geom: 'cylinder',
-    size: [0.95, 0.95, 2.2],
-    tagline: 'Full-duplex binary FlatBuffers pipe for metadata RPCs and server push.',
-    overview: 'Carries all 26 FUSE operations over a single upgraded HTTP connection. Requests multiplex out-of-order by correlation ID; server push frames use ID 0.',
-    specs: [
-      ['Endpoint', 'GET /ws?ns=<namespace> (HTTP Upgrade)'],
-      ['Framing', 'Binary FlatBuffers Request / Response'],
-      ['Multiplexing', 'Concurrent in-flight calls keyed by uint64 id'],
-      ['Server push', 'id = 0 for cache invalidation & lock wakeups']
-    ],
-    guarantees: [
-      'Zero TCP/TLS handshake cost after mount startup.',
-      'Interleaves fast stat/lookup calls alongside long blocking lock waits without head-of-line blocking.'
-    ],
-    related: ['mount-a', 'wire-codec', 'post-join']
-  },
-  {
-    id: 'post-join',
-    code: 'TRN-02',
-    name: '8s Session Hold & POST Fallback',
-    system: 'transport',
-    color: 0xf59e0b,
-    pos: { topology: [-4.2, -2.1, 1.8], cutaway: [-5.2, -2.4, 2.0] },
-    geom: 'octa',
-    size: [1.15, 1.15, 1.15],
-    tagline: 'UUIDv7 session continuity across network blips and stateless HTTP POST.',
-    overview: 'When a WebSocket drops, the server freezes the session handle table and POSIX locks for 8 seconds instead of tearing them down. Reconnecting with X-FS-Relay-Session reclaims state.',
-    specs: [
-      ['Header', 'X-FS-Relay-Session: <UUIDv7>'],
-      ['Hold window', '8.0 seconds before handle & lock sweep'],
-      ['Fallback RPC', 'POST /rpc (stateless unary FlatBuffers)'],
-      ['Recovery', 'Seamless re-bind of open FHs and active locks']
-    ],
-    guarantees: [
-      'A transient Wi-Fi or switch flap under 8 seconds never drops an in-flight SQLite transaction or open file descriptor.',
-      'Expired sessions deterministically release all held byte-range locks and wake queued contenders.'
-    ],
-    related: ['ws-mux', 'lock-table', 'wire-codec']
-  },
-  {
-    id: 'wire-codec',
-    code: 'WIR-01',
-    name: 'FlatBuffers Zero-Allocation Codec',
-    system: 'transport',
-    color: 0xf43f5e,
-    pos: { topology: [-0.6, 1.5, 0.0], cutaway: [-1.8, 2.2, 0.0] },
-    geom: 'box',
-    size: [1.9, 1.5, 1.9],
-    tagline: 'Direct vtable offset reads in internal/wire with zero reflection or JSON parsing.',
-    overview: 'Decodes incoming binary envelopes directly from the socket buffer via FlatBuffers vtable offsets. Dispatches via a closed 26-entry method switch table.',
-    specs: [
-      ['Schema', 'internal/wire/fsrelay.fbs'],
-      ['Imports', 'Zero net/http, zero os, zero go-fuse imports'],
-      ['Error model', 'Single errno table -> wire error.code'],
-      ['Threshold', 'Payloads <= 64 KiB stay inline in FlatBuffers']
-    ],
-    guarantees: [
-      'Zero heap allocations for field decoding during hot metadata lookups.',
-      'Strict package boundary: internal/wire never touches OS files or HTTP headers.'
-    ],
-    related: ['ws-mux', 'hub-fanout', 'inode-map']
-  },
-  {
-    id: 'hub-fanout',
-    code: 'COH-01',
-    name: 'Namespace Fan-out Hub',
-    system: 'coherence',
-    color: 0x38bdf8,
-    pos: { topology: [0.4, -1.8, -1.5], cutaway: [0.2, -2.2, -1.8] },
-    geom: 'torus',
-    size: [1.15, 0.32, 24],
-    tagline: 'Broadcasts targeted inode/dentry invalidations to every other connected mount.',
-    overview: 'Tracks active WebSocket sessions per namespace. When any mutating call (Write, Unlink, Rename, Setattr) succeeds, the hub fans out an invalidation frame to all peers except the writer.',
-    specs: [
-      ['Scope', 'Per-namespace subscriber registry'],
-      ['Trigger ops', 'Write, Create, Unlink, Rename, Mkdir, Setattr'],
-      ['Filter rule', 'Sender session excluded from echo'],
-      ['Payload', 'Target Ino + parent dir Ino + entry name']
-    ],
-    guarantees: [
-      'Peers evict only the mutated inode instead of flushing their entire mount cache.',
-      'Writer mount keeps its warm cache because it originated the mutation.'
-    ],
-    related: ['mount-b', 'wire-codec', 'inode-map']
-  },
-  {
-    id: 'lock-table',
-    code: 'LCK-01',
-    name: 'POSIX Byte-Range & SQLite Lock Table',
-    system: 'locks',
-    color: 0x34d399,
-    pos: { topology: [3.2, 1.8, 1.6], cutaway: [2.2, 0.6, 1.2] },
-    geom: 'lockrings',
-    size: [1.55, 0.22, 32],
-    tagline: 'Server-coordinated fcntl byte-range intervals (PENDING, RESERVED, SHARED/EXCLUSIVE).',
-    overview: 'Coordinates POSIX advisory locks across remote machines so multi-node SQLite and flock/fcntl workloads serialize cleanly without corrupting shared journals.',
-    specs: [
-      ['Ops', 'Getlk, Setlk, Setlkw (blocking wait)'],
-      ['SQLite ranges', 'PENDING (0x40000000), RESERVED (+1), SHARED (+2..510)'],
-      ['Wait discipline', 'Waiter parks on channel; holds zero mutexes'],
-      ['Owner key', '(Session UUIDv7, FUSE lk_owner uint64)']
-    ],
-    guarantees: [
-      'Overlapping exclusive byte ranges strictly serialize across all connected mounts.',
-      'A blocked Setlkw waiter never blocks unrelated metadata or I/O calls on the server.'
-    ],
-    related: ['post-join', 'inode-map', 'mount-b']
-  },
-  {
-    id: 'raw-splice',
-    code: 'SPL-01',
-    name: 'HTTP Raw Bulk Splice Lane (> 64 KiB)',
-    system: 'raw',
-    color: 0xa78bfa,
-    pos: { topology: [1.2, -0.1, 3.2], cutaway: [0.5, -0.4, 3.6] },
-    geom: 'cylinder',
-    size: [0.65, 0.65, 5.8],
-    tagline: 'Bypasses FlatBuffers framing for bulk reads and writes above 64 KiB.',
-    overview: 'Large reads and writes switch to raw HTTP streaming (/raw) with compact X-FS-Relay-* headers, copying bytes straight between the TCP socket and the local file descriptor.',
-    specs: [
-      ['Crossover', 'Payloads > 64 KiB (configurable threshold)'],
-      ['Headers', 'X-FS-Relay-Ino, X-FS-Relay-Fh, X-FS-Relay-Off'],
-      ['Framing overhead', '0 bytes of FlatBuffers envelope around bulk data'],
-      ['Throughput', 'Saturates gigabit/loopback pipes without double buffering']
-    ],
-    guarantees: [
-      'Eliminates base64 or nested byte-vector copying on multi-megabyte reads and writes.',
-      'Coexists with the WebSocket lane: metadata stays on WS while bulk streams over HTTP.'
-    ],
-    related: ['mount-a', 'disk-store', 'ws-mux']
-  },
-  {
-    id: 'inode-map',
-    code: 'LOC-01',
-    name: 'internal/local Inode & Sandbox Guard',
-    system: 'storage',
-    color: 0xf59e0b,
-    pos: { topology: [5.2, 0.4, -1.2], cutaway: [5.8, 0.8, -1.0] },
-    geom: 'box',
-    size: [2.1, 1.8, 1.8],
-    tagline: 'Single-function path resolver refusing ../ escape + 64-bit inode & handle tables.',
-    overview: 'The only package allowed to touch os and unix syscalls. Resolves every path beneath data/<namespace>/ in a single hardened function and maps stable uint64 inodes and file handles.',
-    specs: [
-      ['Sandbox root', 'data/<namespace>/ (strict lexical + openat guard)'],
-      ['State tables', 'Inode map + Open file handle table'],
-      ['Locking rule', 'Table mutex never held across disk I/O'],
-      ['Error output', 'Returns wrapped syscall.Errno values']
-    ],
-    guarantees: [
-      'Any path traversal attempt (../ or symlink escape outside namespace) returns EACCES/EINVAL before touching disk.',
-      'Inode table locks are released before pread/pwrite syscalls execute.'
-    ],
-    related: ['wire-codec', 'lock-table', 'disk-store']
-  },
-  {
-    id: 'disk-store',
-    code: 'DSK-01',
-    name: 'Host Backing Directory (POSIX + xattr)',
-    system: 'storage',
-    color: 0x94a3b8,
-    pos: { topology: [8.4, -0.4, 0.4], cutaway: [9.4, -0.4, 0.4] },
-    geom: 'cylinder',
-    size: [1.45, 1.45, 2.4],
-    tagline: 'Plain host directory storing real files, permissions, symlinks, and extended attributes.',
-    overview: 'No proprietary block format or object chunking. Files live as ordinary POSIX files on the server host disk so backup tools, git, and local processes can inspect them directly.',
-    specs: [
-      ['Format', 'Native host filesystem under data/<namespace>/'],
-      ['POSIX surface', 'pread, pwrite, fsync, rename, symlink, xattr'],
-      ['Benchmark edge', '10.6x faster than WebDAV on git status / tree walks'],
-      ['Dependencies', 'Zero root daemon, zero kernel NFS exports']
-    ],
-    guarantees: [
-      'Stopping fs-relay leaves a clean, directly readable directory tree on the host.',
-      'Atomic rename and fsync semantics map 1:1 to the underlying host filesystem.'
-    ],
-    related: ['inode-map', 'raw-splice']
-  }
-];
-
-const EDGES = [
-  { from: 'mount-a', to: 'ws-mux', system: 'transport', color: 0xf43f5e },
-  { from: 'mount-b', to: 'ws-mux', system: 'transport', color: 0x38bdf8 },
-  { from: 'mount-a', to: 'post-join', system: 'transport', color: 0xf59e0b },
-  { from: 'post-join', to: 'wire-codec', system: 'transport', color: 0xf59e0b },
-  { from: 'ws-mux', to: 'wire-codec', system: 'transport', color: 0xf43f5e },
-  { from: 'wire-codec', to: 'hub-fanout', system: 'coherence', color: 0x38bdf8 },
-  { from: 'hub-fanout', to: 'mount-b', system: 'coherence', color: 0x38bdf8 },
-  { from: 'wire-codec', to: 'lock-table', system: 'locks', color: 0x34d399 },
-  { from: 'lock-table', to: 'inode-map', system: 'locks', color: 0x34d399 },
-  { from: 'wire-codec', to: 'inode-map', system: 'storage', color: 0xf59e0b },
-  { from: 'inode-map', to: 'disk-store', system: 'storage', color: 0x94a3b8 },
-  { from: 'mount-a', to: 'raw-splice', system: 'raw', color: 0xa78bfa },
-  { from: 'raw-splice', to: 'disk-store', system: 'raw', color: 0xa78bfa }
-];
-
-const QUIZ = [
-  { q: 'A 4 MiB file read arrives from Mount A. Which structure bypasses FlatBuffers framing to stream raw bytes above 64 KiB?', target: 'raw-splice', hint: 'Look for the purple bulk bypass cylinder connecting Mount A directly toward the backing store.' },
-  { q: 'Mount A writes to shared file config.db. Which structure broadcasts an unsolicited invalidation frame (id == 0) to Mount B?', target: 'hub-fanout', hint: 'Inspect the cyan torus responsible for per-namespace cache coherence fan-out.' },
-  { q: 'A laptop Wi-Fi connection drops for 3 seconds mid-transaction. Which structure preserves open file handles and POSIX locks for 8 seconds?', target: 'post-join', hint: 'Check the amber octahedron handling UUIDv7 session continuity and HTTP POST fallback.' },
-  { q: 'Two nodes run concurrent SQLite transactions. Which structure coordinates PENDING, RESERVED, and EXCLUSIVE byte-range intervals without holding a mutex while waiting?', target: 'lock-table', hint: 'Find the emerald concentric ring assembly representing byte-range lock intervals.' },
-  { q: 'Which structure enforces the single-function path sandbox under data/<namespace>/ and refuses ../ traversal before any disk syscall runs?', target: 'inode-map', hint: 'Select the amber storage gateway right in front of the Host Backing Directory.' },
-  { q: 'Which component decodes incoming RPC envelopes directly via vtable offsets with zero net/http or os imports?', target: 'wire-codec', hint: 'Locate the central crimson cube between the WebSocket multiplexer and the server subsystems.' },
-  { q: 'Which peer client mount receives unsolicited cache eviction pushes and waits on contended byte-range locks?', target: 'mount-b', hint: 'Select the lower-left cyan client mount node.' },
-  { q: 'Where do files finally rest as ordinary POSIX files and extended attributes with zero proprietary chunking?', target: 'disk-store', hint: 'Click the rightmost slate cylinder representing the host backing directory.' }
-];
+import { STRUCTURES, EDGES, QUIZ, GUIDE_STEPS } from './data.js';
 
 // --- Web Audio API Synthesizer (muted by default) ---
 let audioOn = false;
@@ -292,7 +33,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
-camera.position.set(0, 8.2, 22.8);
+camera.position.set(0, 7.8, 22.0);
 
 const controls = new OrbitControls(camera, canvasEl);
 controls.enableDamping = true;
@@ -302,7 +43,6 @@ controls.minDistance = 6;
 controls.maxDistance = 36;
 controls.target.set(0, 0, 0);
 
-// Subtle grid floor & lighting
 const grid = new THREE.GridHelper(28, 28, 0x263540, 0x162129);
 grid.position.y = -4.0;
 scene.add(grid);
@@ -315,7 +55,7 @@ const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.8);
 rimLight.position.set(-12, -8, -10);
 scene.add(rimLight);
 
-// --- Build 3D Structures & 2D Floating Labels ---
+// --- Build 3D Structures & Multi-Machine Silhouettes ---
 const meshMap = new Map();
 const pickables = [];
 const tagMap = new Map();
@@ -331,12 +71,56 @@ function buildGeometry(s) {
   if (s.geom === 'torus') return new THREE.TorusGeometry(s.size[0], s.size[1], 18, 42);
   if (s.geom === 'octa') return new THREE.OctahedronGeometry(s.size[0], 0);
   if (s.geom === 'lockrings') return new THREE.TorusGeometry(s.size[0], s.size[1], 16, 48);
+  if (s.id === 'mount-a') return new THREE.BoxGeometry(2.3, 0.22, 1.6); // Laptop base deck
+  if (s.id === 'mount-b') return new THREE.BoxGeometry(2.2, 1.35, 0.22); // Desktop monitor panel
   return new THREE.BoxGeometry(s.size[0], s.size[1], s.size[2]);
+}
+
+function decorateMultiMachineNode(group, s) {
+  if (s.id === 'mount-a') {
+    // Hinged laptop screen
+    const lid = new THREE.Mesh(
+      new THREE.BoxGeometry(2.25, 1.35, 0.12),
+      new THREE.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.25, metalness: 0.3 })
+    );
+    lid.position.set(0, 0.72, -0.72);
+    lid.rotation.x = -0.22;
+    group.add(lid);
+  } else if (s.id === 'mount-b') {
+    // Monitor stand + desktop workstation tower + cloud VM blade
+    const stand = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9, 0.16, 0.9),
+      new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.35 })
+    );
+    stand.position.set(0, -0.78, 0);
+    const tower = new THREE.Mesh(
+      new THREE.BoxGeometry(0.75, 1.55, 1.25),
+      new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.3, transparent: true, opacity: 0.88 })
+    );
+    tower.position.set(-1.65, -0.05, 0.2);
+    const vmBlade = new THREE.Mesh(
+      new THREE.BoxGeometry(1.8, 0.42, 1.2),
+      new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.3, transparent: true, opacity: 0.82 })
+    );
+    vmBlade.position.set(0.2, 1.25, -0.9);
+    group.add(stand, tower, vmBlade);
+  } else if (s.id === 'disk-store') {
+    // 3 shared live files resting inside the single host directory
+    const colors = [0xf43f5e, 0x38bdf8, 0x34d399];
+    colors.forEach((col, i) => {
+      const f = new THREE.Mesh(
+        new THREE.BoxGeometry(0.65, 0.48, 0.85),
+        new THREE.MeshStandardMaterial({ color: col, roughness: 0.25 })
+      );
+      f.position.set((i - 1) * 0.72, 1.45, 0);
+      group.add(f);
+    });
+  }
 }
 
 STRUCTURES.forEach((s) => {
   const group = new THREE.Group();
-  group.position.set(...s.pos.topology);
+  group.position.set(...s.pos.everyday);
   group.userData = { id: s.id, struct: s };
 
   const geom = buildGeometry(s);
@@ -373,8 +157,9 @@ STRUCTURES.forEach((s) => {
     group.userData.rings = [mesh, inner1, inner2];
   }
 
+  decorateMultiMachineNode(group, s);
   scene.add(group);
-  meshMap.set(s.id, { group, mesh, mat, edges, targetPos: new THREE.Vector3(...s.pos.topology) });
+  meshMap.set(s.id, { group, mesh, mat, edges, targetPos: new THREE.Vector3(...s.pos.everyday) });
 
   const tag = document.createElement('button');
   tag.type = 'button';
@@ -391,6 +176,14 @@ STRUCTURES.forEach((s) => {
   tagMap.set(s.id, tag);
 });
 
+// --- State & Camera Transitions ---
+let currentView = 'everyday';
+let currentSystem = 'all';
+let selectedId = 'disk-store';
+let cameraGoalPos = new THREE.Vector3(0, 7.8, 22.0);
+let cameraGoalTarget = new THREE.Vector3(0, 0, 0);
+let cameraLerpFrames = 0;
+
 // --- Build 3D Connecting Tubes ---
 const activeParticles = [];
 
@@ -400,18 +193,25 @@ function rebuildTubes(activeSystem = 'all') {
     c.geometry.dispose();
     c.material.dispose();
   }
-  EDGES.forEach((e) => {
+  const edgeList = currentView === 'everyday'
+    ? [
+        { from: 'mount-a', to: 'ws-mux', system: 'transport', color: 0xf43f5e },
+        { from: 'mount-b', to: 'ws-mux', system: 'coherence', color: 0x38bdf8 },
+        { from: 'ws-mux', to: 'disk-store', system: 'storage', color: 0x34d399 }
+      ]
+    : EDGES;
+  edgeList.forEach((e) => {
     const a = meshMap.get(e.from).targetPos;
     const b = meshMap.get(e.to).targetPos;
     const mid = a.clone().lerp(b, 0.5);
-    mid.y += (e.system === 'splice' ? -0.6 : 0.55);
+    mid.y += (e.system === 'raw' ? -0.6 : 0.55);
     const curve = new THREE.CatmullRomCurve3([a.clone(), mid, b.clone()]);
-    const geom = new THREE.TubeGeometry(curve, 28, 0.065, 8, false);
+    const geom = new THREE.TubeGeometry(curve, 28, 0.08, 8, false);
     const match = activeSystem === 'all' || activeSystem === e.system;
     const mat = new THREE.MeshBasicMaterial({
       color: e.color,
       transparent: true,
-      opacity: match ? 0.52 : 0.08
+      opacity: match ? 0.62 : 0.08
     });
     const tube = new THREE.Mesh(geom, mat);
     tube.userData = { curve, edge: e };
@@ -427,20 +227,12 @@ function spawnPacket(fromId, toId, colorHex, speed = 0.018) {
   mid.y += 0.55;
   const curve = new THREE.CatmullRomCurve3([a, mid, b]);
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.22, 14, 14),
+    new THREE.SphereGeometry(0.24, 14, 14),
     new THREE.MeshBasicMaterial({ color: colorHex })
   );
   scene.add(mesh);
   activeParticles.push({ mesh, curve, t: 0, speed });
 }
-
-// --- State & Camera Transitions ---
-let currentView = 'topology';
-let currentSystem = 'all';
-let selectedId = 'wire-codec';
-let cameraGoalPos = new THREE.Vector3(0, 8.2, 22.8);
-let cameraGoalTarget = new THREE.Vector3(0, 0, 0);
-let cameraLerpFrames = 0;
 
 function moveCameraTo(posArr, targetArr, frames = 45) {
   cameraGoalPos.set(...posArr);
@@ -603,43 +395,75 @@ function handleStructureActivated(id) {
   const guideCard = document.getElementById('guide-card');
   if (guideCard && !guideCard.classList.contains('hidden') && GUIDE_STEPS[guideIdx].nextTarget === id) {
     stopGuideAutoPlay();
-    applyGuideStep(guideIdx + 1);
+    applyGuideStep(guideIdx + 1, true);
   }
 }
 
+const EVERYDAY_PRIMARY = new Set(['mount-a', 'mount-b', 'ws-mux', 'disk-store']);
+
+const VIEW_PRESETS = {
+  everyday: {
+    posKey: 'everyday',
+    hover: 'Everyday View · Laptop, Office Desktop & Cloud VM sharing 1 live server folder (0 GB copied)',
+    telemetry: 'LAYER 1 · BUSINESS & WORKFLOW',
+    cam: [[0, 7.8, 22.0], [0, 0, 0]],
+    tab: 'overview'
+  },
+  cutaway: {
+    posKey: 'cutaway',
+    hover: 'Cutaway · Byte-range lock rings, FlatBuffers codec, and sandboxed inode resolution',
+    telemetry: 'LAYER 2 · KERNEL & LOCK CUTAWAY',
+    cam: [[1.8, 3.8, 11.5], [1.8, 0.5, 0.2]],
+    tab: 'overview',
+    focus: 'lock-table'
+  },
+  quiz: {
+    posKey: 'topology',
+    hover: 'Self-Test Mode · Click the 3D structure or badge that answers the prompt',
+    telemetry: 'VIEW · QUIZ (8 Qs)',
+    cam: [[0, 8.2, 22.8], [0, 0, 0]],
+    tab: 'quiz'
+  },
+  topology: {
+    posKey: 'topology',
+    hover: 'System Topology · All 10 FUSE, WebSocket, Lock, Splice & Inode structures',
+    telemetry: 'LAYER 2 · OS & PROTOCOL TOPOLOGY',
+    cam: [[0, 8.2, 22.8], [0, 0, 0]],
+    tab: 'overview'
+  }
+};
+
+function updateStructureVisibilityForView(view, posKey) {
+  STRUCTURES.forEach((s) => {
+    const entry = meshMap.get(s.id);
+    entry.targetPos.set(...s.pos[posKey]);
+    const show = view !== 'everyday' || EVERYDAY_PRIMARY.has(s.id);
+    entry.group.visible = show;
+    entry.mat.opacity = 0.9;
+    tagMap.get(s.id).style.visibility = show ? 'visible' : 'hidden';
+    tagMap.get(s.id).classList.remove('dimmed');
+  });
+}
+
 // --- View Switcher, Subsystem Filters & Simulations ---
-function setViewMode(view) {
+function setViewMode(view, moveCam = true) {
   currentView = view;
+  const preset = VIEW_PRESETS[view] || VIEW_PRESETS.topology;
   document.querySelectorAll('.view-switcher [data-view]').forEach((b) => {
     const active = b.dataset.view === view;
     b.classList.toggle('active', active);
     b.setAttribute('aria-pressed', String(active));
   });
 
-  const posKey = view === 'cutaway' ? 'cutaway' : 'topology';
-  STRUCTURES.forEach((s) => {
-    meshMap.get(s.id).targetPos.set(...s.pos[posKey]);
-  });
+  updateStructureVisibilityForView(view, preset.posKey);
   setTimeout(() => rebuildTubes(currentSystem), 180);
 
-  if (view === 'cutaway') {
-    document.getElementById('hud-hover-text').textContent = 'Cutaway · Byte-range lock rings, FlatBuffers codec, and sandboxed inode resolution';
-    document.getElementById('hud-telemetry').textContent = 'VIEW · CUTAWAY';
-    moveCameraTo([1.8, 3.8, 11.5], [1.8, 0.5, 0.2], 50);
-    selectStructure('lock-table');
-    activateInspectorTab('overview');
-  } else if (view === 'quiz') {
-    document.getElementById('hud-hover-text').textContent = 'Self-Test Mode · Click the 3D structure or badge that answers the prompt';
-    document.getElementById('hud-telemetry').textContent = 'VIEW · QUIZ (8 Qs)';
-    moveCameraTo([0, 8.2, 20.5], [0, 0, 0], 45);
-    activateInspectorTab('quiz');
-    updateQuizUI();
-  } else {
-    document.getElementById('hud-hover-text').textContent = 'Drag to orbit · Scroll to zoom · Click any 3D structure';
-    document.getElementById('hud-telemetry').textContent = 'IDLE · 10 structures online';
-    moveCameraTo([0, 8.2, 22.8], [0, 0, 0], 45);
-    activateInspectorTab('overview');
-  }
+  document.getElementById('hud-hover-text').textContent = preset.hover;
+  document.getElementById('hud-telemetry').textContent = preset.telemetry;
+  if (moveCam) moveCameraTo(preset.cam[0], preset.cam[1], 45);
+  if (preset.focus) selectStructure(preset.focus);
+  activateInspectorTab(preset.tab);
+  if (view === 'quiz') updateQuizUI();
 }
 
 function setSystemFilter(sys) {
@@ -651,8 +475,7 @@ function setSystemFilter(sys) {
   });
   STRUCTURES.forEach((s) => {
     const match = sys === 'all' || s.system === sys;
-    const entry = meshMap.get(s.id);
-    entry.mat.opacity = match ? 0.9 : 0.16;
+    meshMap.get(s.id).mat.opacity = match ? 0.9 : 0.16;
     tagMap.get(s.id).classList.toggle('dimmed', !match);
   });
   rebuildTubes(sys);
@@ -696,9 +519,84 @@ function runSimulation(simType) {
   }
 }
 
+// --- Guided Lifecycle Tour & Interactive Coaching Tips (Steps 0..7) ---
+let guideIdx = 0;
+let guideVisited = new Set([0]);
+let guideTimer = null;
+
+const beaconMesh = new THREE.Mesh(
+  new THREE.RingGeometry(1.35, 1.62, 36),
+  new THREE.MeshBasicMaterial({ color: 0xf43f5e, side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
+);
+beaconMesh.rotation.x = Math.PI / 2;
+scene.add(beaconMesh);
+
+function applyGuideStep(idx, moveCam = true) {
+  guideIdx = (idx + GUIDE_STEPS.length) % GUIDE_STEPS.length;
+  guideVisited.add(guideIdx);
+  const step = GUIDE_STEPS[guideIdx];
+
+  if (step.view && step.view !== currentView && currentView !== 'quiz') {
+    setViewMode(step.view, false);
+  }
+
+  document.getElementById('guide-step-badge').textContent = step.badge;
+  document.getElementById('guide-title').textContent = step.title;
+  document.getElementById('guide-body').textContent = step.body;
+  document.getElementById('guide-tip-text').textContent = step.tip;
+
+  const dotsEl = document.getElementById('guide-dots');
+  clearChildren(dotsEl);
+  GUIDE_STEPS.forEach((_, i) => {
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'guide-dot' + (i === guideIdx ? ' active' : (guideVisited.has(i) ? ' done' : ''));
+    dot.textContent = String(i);
+    dot.setAttribute('aria-label', 'Go to step ' + i);
+    dot.addEventListener('click', () => {
+      stopGuideAutoPlay();
+      applyGuideStep(i, true);
+    });
+    dotsEl.appendChild(dot);
+  });
+
+  STRUCTURES.forEach((s) => {
+    tagMap.get(s.id).classList.toggle('coach-target', s.id === step.nextTarget);
+  });
+
+  selectStructure(step.focus);
+  if (moveCam) moveCameraTo(step.cam[0], step.cam[1], 44);
+  step.packets.forEach(([from, to, col], i) => {
+    setTimeout(() => spawnPacket(from, to, col, 0.022), i * 240);
+  });
+}
+
+function stopGuideAutoPlay() {
+  if (!guideTimer) return;
+  clearInterval(guideTimer);
+  guideTimer = null;
+  const playBtn = document.getElementById('btn-guide-play');
+  playBtn.setAttribute('aria-pressed', 'false');
+  playBtn.textContent = '▶ Auto-Play Cycle';
+}
+
+function toggleGuideAutoPlay() {
+  const playBtn = document.getElementById('btn-guide-play');
+  if (guideTimer) {
+    stopGuideAutoPlay();
+    return;
+  }
+  playBtn.setAttribute('aria-pressed', 'true');
+  playBtn.textContent = '⏸ Pause Cycle';
+  applyGuideStep(guideIdx, true);
+  guideTimer = setInterval(() => {
+    applyGuideStep(guideIdx + 1, true);
+  }, 4400);
+}
+
 // --- Bind DOM Controls ---
 document.querySelectorAll('.view-switcher [data-view]').forEach((btn) => {
-  btn.addEventListener('click', () => setViewMode(btn.dataset.view));
+  btn.addEventListener('click', () => setViewMode(btn.dataset.view, true));
 });
 document.querySelectorAll('.sys-tab').forEach((btn) => {
   btn.addEventListener('click', () => setSystemFilter(btn.dataset.sys));
@@ -729,7 +627,7 @@ slider.addEventListener('input', () => {
 
 document.getElementById('btn-reset-cam').addEventListener('click', () => {
   setSystemFilter('all');
-  setViewMode('topology');
+  setViewMode('everyday', true);
 });
 
 const audioBtn = document.getElementById('btn-audio');
@@ -751,99 +649,18 @@ document.getElementById('btn-quiz-reset').addEventListener('click', () => {
   updateQuizUI();
 });
 
-// --- Guided Lifecycle Tour & Interactive Coaching Tips (7 Steps) ---
-const GUIDE_STEPS = [
-  { badge: 'STEP 1 OF 7 · MOUNT & HANDSHAKE', title: '1. Mount & WebSocket Handshake', body: 'You run fs-relay-bind on Client Mount A without root. It upgrades a single HTTP connection into a persistent WebSocket and receives a UUIDv7 session ID.', focus: 'mount-a', nextTarget: 'ws-mux', cam: [[-5.8, 5.2, 13.5], [-6.0, 1.8, 1.4]], packets: [['mount-a', 'ws-mux', 0xf43f5e]], tip: 'Click TRN-01 (pulsing badge) or click here to send a FlatBuffers metadata lookup over the WebSocket.' },
-  { badge: 'STEP 2 OF 7 · ZERO-COPY DECODE', title: '2. Multiplexed Lookup & FlatBuffers Decode', body: 'Small metadata calls (stat, readdir, lookup <= 64 KiB) travel over the WebSocket into internal/wire, which reads fields directly from vtable offsets with zero heap allocations.', focus: 'wire-codec', nextTarget: 'inode-map', cam: [[-1.2, 4.8, 12.2], [-1.0, 1.4, 0.2]], packets: [['ws-mux', 'wire-codec', 0xf43f5e], ['wire-codec', 'inode-map', 0xf59e0b]], tip: 'Click LOC-01 (pulsing badge) or click here to resolve the path inside the namespace sandbox.' },
-  { badge: 'STEP 3 OF 7 · SANDBOX & DISK WRITE', title: '3. Sandboxed Path Guard & POSIX Write', body: 'internal/local verifies the path stays inside data/<namespace>/ (refusing any ../ escape), releases its table lock before I/O, and writes to the host backing directory.', focus: 'inode-map', nextTarget: 'hub-fanout', cam: [[5.4, 4.6, 12.5], [5.8, 0.2, -0.4]], packets: [['inode-map', 'disk-store', 0x94a3b8], ['wire-codec', 'hub-fanout', 0x38bdf8]], tip: 'Click COH-01 (pulsing badge) or click here to see how peer Mount B learns about the write.' },
-  { badge: 'STEP 4 OF 7 · PEER CACHE INVALIDATION', title: '4. Unsolicited Broadcast Evicts Stale Cache', body: 'As soon as Mount A mutates a file, the Namespace Fan-out Hub pushes an unsolicited frame (id == 0) to Mount B so Mount B evicts only that inode from its local kernel cache.', focus: 'hub-fanout', nextTarget: 'mount-b', cam: [[-3.2, 4.2, 13.8], [-3.5, -1.8, -1.5]], packets: [['hub-fanout', 'mount-b', 0x38bdf8]], tip: 'Click MNT-02 (pulsing badge) or click here to inspect how Mount B handles cache eviction and lock contention.' },
-  { badge: 'STEP 5 OF 7 · SQLITE BYTE-RANGE LOCKS', title: '5. Multi-Node SQLite Lock Serialization', body: 'When both mounts run SQLite transactions, the Lock Table coordinates PENDING, RESERVED, and EXCLUSIVE byte ranges. Blocked waiters park on a channel holding zero mutexes.', focus: 'lock-table', nextTarget: 'raw-splice', cam: [[2.8, 4.5, 11.8], [2.8, 1.2, 1.2]], packets: [['mount-a', 'ws-mux', 0x34d399], ['ws-mux', 'wire-codec', 0x34d399], ['wire-codec', 'lock-table', 0x34d399]], tip: 'Click SPL-01 (pulsing purple cylinder) or click here to see what happens when payload size exceeds 64 KiB.' },
-  { badge: 'STEP 6 OF 7 · > 64 KIB RAW SPLICE LANE', title: '6. Bulk Streaming Bypasses FlatBuffers', body: 'Reads and writes larger than 64 KiB switch to the HTTP Raw Bulk Splice lane (/raw), streaming bytes straight between the socket and host disk without envelope copies.', focus: 'raw-splice', nextTarget: 'post-join', cam: [[1.2, 3.8, 13.5], [1.2, -0.2, 2.2]], packets: [['mount-a', 'raw-splice', 0xa78bfa], ['raw-splice', 'disk-store', 0xa78bfa]], tip: 'Click TRN-02 (pulsing amber octahedron) or click here to test a Wi-Fi blip during an active transaction.' },
-  { badge: 'STEP 7 OF 7 · 8S HOLD & SESSION REJOIN', title: '7. 8-Second Grace Window & Seamless Rejoin', body: 'If the WebSocket drops, the server freezes your open file handles and SQLite locks for 8 seconds. Reconnecting with X-FS-Relay-Session reclaims them without dropping I/O.', focus: 'post-join', nextTarget: 'mount-a', cam: [[-3.8, 4.0, 13.2], [-3.8, -1.2, 1.2]], packets: [['mount-a', 'post-join', 0xf59e0b], ['post-join', 'wire-codec', 0xf59e0b], ['wire-codec', 'lock-table', 0x34d399]], tip: 'Full cycle complete! Click here to restart from Step 1, or switch to 3 · Self-Test Quiz above.' }
-];
-
-let guideIdx = 0;
-let guideVisited = new Set([0]);
-let guideTimer = null;
-
-const beaconMesh = new THREE.Mesh(
-  new THREE.RingGeometry(1.35, 1.62, 36),
-  new THREE.MeshBasicMaterial({ color: 0xf43f5e, side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
-);
-beaconMesh.rotation.x = Math.PI / 2;
-scene.add(beaconMesh);
-
-function applyGuideStep(idx, moveCam = true) {
-  guideIdx = (idx + GUIDE_STEPS.length) % GUIDE_STEPS.length;
-  guideVisited.add(guideIdx);
-  const step = GUIDE_STEPS[guideIdx];
-
-  document.getElementById('guide-step-badge').textContent = step.badge;
-  document.getElementById('guide-title').textContent = step.title;
-  document.getElementById('guide-body').textContent = step.body;
-  document.getElementById('guide-tip-text').textContent = step.tip;
-
-  const dotsEl = document.getElementById('guide-dots');
-  clearChildren(dotsEl);
-  GUIDE_STEPS.forEach((_, i) => {
-    const dot = document.createElement('button');
-    dot.type = 'button';
-    dot.className = 'guide-dot' + (i === guideIdx ? ' active' : (guideVisited.has(i) ? ' done' : ''));
-    dot.textContent = String(i + 1);
-    dot.setAttribute('aria-label', 'Go to step ' + (i + 1));
-    dot.addEventListener('click', () => {
-      stopGuideAutoPlay();
-      applyGuideStep(i, true);
-    });
-    dotsEl.appendChild(dot);
-  });
-
-  STRUCTURES.forEach((s) => {
-    tagMap.get(s.id).classList.toggle('coach-target', s.id === step.nextTarget);
-  });
-
-  selectStructure(step.focus);
-  if (moveCam) moveCameraTo(step.cam[0], step.cam[1], 44);
-  step.packets.forEach(([from, to, col], i) => {
-    setTimeout(() => spawnPacket(from, to, col, 0.022), i * 260);
-  });
-}
-
-function stopGuideAutoPlay() {
-  if (!guideTimer) return;
-  clearInterval(guideTimer);
-  guideTimer = null;
-  const playBtn = document.getElementById('btn-guide-play');
-  playBtn.setAttribute('aria-pressed', 'false');
-  playBtn.textContent = '▶ Auto-Play Cycle';
-}
-
-function toggleGuideAutoPlay() {
-  const playBtn = document.getElementById('btn-guide-play');
-  if (guideTimer) {
-    stopGuideAutoPlay();
-    return;
-  }
-  playBtn.setAttribute('aria-pressed', 'true');
-  playBtn.textContent = '⏸ Pause Cycle';
-  applyGuideStep(guideIdx);
-  guideTimer = setInterval(() => {
-    applyGuideStep(guideIdx + 1);
-  }, 4200);
-}
-
 document.getElementById('btn-guide-play').addEventListener('click', toggleGuideAutoPlay);
 document.getElementById('btn-guide-prev').addEventListener('click', () => {
   stopGuideAutoPlay();
-  applyGuideStep(guideIdx - 1);
+  applyGuideStep(guideIdx - 1, true);
 });
 document.getElementById('btn-guide-next').addEventListener('click', () => {
   stopGuideAutoPlay();
-  applyGuideStep(guideIdx + 1);
+  applyGuideStep(guideIdx + 1, true);
 });
 document.getElementById('btn-guide-tip').addEventListener('click', () => {
   stopGuideAutoPlay();
-  applyGuideStep(guideIdx + 1);
+  applyGuideStep(guideIdx + 1, true);
 });
 
 const guideToggleBtn = document.getElementById('btn-guide-toggle');
@@ -890,6 +707,7 @@ window.addEventListener('resize', resizeRenderer);
 resizeRenderer();
 
 // --- Initialize & Animate Loop ---
+setViewMode('everyday', false);
 applyGuideStep(0, false);
 updateQuizUI();
 
@@ -930,7 +748,7 @@ function animate(now) {
     }
 
     projVec.copy(entry.group.position);
-    projVec.y += s.size[1] * 0.75 + 0.45;
+    projVec.y += s.size[1] * 0.75 + 0.55;
     projVec.project(camera);
     const tag = tagMap.get(s.id);
     if (projVec.z > 1) {

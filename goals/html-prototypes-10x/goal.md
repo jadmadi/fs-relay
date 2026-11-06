@@ -34,6 +34,7 @@ Upgrade the eight `html-prototypes/` pages and animated explainer with token-str
 - html-prototypes/explainer.html
 - interactive-prototype/index.html
 - interactive-prototype/style.css
+- interactive-prototype/data.js
 - interactive-prototype/app.js
 - interactive-prototype/vendor/three.module.min.js
 - interactive-prototype/vendor/controls/OrbitControls.js

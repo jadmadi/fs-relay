@@ -1,11 +1,10 @@
 {
   "goal_slug": "html-prototypes-10x",
-  "reopened_at": "2026-11-06T00:26:44.609176479Z",
+  "reopened_at": "2026-11-06T00:35:39.78550451Z",
   "reopened_by": "agent",
-  "reason": "Make #guide-card a horizontal strip outside the 3D canvas so it never overlays the 3D viewport",
-  "original_commit": "1f2a446",
-  "resolved_commit": "f353ecd",
-  "resolved_at": "2026-11-06T00:29:48.661104729Z",
-  "active": false,
-  "reopen_epoch": 5
+  "reason": "Add Step 0 Everyday Multi-Machine View (3D Laptop, Desktop, Cloud VM accessing one shared folder) and Business + Technical layered walkthrough",
+  "original_commit": "f353ecd",
+  "resolved_at": "0001-01-01T00:00:00Z",
+  "active": true,
+  "reopen_epoch": 6
 }
