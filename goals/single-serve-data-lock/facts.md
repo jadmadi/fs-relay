@@ -8,7 +8,7 @@
 ## File & Interface Contracts
 - Relevant files:
   - `internal/local/tree.go`
-  - `internal/local/path_test.go`
+  - `internal/local/local_test.go`
   - `cmd/fs-relay/main.go`
   - `README.md`
   - `ROADMAP.md`

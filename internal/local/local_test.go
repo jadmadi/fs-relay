@@ -547,6 +547,35 @@ func TestPrepareRejectsFile(t *testing.T) {
 	}
 }
 
+func TestTreeLockRefusesSecondServerAndReleasesOnClose(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "data")
+	first := New(root)
+	t.Cleanup(func() { _ = first.Close() })
+	if err := first.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Lock(); err != nil {
+		t.Fatalf("first.Lock: %v", err)
+	}
+
+	second := New(root)
+	t.Cleanup(func() { _ = second.Close() })
+	if err := second.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	err := second.Lock()
+	if err == nil || !strings.Contains(err.Error(), "is already served by pid ") {
+		t.Fatalf("second.Lock = %v, want already served by pid error", err)
+	}
+
+	if err := first.Close(); err != nil {
+		t.Fatalf("first.Close: %v", err)
+	}
+	if err := second.Lock(); err != nil {
+		t.Fatalf("second.Lock after first.Close: %v", err)
+	}
+}
+
 func TestOpenNamespace(t *testing.T) {
 	tr, dir := newTree(t)
 	if err := tr.OpenNamespace("demo"); err != nil {

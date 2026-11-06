@@ -21,7 +21,7 @@ Add `(*Tree).Lock() error` in `internal/local/tree.go` that opens `<root>/.fs-re
 
 ## Files to Touch
 - internal/local/tree.go
-- internal/local/path_test.go
+- internal/local/local_test.go
 - cmd/fs-relay/main.go
 - README.md
 - ROADMAP.md
