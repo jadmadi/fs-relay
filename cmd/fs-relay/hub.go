@@ -21,10 +21,6 @@ type hub struct {
 	holdFor time.Duration
 	token   string
 	tree    *local.Tree
-
-	// waiting is ns -> inode -> client. A release sends an event only when
-	// a client is waiting on that inode.
-	waiting map[string]map[uint64]map[string]struct{}
 	events  uint64
 }
 
@@ -46,45 +42,7 @@ func newHub(token string) *hub {
 		rooms:   map[string]*room{},
 		holdFor: holdFor,
 		token:   token,
-		waiting: map[string]map[uint64]map[string]struct{}{},
 	}
-}
-
-// markWaiting records that a client is about to wait on an inode.
-func (h *hub) markWaiting(ns string, ino uint64, client string) {
-	if ino == 0 {
-		return
-	}
-	h.mu.Lock()
-	if h.waiting[ns] == nil {
-		h.waiting[ns] = map[uint64]map[string]struct{}{}
-	}
-	if h.waiting[ns][ino] == nil {
-		h.waiting[ns][ino] = map[string]struct{}{}
-	}
-	h.waiting[ns][ino][client] = struct{}{}
-	h.mu.Unlock()
-}
-
-// clearWaiting reports whether anyone waited on the inode, and forgets them.
-func (h *hub) clearWaiting(ns string, ino uint64) bool {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	set := h.waiting[ns][ino]
-	if len(set) == 0 {
-		return false
-	}
-	delete(h.waiting[ns], ino)
-	if len(h.waiting[ns]) == 0 {
-		delete(h.waiting, ns)
-	}
-	return true
-}
-
-func (h *hub) anyWaiting(ns string) bool {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return len(h.waiting[ns]) > 0
 }
 
 // releaseAll sends one release event to every subscriber and keeps it owed
@@ -219,7 +177,7 @@ func (h *hub) dropHold(ns, id string) {
 	delete(r.hold, id)
 	delete(r.owed, id)
 	h.mu.Unlock()
-	if h.tree != nil && h.tree.ReleaseClient(ns, id) && h.anyWaiting(ns) {
+	if h.tree != nil && h.tree.ReleaseClient(ns, id) && h.tree.AnyWaiting(ns) {
 		h.releaseAll(ns)
 	}
 }
