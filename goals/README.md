@@ -29,18 +29,9 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 ## Summary
 - **Total Goals**: 17
 - 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
-- 🔵 **In Progress (Claimed)**: 1
-- 🟢 **Implemented**: 16 (16 verified 📜, 0 unverified)
+- 🟢 **Implemented**: 17 (16 verified 📜, 1 stale ⚠️, 0 unverified)
 - 🎯 **By Tier**: 0 immediate (Tier 1), 17 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 77/80 completed (96%)
-
----
-
-## 🔵 In Progress (Claimed Goals)
-
-| Goal Package | Tier | Mode | Agent | Status & Note | Started |
-| :--- | :---: | :---: | :--- | :--- | :--- |
-| [`self-update-and-version-check`](self-update-and-version-check/goal.md) | `🗺️ Roadmap` | `🔗 Dep` | `@agent` | in progress | 0s ago |
+- 📋 **Execution Tasks Progress**: 80/80 completed (100%)
 
 ---
 
@@ -52,7 +43,7 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | [`cli-review-fixes`](cli-review-fixes/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `a69607e` |
 | [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `12bcc6e` |
 | [`lock-robustness`](lock-robustness/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `7399591` |
-| [`ci-race`](ci-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `8740b26` |
+| [`ci-race`](ci-race/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `8740b26` |
 | [`namespace-cache`](namespace-cache/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `f5e6f13` |
 | [`bind-grant-race`](bind-grant-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `30504b1` |
 | [`bind-lock-coherence`](bind-lock-coherence/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `636df49` |
@@ -64,3 +55,4 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | [`lock-wake-races`](lock-wake-races/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `63427fd` |
 | [`bind-sigint-busy`](bind-sigint-busy/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `532649e` |
 | [`single-serve-data-lock`](single-serve-data-lock/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `adb1ce1` |
+| [`self-update-and-version-check`](self-update-and-version-check/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `2f082aa` |

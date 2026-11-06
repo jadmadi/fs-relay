@@ -1,13 +1,13 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "single-serve-data-lock",
-  "level": "L3",
+  "level": "L1",
   "outcome": "passed",
-  "method": "audit",
+  "method": "evidence",
   "spec_hash": "ace98c3362917bb76788d62103fe36932eeb892e5f9c6762e92f676d34e8ab24",
   "subject": {
     "algorithm": "sha256",
-    "hash": "1db8716873f6a8665940cce26b52b579eaff1bbc8af3574d9b3362c0f1320008",
+    "hash": "d2858d7c0b931d79a095d8309d118d4fe001dfeecc1ebc71eb7420b67f20cbc0",
     "paths": [
       {
         "path": "ROADMAP.md",
@@ -22,12 +22,12 @@
       {
         "path": "cmd/fs-relay/cli_test.go",
         "kind": "file",
-        "hash": "0b6c221cfcc8ce47f8660fd598fab94ffb514bb5c870b70b17daacd04b7445c9"
+        "hash": "a7d5c5ba369c2ba335cf7b63bbdd8e3a83339e807af005c3f1fb874281203492"
       },
       {
         "path": "cmd/fs-relay/main.go",
         "kind": "file",
-        "hash": "5e9d390f69c962964ed53e684235c78f9c7a62596f9c2290face56033c56e743"
+        "hash": "6ef5089622b06738e80407e8c3c610e2a902af987eb29f6a2d26f73575bedb5f"
       },
       {
         "path": "go.mod",
@@ -70,9 +70,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+16581f94-dirty",
+    "sila_version": "dev+1e4a5d73-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "a6101e5ab41461f0d2fbca79ce33d7e4034f3baf6a30ed1c99f4f3f2b9c62149",
-  "verified_at": "2026-11-06T17:49:36Z"
+  "previous": "a318df875b759ba5fb5d9e709810edcd1e8815f1e9d303211db7d972f865982a",
+  "verified_at": "2026-11-06T19:14:11Z"
 }

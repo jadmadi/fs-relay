@@ -4,7 +4,7 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_self-update-and-version-check_1793992430`
 ## Goal Description
 Implement release lifecycle discipline for `fs-relay` and `fs-relay-bind`:
 1. Support natural-language CLI commands `fs-relay update`, `fs-relay version`, and `fs-relay help` (alongside `-update`, `-version`, and `-h`) in `cmd/fs-relay`, and `fs-relay-bind update` (alongside `-update`, `-version`, and `-h`) in `cmd/fs-relay-bind`, while still rejecting unknown positional arguments (`fs-relay extra`) with exit code `2`.

@@ -1,6 +1,6 @@
 {
   "goal_slug": "cli-review-fixes",
-  "certified_at": "2026-11-06T17:49:38.370819978Z",
+  "certified_at": "2026-11-06T19:14:07.371626057Z",
   "certified_by": "agent",
   "evidence_file": "goals/cli-review-fixes/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "e47322c679009a8e12dfe31bba112546dbf6c453",
+  "commit_sha": "2f082aab7cca47ea76b7e2b8a41ec817c8debc7f",
   "memory_required": true,
   "memory_verified": true,
   "memory": {

@@ -1,28 +1,28 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "bind-sigint-busy",
-  "level": "L3",
+  "level": "L1",
   "outcome": "passed",
-  "method": "audit",
+  "method": "evidence",
   "spec_hash": "bd61aabad3b7f6f1f588e2d163e0ef83f4193dad1b4886719b51b204f3f0caa7",
   "subject": {
     "algorithm": "sha256",
-    "hash": "23f8cc5d548ea6a7386ca85fece3f180029a3451d02f72d60b6e932e7534383a",
+    "hash": "9a7389b72fa089d951ce9aebc791d740b599d9eab5d6ccefb3ce1fd96f6ea3de",
     "paths": [
       {
         "path": "cmd/fs-relay-bind/cli.go",
         "kind": "file",
-        "hash": "a449a5bef4c5ab5b967bcd330d0d9275018e9b7bf3fc5b0bf5ec14bb66cd4af2"
+        "hash": "7bfc82d635dd2bf121c1ccf18f6d1eea59177d22616f07939c8d79fe6bbb927f"
       },
       {
         "path": "cmd/fs-relay-bind/cli_test.go",
         "kind": "file",
-        "hash": "8e737e7ec448da40eb3c3352dc2879930754aabfb88afe6662e6b72c54a92d6b"
+        "hash": "2a78033d48d9aecbe2f89fe43ccd882357f3e3ceeac3d199b3abec5334067e53"
       },
       {
         "path": "cmd/fs-relay-bind/main.go",
         "kind": "file",
-        "hash": "6aeb86bf900ae1a9129315aef711584fade83c365ad3d485c4bf728f4d34edc9"
+        "hash": "1e1b314fec10d2b753f66718411aa67169ccc6d017a988fd17bf4eb0cce42203"
       },
       {
         "path": "go.mod",
@@ -50,9 +50,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+649b8819-dirty",
+    "sila_version": "dev+1e4a5d73-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "01eb0110935db557c1a9db7dcebc17397a88fbda275267f9633c886b143e4100",
-  "verified_at": "2026-11-06T17:27:34Z"
+  "previous": "88fa722d3e55e3d93ef046d3fb8e4b0f009cfeb8f6ce9e687dee8e799a4df4ba",
+  "verified_at": "2026-11-06T19:14:14Z"
 }
