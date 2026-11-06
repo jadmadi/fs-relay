@@ -547,34 +547,32 @@ func TestPrepareRejectsFile(t *testing.T) {
 	}
 }
 
-// TestTreeLockRefusesSecondServerAndReleasesOnClose verifies that Lock refuses
-// a second Tree on the same data directory and releases the flock on Close.
-func TestTreeLockRefusesSecondServerAndReleasesOnClose(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "data")
-	first := New(root)
-	t.Cleanup(func() { _ = first.Close() })
-	if err := first.Prepare(); err != nil {
+func TestCheckNamespace(t *testing.T) {
+	tr, dir := newTree(t)
+	if err := tr.CheckNamespace("demo"); err != nil {
 		t.Fatal(err)
 	}
-	if err := first.Lock(); err != nil {
-		t.Fatalf("first.Lock: %v", err)
+	if err := tr.CheckNamespace("missing"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing: %v", err)
 	}
-
-	second := New(root)
-	t.Cleanup(func() { _ = second.Close() })
-	if err := second.Prepare(); err != nil {
+	if err := os.Mkdir(filepath.Join(dir, "later"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	err := second.Lock()
-	if err == nil || !strings.Contains(err.Error(), "is already served by pid ") {
-		t.Fatalf("second.Lock = %v, want already served by pid error", err)
+	if err := tr.CheckNamespace("later"); err != nil {
+		t.Fatal(err)
 	}
+}
 
-	if err := first.Close(); err != nil {
-		t.Fatalf("first.Close: %v", err)
+func TestCallChecksNamespaceEveryTime(t *testing.T) {
+	tr, dir := newTree(t)
+	if _, err := tr.Call(context.Background(), wire.Getattr, wire.Params{Namespace: "demo", Inode: 1}); err != nil {
+		t.Fatal(err)
 	}
-	if err := second.Lock(); err != nil {
-		t.Fatalf("second.Lock after first.Close: %v", err)
+	if err := os.RemoveAll(filepath.Join(dir, "demo")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr.Call(context.Background(), wire.Getattr, wire.Params{Namespace: "demo", Inode: 1}); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("call after delete: %v", err)
 	}
 }
 
@@ -617,4 +615,35 @@ func TestReleaseFailureDropsLocks(t *testing.T) {
 		t.Fatal("release with a closed file succeeded")
 	}
 	call(t, tr, wire.Setlk, lp(ino, 0, "B", 2, wire.LockWrite, 100, 1))
+}
+
+// TestTreeLockRefusesSecondServerAndReleasesOnClose verifies that Lock refuses
+// a second Tree on the same data directory and releases the flock on Close.
+func TestTreeLockRefusesSecondServerAndReleasesOnClose(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "data")
+	first := New(root)
+	t.Cleanup(func() { _ = first.Close() })
+	if err := first.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Lock(); err != nil {
+		t.Fatalf("first.Lock: %v", err)
+	}
+
+	second := New(root)
+	t.Cleanup(func() { _ = second.Close() })
+	if err := second.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	err := second.Lock()
+	if err == nil || !strings.Contains(err.Error(), "is already served by pid ") {
+		t.Fatalf("second.Lock = %v, want already served by pid error", err)
+	}
+
+	if err := first.Close(); err != nil {
+		t.Fatalf("first.Close: %v", err)
+	}
+	if err := second.Lock(); err != nil {
+		t.Fatalf("second.Lock after first.Close: %v", err)
+	}
 }

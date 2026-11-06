@@ -112,6 +112,9 @@ func (t *Tree) Lock() error {
 
 // CheckNamespace stats data/<ns> every time. Connections use it so a
 // namespace that was removed is refused.
+// CheckNamespace stats data/<ns> and requires a directory. It runs on every
+// call on purpose: a cached hit would let calls through after the directory
+// is removed.
 func (t *Tree) CheckNamespace(ns string) error {
 	if err := wire.CheckNS(ns); err != nil {
 		return err
@@ -159,6 +162,9 @@ func (t *Tree) Close() error {
 // Call runs one method. Filesystem failures are syscall.Errno, possibly wrapped.
 func (t *Tree) Call(ctx context.Context, method string, p wire.Params) (wire.Result, error) {
 	if err := ctx.Err(); err != nil {
+		return wire.Result{}, err
+	}
+	if err := wire.CheckNS(p.Namespace); err != nil {
 		return wire.Result{}, err
 	}
 	if err := t.CheckNamespace(p.Namespace); err != nil {
