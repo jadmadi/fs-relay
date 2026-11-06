@@ -4,9 +4,7 @@
 - **Registered By**: Pending Registration
 - **Spec Audited By**: Pending Spec Audit
 - **Implemented By**: Pending Implementation
-- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-lock-coherence_1793933148`
-
-
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-lock-coherence_1793935639`
 ## Goal Description
 
 Ensure lock handoffs across mounts in `cmd/fs-relay-bind` are coherent with

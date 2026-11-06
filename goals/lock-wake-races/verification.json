@@ -4,10 +4,10 @@
   "level": "L3",
   "outcome": "passed",
   "method": "audit",
-  "spec_hash": "a17cb71fb35c94a289459b070302641947fa1a06faec764ab0adf4b0860d614f",
+  "spec_hash": "fd457073838a45a6903a9c979cce937f31fff9e5b36d142d59c4aef68fdecb53",
   "subject": {
     "algorithm": "sha256",
-    "hash": "f481924640ed1a9fdf3cdb7035613304cb4190e40aae5347c32ea21be2b537d6",
+    "hash": "e3fea152acb390779609ea4495546d5b9bf69352687592185015a68700811657",
     "paths": [
       {
         "path": "SPEC.md",
@@ -32,7 +32,7 @@
       {
         "path": "cmd/fs-relay/serve.go",
         "kind": "file",
-        "hash": "d7e1e19aff5eab360d40c8c04ea46811846654cfcfd643a4547c0952bfab29b8"
+        "hash": "368e1b428faedaf68aec425abf4a66924e4b39aa5dabe26257ef1d519e4ab51c"
       },
       {
         "path": "cmd/fs-relay/ws.go",
@@ -67,12 +67,12 @@
       {
         "path": "internal/local/lock.go",
         "kind": "file",
-        "hash": "2f6e4a180d155f530370a41a7bb1e024d915a9524732e1f81d7477873346dc18"
+        "hash": "77014552827305057a401207596c363e01759a00a3a8f299646485bd956ef521"
       },
       {
         "path": "internal/local/lock_test.go",
         "kind": "file",
-        "hash": "554c8c9b44d4a5139d665187be7fa9866bec2346b9655fe960d30b3b27f2df77"
+        "hash": "afaaa42c0c32027bd2e0e1e9beeebb38cce4c708210d91f0f894e6a5e3b541cd"
       }
     ]
   },
@@ -83,6 +83,6 @@
     "sila_version": "dev+b8acfdcc-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "747c032484121d79ae940c875304038d9237a75efe525b739aa2ee20b3e5dba1",
-  "verified_at": "2026-11-06T02:54:02Z"
+  "previous": "e3fb0fffa7f8d2e94e099d50d2c8f847de2a7a66267591ec3965d9e6e25abd6e",
+  "verified_at": "2026-11-06T03:27:24Z"
 }
