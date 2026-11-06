@@ -78,7 +78,20 @@ func (n *node) lock(ctx context.Context, method string, f fs.FileHandle, owner u
 	if h != nil && h.fh == 0 && grant {
 		h.addOwner(owner)
 	}
+	var drainErr syscall.Errno
+	if method != wire.Getlk && p.Lock == wire.LockUnlock {
+		drainErr = n.drain(ctx)
+	}
 	res, err := n.c.Call(ctx, method, p)
+	if grant && err == nil {
+		n.forgetAttr()
+		if n.k != nil {
+			n.k.forgetIno(n.ino)
+		}
+	}
+	if drainErr != 0 {
+		return res, drainErr
+	}
 	return res, toErrno(err)
 }
 
