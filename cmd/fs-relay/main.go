@@ -20,6 +20,13 @@ import (
 var errUsage = errors.New("usage")
 
 func main() {
+	if done, err := dispatchCLI(os.Args[1:]); done {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "fs-relay: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(); err != nil {
 		if errors.Is(err, errUsage) {
 			os.Exit(2)
@@ -50,6 +57,7 @@ func run() error {
 		fmt.Println(versionLine("fs-relay"))
 		return nil
 	}
+	runCachedCheck()
 
 	var tokenSet, fileSet bool
 	flags.Visit(func(f *flag.Flag) {

@@ -43,6 +43,7 @@ func run() error {
 	token := flags.String("token", "", "secret printed by fs-relay")
 	tokenFile := flags.String("token-file", "", "read the secret from this file (mode 600)")
 	showVersion := flags.Bool("version", false, "print the version and exit")
+	doUpdate := flags.Bool("update", false, "upgrade fs-relay and fs-relay-bind to the latest release")
 	flags.SetOutput(os.Stderr)
 	flags.Usage = func() {}
 	if err := flags.Parse(os.Args[1:]); err != nil {
@@ -53,9 +54,8 @@ func run() error {
 		fmt.Fprint(os.Stderr, usageText(flags))
 		return errUsage
 	}
-	if *showVersion {
-		fmt.Println(versionLine("fs-relay-bind"))
-		return nil
+	if done, err := dispatchBindCLI(flags, *showVersion, *doUpdate); done || err != nil {
+		return err
 	}
 	if flags.NArg() != 1 {
 		if bad := misplacedFlag(flags.Args()); bad != "" {
