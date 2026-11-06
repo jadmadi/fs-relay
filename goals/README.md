@@ -28,11 +28,10 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 ## Summary
 - **Total Goals**: 12
-- 🟡 **Ready to Execute (Pending)**: 1 (1 independent ⚡, 0 unblocked 🔗)
-- ⛔ **Blocked on Prerequisites**: 1
-- 🟢 **Implemented**: 10 (10 verified 📜, 0 unverified)
+- 🟡 **Ready to Execute (Pending)**: 1 (0 independent ⚡, 1 unblocked 🔗)
+- 🟢 **Implemented**: 11 (6 verified 📜, 5 stale ⚠️, 0 unverified)
 - 🎯 **By Tier**: 0 immediate (Tier 1), 12 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 58/65 completed (89%)
+- 📋 **Execution Tasks Progress**: 61/65 completed (93%)
 
 ---
 
@@ -40,8 +39,7 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 | Goal Package | Tier | Mode & Sequence | Dependencies | Focus & Description | Launch Command |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| [`bind-lock-coherence`](bind-lock-coherence/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⚡ Independent (#9)` | - | Drain write-behind before unlock and drop cached reads on lock grant — Ensure lock handoffs across mounts in `cmd/fs-relay-bind` are coherent with clie... | `/goal goals/bind-lock-coherence/goal.md` |
-| [`lock-wake-races`](lock-wake-races/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⛔ Blocked (#10)` | Prereqs: bind-lock-coherence | Close lock wake-up races across EAGAIN registration, downgrades, and multi-waiters — Eliminate the three server-side lock wake-up races in `internal/local` and `cmd/... | `/goal goals/lock-wake-races/goal.md` |
+| [`lock-wake-races`](lock-wake-races/goal.md) | `🗺️ Roadmap` | `🚢 SHIP 🔗 Ready (#10)` | Deps met: bind-lock-coherence | Close lock wake-up races across EAGAIN registration, downgrades, and multi-waiters — Eliminate the three server-side lock wake-up races in `internal/local` and `cmd/... | `/goal goals/lock-wake-races/goal.md` |
 
 ---
 
@@ -49,13 +47,14 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 | Goal Package | Mode | Shape | Verification | Task / Ref | Commit |
 | :--- | :---: | :--- | :---: | :--- | :--- |
-| [`advisory-record-locks`](advisory-record-locks/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `c84e4b2` |
-| [`cli-review-fixes`](cli-review-fixes/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `a69607e` |
-| [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `12bcc6e` |
-| [`lock-robustness`](lock-robustness/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `7399591` |
+| [`advisory-record-locks`](advisory-record-locks/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `c84e4b2` |
+| [`cli-review-fixes`](cli-review-fixes/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `a69607e` |
+| [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `12bcc6e` |
+| [`lock-robustness`](lock-robustness/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `7399591` |
 | [`ci-race`](ci-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `8740b26` |
 | [`namespace-cache`](namespace-cache/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `f5e6f13` |
-| [`bind-grant-race`](bind-grant-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `30504b1` |
+| [`bind-grant-race`](bind-grant-race/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `30504b1` |
+| [`bind-lock-coherence`](bind-lock-coherence/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `538e19f` |
 | [`html-prototypes-10x`](html-prototypes-10x/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `b6464f2` |
 | [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `e991617` |
 | [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `daa9689` |

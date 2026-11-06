@@ -1,0 +1,63 @@
+{
+  "version": "sila/verification/v2",
+  "goal_slug": "bind-lock-coherence",
+  "level": "L3",
+  "outcome": "passed",
+  "method": "audit",
+  "spec_hash": "df55fc7ceb197b23628e42f65d438c1ded34428615f9dfb27a7a01a28a3792ba",
+  "subject": {
+    "algorithm": "sha256",
+    "hash": "e9e36ff8eac653d7674264de0c040b8b62923c577707c70f091773f8eb4a9b3b",
+    "paths": [
+      {
+        "path": "SPEC.md",
+        "kind": "file",
+        "hash": "8564cba9979896601ced76be48f7eb213b99945d13a1a7633189f3eb036ffd28"
+      },
+      {
+        "path": "cmd/fs-relay-bind/lock.go",
+        "kind": "file",
+        "hash": "47fbc7c6335194affc3f04dabc6a49f3b2afdfcbd89526c49ee6e6e68b4a3bee"
+      },
+      {
+        "path": "cmd/fs-relay-bind/lock_release_test.go",
+        "kind": "file",
+        "hash": "1c3002bcd605d98127db5137e9b8ab0544510fc7c2ba14b03c9d3fcfd78ad0f8"
+      },
+      {
+        "path": "cmd/fs-relay-bind/writeback.go",
+        "kind": "file",
+        "hash": "b4ad06ee70f35d79684c5ad6af7423905cd7053eb61eeb5a0e0bec1db38987ff"
+      },
+      {
+        "path": "go.mod",
+        "kind": "file",
+        "hash": "ec75fb5a26908b423a649d514ea7674daa4e6e6ab1d92d51b27d2a145f2d3d47"
+      },
+      {
+        "path": "go.sum",
+        "kind": "file",
+        "hash": "22f46fc43dfdf65a599cc8bb6e67c2ff8553eba4a7aa31f1b73725f5ef12df21"
+      },
+      {
+        "path": "go.work",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "go.work.sum",
+        "kind": "missing",
+        "hash": ""
+      }
+    ]
+  },
+  "environment": {
+    "go_version": "go1.27.3",
+    "os": "linux",
+    "arch": "amd64",
+    "sila_version": "dev+b8acfdcc-dirty",
+    "bwrap": "bubblewrap 0.12.0"
+  },
+  "previous": "2257ed508515e109ea5d995e121aaa8edbad6ec97dbcd30b20d9e3d2fea00e77",
+  "verified_at": "2026-11-06T02:45:49Z"
+}

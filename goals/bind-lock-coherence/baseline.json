@@ -1,0 +1,7 @@
+{
+  "goal_slug": "bind-lock-coherence",
+  "patch_id": "4dd69858d6ec5637a7a984f23492b3a3f1197d9d",
+  "base_ref": "main",
+  "recorded_at": "2026-11-06T02:44:57.299325661Z",
+  "certified_by": "initial-certification"
+}

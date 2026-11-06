@@ -1,5 +1,12 @@
 # Goal: Drain write-behind before unlock and drop cached reads on lock grant
 
+## Chain of Custody (Isnad)
+- **Registered By**: Pending Registration
+- **Spec Audited By**: Pending Spec Audit
+- **Implemented By**: Pending Implementation
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-lock-coherence_1793933148`
+
+
 ## Goal Description
 
 Ensure lock handoffs across mounts in `cmd/fs-relay-bind` are coherent with
