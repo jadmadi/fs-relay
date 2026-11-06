@@ -50,9 +50,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+b8acfdcc-dirty",
+    "sila_version": "dev+40d2d9e8-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "dd203d939e23a4804b5b52631502bedc613b2c8fb223cd0770a3386551279a63",
-  "verified_at": "2026-11-06T03:35:51Z"
+  "previous": "e85cb9ba2fb96a4629b382d45f0c902476f79925e71c863eda91d19f73a13b4d",
+  "verified_at": "2026-11-06T07:36:20Z"
 }

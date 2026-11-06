@@ -7,12 +7,12 @@
   "spec_hash": "17105b5614799a898c7a80a3975ffefd10a7dc62acc21d2651b54eaed294ff12",
   "subject": {
     "algorithm": "sha256",
-    "hash": "9b12e2092ca86020613e9000756cae92eff68216704755467cbdedca8d6cf287",
+    "hash": "00a1938b74e8f75316f5fa640a0c44a4fd4f98e226e659d619b512326221b543",
     "paths": [
       {
         "path": "ROADMAP.md",
         "kind": "file",
-        "hash": "060ececb7c7243582a4735e420903009eeab9a2be2604acc77dd31d332c5ed8c"
+        "hash": "022ee514b958bf80e7184668402b3bbd1708ad891f46e4a645729e126135ea74"
       },
       {
         "path": "cmd/fs-relay/main.go",
@@ -55,9 +55,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+b8acfdcc-dirty",
+    "sila_version": "dev+40d2d9e8-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "353531ef99443783d4d2a46d971d97ca81e84a4a1d14c437ed3920d411008f97",
-  "verified_at": "2026-11-06T03:35:56Z"
+  "previous": "2e1b94d1bde4c939205c083334a482f62d32e1aa55f8e10077fe85dfd389ed5d",
+  "verified_at": "2026-11-06T07:36:21Z"
 }

@@ -1,6 +1,6 @@
 {
   "goal_slug": "lock-robustness",
-  "certified_at": "2026-11-06T03:35:51.83586084Z",
+  "certified_at": "2026-11-06T07:36:20.262342867Z",
   "certified_by": "agent",
   "evidence_file": "goals/lock-robustness/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "86d253bf2493d4209c34182bee89f60c7f98fcbc",
+  "commit_sha": "6b3482bb8109dcd6296ed138709c034465c060d7",
   "memory_required": true,
   "memory_verified": true,
   "memory": {

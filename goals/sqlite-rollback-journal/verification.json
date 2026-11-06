@@ -7,12 +7,12 @@
   "spec_hash": "7e2feccfd1dbec1473c881cd9902f5228a37a8cbf2ea3abff788fd3850cbec92",
   "subject": {
     "algorithm": "sha256",
-    "hash": "b70e7b93724b2a62efb8526003fc68975e3663608b7f3d4ba37190598ef2b680",
+    "hash": "79fe2656b93e0e158428821d4f3a8a3c055d83829ab216c4b288f01a5ad93b6f",
     "paths": [
       {
         "path": "ROADMAP.md",
         "kind": "file",
-        "hash": "060ececb7c7243582a4735e420903009eeab9a2be2604acc77dd31d332c5ed8c"
+        "hash": "022ee514b958bf80e7184668402b3bbd1708ad891f46e4a645729e126135ea74"
       },
       {
         "path": "go.mod",
@@ -40,9 +40,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+b8acfdcc-dirty",
+    "sila_version": "dev+40d2d9e8-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "21d5c4870f4e4cc1e0ba87a5fa0bcdbd4ba49db74f05fee28d2bf8df7000405e",
-  "verified_at": "2026-11-06T03:35:56Z"
+  "previous": "3bd338daf2b41bccc1adbc1a330966736644b2d86d530ce5f69d15af1829c798",
+  "verified_at": "2026-11-06T07:36:22Z"
 }
