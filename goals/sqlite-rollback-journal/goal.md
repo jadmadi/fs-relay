@@ -34,6 +34,11 @@ the implementation goal is not proven, no matter how many unit tests pass.
 - **Tier**: roadmap
 - **Memory Protocol**: required
 
+## Files to Touch
+
+- ROADMAP.md
+- README.md
+
 Start only when `sila goals --json` shows `advisory-record-locks` as
 `implemented` and its mount methods are in `main`. A harness against an
 incomplete table produces false failures.

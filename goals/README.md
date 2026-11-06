@@ -30,7 +30,7 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 - **Total Goals**: 12
 - 🟡 **Ready to Execute (Pending)**: 1 (1 independent ⚡, 0 unblocked 🔗)
 - ⛔ **Blocked on Prerequisites**: 1
-- 🟢 **Implemented**: 10 (5 verified 📜, 5 unbound ○, 0 unverified)
+- 🟢 **Implemented**: 10 (10 verified 📜, 0 unverified)
 - 🎯 **By Tier**: 0 immediate (Tier 1), 12 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
 - 📋 **Execution Tasks Progress**: 58/65 completed (89%)
 
@@ -49,13 +49,13 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 
 | Goal Package | Mode | Shape | Verification | Task / Ref | Commit |
 | :--- | :---: | :--- | :---: | :--- | :--- |
-| [`advisory-record-locks`](advisory-record-locks/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `c84e4b2` |
-| [`cli-review-fixes`](cli-review-fixes/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `a69607e` |
-| [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `12bcc6e` |
+| [`advisory-record-locks`](advisory-record-locks/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `c84e4b2` |
+| [`cli-review-fixes`](cli-review-fixes/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `a69607e` |
+| [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `12bcc6e` |
 | [`lock-robustness`](lock-robustness/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `7399591` |
 | [`ci-race`](ci-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `8740b26` |
 | [`namespace-cache`](namespace-cache/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `f5e6f13` |
 | [`bind-grant-race`](bind-grant-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `30504b1` |
 | [`html-prototypes-10x`](html-prototypes-10x/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `b6464f2` |
-| [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | unbound ○ | Git Commit | `e991617` |
-| [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | unbound ○ | Git Commit | `daa9689` |
+| [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `e991617` |
+| [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `daa9689` |

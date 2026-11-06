@@ -39,6 +39,17 @@ describes a table that does not exist.
 - **Tier**: roadmap
 - **Memory Protocol**: required
 
+## Files to Touch
+
+- internal/wire
+- internal/local
+- internal/client
+- cmd/fs-relay
+- cmd/fs-relay-bind
+- SPEC.md
+- ROADMAP.md
+- README.md
+
 ## Success looks like
 
 1. Two mounts of one namespace cannot both hold a conflicting byte range.

@@ -29,6 +29,13 @@ Fix these inside PR #19. Do not widen beyond #9, #10 and #11.
 - **Tier**: roadmap
 - **Memory Protocol**: required
 
+## Files to Touch
+
+- cmd/fs-relay
+- cmd/fs-relay-bind
+- justfile
+- README.md
+
 ## Decisions fixed before dispatch
 
 | Decision | Value | Reason |

@@ -7,7 +7,7 @@
   "spec_hash": "44ab3544d018ea3dbf3ec5416c600b109a701e1fff75d12dd0f371d00cecc0ad",
   "subject": {
     "algorithm": "sha256",
-    "hash": "391b9da5e72a266cd57ae3efcd19bde9f01a6b97a1ec8ef926315dbe225932fb",
+    "hash": "7ff1b041242cfb5980d0a1f3130f62a7f68c8641b713a063b03215a57d0f1c3f",
     "paths": [
       {
         "path": ".github/workflows/ci.yml",
@@ -17,7 +17,7 @@
       {
         "path": "AGENTS.md",
         "kind": "file",
-        "hash": "cc08913474d2dc68a8f5a2f45fd2f157459e2a82c505b388fe1a60da1ae1b03e"
+        "hash": "d007b392818e1477b4507ebb04e1d40fab473edeca2659f840ca6b1fd5b2959b"
       },
       {
         "path": "go.mod",
@@ -47,11 +47,12 @@
     ]
   },
   "environment": {
-    "go_version": "go1.27.2",
+    "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+3040a824-dirty",
+    "sila_version": "dev+b8acfdcc-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "verified_at": "2026-11-04T13:50:28Z"
+  "previous": "c414b4ba387c85158a97c1f5cefc195e36fa810c79ce85020545e03ea5c30421",
+  "verified_at": "2026-11-06T02:01:21Z"
 }

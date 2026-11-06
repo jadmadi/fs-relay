@@ -34,7 +34,7 @@ the fast `test` job still answers a formatting or vet mistake in under a minute.
   "memos": [{"id": "fact_fab09007"}],
   "lessons": [{"id": "fact_459977b3"}],
   "cases": [],
-  "facts_verify": {"exit_code": 1},
+  "facts_verify": {"exit_code": 0},
   "handoff": {"id": "session-end"}
 }
 ```

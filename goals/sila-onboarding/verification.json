@@ -1,0 +1,47 @@
+{
+  "version": "sila/verification/v2",
+  "goal_slug": "sila-onboarding",
+  "level": "L1",
+  "outcome": "passed",
+  "method": "evidence",
+  "spec_hash": "394e636031ffa9705ed35880425dbf723006f7061f532080a32a1f9089178b0b",
+  "subject": {
+    "algorithm": "sha256",
+    "hash": "dc6fea67666815c97e1fdde2cda5a04cfa301fdf0478dc4b4c59ec645662e298",
+    "paths": [
+      {
+        "path": "AGENTS.md",
+        "kind": "file",
+        "hash": "d007b392818e1477b4507ebb04e1d40fab473edeca2659f840ca6b1fd5b2959b"
+      },
+      {
+        "path": "go.mod",
+        "kind": "file",
+        "hash": "ec75fb5a26908b423a649d514ea7674daa4e6e6ab1d92d51b27d2a145f2d3d47"
+      },
+      {
+        "path": "go.sum",
+        "kind": "file",
+        "hash": "22f46fc43dfdf65a599cc8bb6e67c2ff8553eba4a7aa31f1b73725f5ef12df21"
+      },
+      {
+        "path": "go.work",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "go.work.sum",
+        "kind": "missing",
+        "hash": ""
+      }
+    ]
+  },
+  "environment": {
+    "go_version": "go1.27.3",
+    "os": "linux",
+    "arch": "amd64",
+    "sila_version": "dev+b8acfdcc-dirty",
+    "bwrap": "bubblewrap 0.12.0"
+  },
+  "verified_at": "2026-11-06T02:01:23Z"
+}

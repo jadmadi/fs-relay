@@ -30,6 +30,12 @@ forced.
 - **Tier**: roadmap
 - **Memory Protocol**: required
 
+## Files to Touch
+
+- internal/local
+- cmd/fs-relay
+- cmd/fs-relay-bind
+
 ## Decisions fixed before dispatch
 
 | Decision | Value | Reason |

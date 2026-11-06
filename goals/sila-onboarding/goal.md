@@ -16,6 +16,10 @@ Wire fs-relay fully into sila and verify it: map the legacy task surfaces found 
 - **Sequence**: -
 - **Shape**: ship
 
+## Files to Touch
+
+- AGENTS.md
+
 ## Done Condition
 1. Every unmanaged surface from `sila onboard` is mapped into a sila goal, deferred with a recorded reason, or frozen in place.
 2. The verified runbook commands are recorded and current.

@@ -1,6 +1,6 @@
 {
   "goal_slug": "ci-race",
-  "certified_at": "2026-11-04T13:50:28.175767406Z",
+  "certified_at": "2026-11-06T02:01:21.499438949Z",
   "certified_by": "agent",
   "evidence_file": "goals/ci-race/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,19 +8,17 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "2c99c9e2c3493285ef9d3b95f72503ec2cf4d1bb",
+  "commit_sha": "74b33ddee2e13503f8d25de25c7950faaa7dc06b",
   "memory_required": true,
-  "memory_waived": true,
-  "memory_waiver_reason": "facts ledger has pre-existing hash mismatches from other projects",
+  "memory_verified": true,
   "memory": {
     "required": true,
-    "status": "waived",
-    "prime": false,
-    "recall": false,
-    "writes": false,
-    "facts": false,
-    "handoff": false,
-    "waived": true,
-    "waiver_reason": "facts ledger has pre-existing hash mismatches from other projects"
+    "status": "verified",
+    "prime": true,
+    "recall": true,
+    "writes": true,
+    "facts": true,
+    "handoff": true,
+    "verified": true
   }
 }
