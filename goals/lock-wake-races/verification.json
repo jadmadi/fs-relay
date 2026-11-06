@@ -7,12 +7,12 @@
   "spec_hash": "356ced8dbe07df2bfd2f2e263ab0d41142cedd13afbb0f3622de08142e6467dc",
   "subject": {
     "algorithm": "sha256",
-    "hash": "58869ffa57948189370e94f826a11b7ee84a7fe32be8bd4bda67913f34087d59",
+    "hash": "7a5326b335fb24bbe143cf3571d3c7841d90677e1fe0fe5c443ada8351ef8fde",
     "paths": [
       {
         "path": "SPEC.md",
         "kind": "file",
-        "hash": "b57e07d9e4d6b9c7d0f885193410b4a11fc1966468e109a6571d44ba50c3fe37"
+        "hash": "3379df664dd49ce485de13dd81f124c0a33eb633434844e77600fb42d9305636"
       },
       {
         "path": "cmd/fs-relay/hub.go",
@@ -80,9 +80,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+649b8819-dirty",
+    "sila_version": "dev+16581f94-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "10555b5a35fa1fb6e43adc0c8fefc2724a7b1c2d7e6d9c4f3d0c39914f4ed952",
-  "verified_at": "2026-11-06T17:27:21Z"
+  "previous": "c12bc5478f880e803fef6c4f37499187c6aa037df4d8abef91bbe44027115484",
+  "verified_at": "2026-11-06T17:49:45Z"
 }

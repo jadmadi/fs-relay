@@ -1,9 +1,9 @@
 {
   "version": "sila/audit-receipt/v1",
   "goal_slug": "single-serve-data-lock",
-  "commit_sha": "6a3142ef059f918620f9adaa93662646964b2c9f",
-  "spec_hash": "23bfc85fda51687cd33aab3e26f5ca3f360ef125ba092646f0f3d23a2b454c51",
-  "sandbox_nonce": "493e7278b6dbc204",
+  "commit_sha": "e47322c679009a8e12dfe31bba112546dbf6c453",
+  "spec_hash": "cba7edaa4ba6b0c22371e6871f169f759804d08219658255b40745f18cb30705",
+  "sandbox_nonce": "2c6135422f6816bf",
   "candidate_selection": "A",
   "blindfold_verified": true,
   "canary_passed": true,
@@ -12,7 +12,7 @@
   "probes_executed": 6,
   "probes_passed": 6,
   "probe_manifest_hash": "9c3c599ac1f291d279fcfca8ab7da3daf6fe19403a9d7f921257d284d0acd7c7",
-  "auditor_pub_key": "mds9SEqpu2S6r4gDKy843PoCI/AgDP/G9lxfQSILg9w=",
-  "auditor_signature": "KRqMJvqP8IBbWPkVTPzlpC3VThMe1URVZ4cCuiJEh/tgte+OwzgGhLvzbic9CVhLrKKIKaD4k4KZwzYEHXbAAw==",
-  "certified_at": "2026-11-06T17:27:37Z"
+  "auditor_pub_key": "EKls8Lt3mPPORO2yaI9ZU4Jd8Iy6ti80LmlTZo4u2eM=",
+  "auditor_signature": "mDhvRkw6ABZeEKs0A/Im9Q5ET1DewQykYQXkh5jY28SrdXKdQODvtgf7ITPz1oqkRtBJiP2Pth2wosT52VNaAQ==",
+  "certified_at": "2026-11-06T17:49:35Z"
 }

@@ -4,10 +4,10 @@
   "level": "L3",
   "outcome": "passed",
   "method": "audit",
-  "spec_hash": "98baee0810c3509b9d2648f76d46c9cea69291670729ce1780a811011c3dcd9c",
+  "spec_hash": "ace98c3362917bb76788d62103fe36932eeb892e5f9c6762e92f676d34e8ab24",
   "subject": {
     "algorithm": "sha256",
-    "hash": "2c6433f88b73c44a4b88a40eb81177c5e1a439b9dc4b2c9b39912fa8a8a8a8f7",
+    "hash": "1db8716873f6a8665940cce26b52b579eaff1bbc8af3574d9b3362c0f1320008",
     "paths": [
       {
         "path": "ROADMAP.md",
@@ -17,12 +17,17 @@
       {
         "path": "SPEC.md",
         "kind": "file",
-        "hash": "b57e07d9e4d6b9c7d0f885193410b4a11fc1966468e109a6571d44ba50c3fe37"
+        "hash": "3379df664dd49ce485de13dd81f124c0a33eb633434844e77600fb42d9305636"
+      },
+      {
+        "path": "cmd/fs-relay/cli_test.go",
+        "kind": "file",
+        "hash": "0b6c221cfcc8ce47f8660fd598fab94ffb514bb5c870b70b17daacd04b7445c9"
       },
       {
         "path": "cmd/fs-relay/main.go",
         "kind": "file",
-        "hash": "369763ef0ed441ac7ff8f47d050ea7aed285dab23f4f24d84ab6c6ab8e4ccfcc"
+        "hash": "5e9d390f69c962964ed53e684235c78f9c7a62596f9c2290face56033c56e743"
       },
       {
         "path": "go.mod",
@@ -47,12 +52,17 @@
       {
         "path": "internal/local/local_test.go",
         "kind": "file",
-        "hash": "0e28b688c2358fe2455176e9ffba744374a272c00397bf1d25956ebca9386878"
+        "hash": "29e002a548496bb1eaae12c43adbf5789d1c9ddc9789d17ce0f111f0570931b1"
+      },
+      {
+        "path": "internal/local/path.go",
+        "kind": "file",
+        "hash": "76ca0fce57107bd0fd53f35dc876fab56e6f2ec7e32bb04d30fb5c8282699458"
       },
       {
         "path": "internal/local/tree.go",
         "kind": "file",
-        "hash": "451912f1ac41e3a58593fd93ef8af8f20ae21bf57ff0dd145f7ef033f6116357"
+        "hash": "247d03f5c46fa0b0f59f6e2eaa6ada7062d06dacc172324738c15c8135c402fc"
       }
     ]
   },
@@ -60,9 +70,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+649b8819-dirty",
+    "sila_version": "dev+16581f94-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "3b7f0fc1ef4535706cb997623359522e954385208d4eaad4d659e8b23a33eda7",
-  "verified_at": "2026-11-06T17:27:37Z"
+  "previous": "a6101e5ab41461f0d2fbca79ce33d7e4034f3baf6a30ed1c99f4f3f2b9c62149",
+  "verified_at": "2026-11-06T17:49:36Z"
 }

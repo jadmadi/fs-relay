@@ -1,13 +1,13 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "reject-extra-args",
-  "level": "L3",
+  "level": "L1",
   "outcome": "passed",
-  "method": "audit",
+  "method": "evidence",
   "spec_hash": "5f52b2a1348ce1a5ea17897a6803c46d284f56eb5d8b8e8aa9650f39cf547020",
   "subject": {
     "algorithm": "sha256",
-    "hash": "5b028ec00b7f8db045bd92a0fedd4adb3ada055e7ea955364752add25a7f9512",
+    "hash": "64022ce546095d903dd458932046b5b82dcc8ae4e7ff85a295a0dcdf03303e2b",
     "paths": [
       {
         "path": "cmd/fs-relay/cli.go",
@@ -17,12 +17,12 @@
       {
         "path": "cmd/fs-relay/cli_test.go",
         "kind": "file",
-        "hash": "fd14293a48d890bd77c373e0070cdba82ad8b469a4dcc3d2e746d19f0f948131"
+        "hash": "0b6c221cfcc8ce47f8660fd598fab94ffb514bb5c870b70b17daacd04b7445c9"
       },
       {
         "path": "cmd/fs-relay/main.go",
         "kind": "file",
-        "hash": "369763ef0ed441ac7ff8f47d050ea7aed285dab23f4f24d84ab6c6ab8e4ccfcc"
+        "hash": "5e9d390f69c962964ed53e684235c78f9c7a62596f9c2290face56033c56e743"
       },
       {
         "path": "go.mod",
@@ -50,9 +50,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+649b8819-dirty",
+    "sila_version": "dev+16581f94-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "ad5648016a66a8b25220e8cc0486d7510ec2c1163071c5bf7a2b961ea567ff89",
-  "verified_at": "2026-11-06T17:27:25Z"
+  "previous": "1736ddb9cfb4b9c063a72634ceea643515c72dadccd6e0dceb47898c4ae418c7",
+  "verified_at": "2026-11-06T17:49:46Z"
 }
