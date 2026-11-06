@@ -27,6 +27,7 @@ type fakeCaller struct {
 	before func(method string, p wire.Params)
 }
 
+// Call records the request and returns a canned response or error.
 func (f *fakeCaller) Call(ctx context.Context, method string, p wire.Params) (wire.Result, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, callRecord{method: method, p: p})
@@ -39,7 +40,14 @@ func (f *fakeCaller) Call(ctx context.Context, method string, p wire.Params) (wi
 	if deny {
 		return wire.Result{}, &wire.Error{Code: uint32(syscall.EAGAIN)}
 	}
-	return wire.Result{}, nil
+	switch method {
+	case wire.Write:
+		return wire.Result{Written: uint32(len(p.Data))}, nil
+	case wire.Getlk:
+		return wire.Result{Lock: &wire.Lock{Type: wire.LockUnlock}}, nil
+	default:
+		return wire.Result{}, nil
+	}
 }
 
 func (f *fakeCaller) Releases() <-chan struct{} {
@@ -305,5 +313,106 @@ func TestReleaseWithErrorStillDropsOwners(t *testing.T) {
 	}
 	if !released {
 		t.Fatal("owners kept after a failed close")
+	}
+}
+
+// TestUnlockDrainsWriteBehindBeforeSetlk verifies buffered writes flush before F_UNLCK.
+func TestUnlockDrainsWriteBehindBeforeSetlk(t *testing.T) {
+	f := &fakeCaller{}
+	n := &node{c: f, ino: 5}
+	h := &handle{c: f, n: n, ino: 5, fh: 11}
+	defer h.releaseBuf()
+
+	if written, errno := h.Write(context.Background(), []byte("abc"), 0); errno != 0 || written != 3 {
+		t.Fatalf("write: n=%d errno=%v", written, errno)
+	}
+	if len(f.records()) != 0 {
+		t.Fatalf("expected buffered write before unlock, got %+v", f.records())
+	}
+
+	unlock := &fuse.FileLock{Start: 0, End: 9, Typ: syscall.F_UNLCK}
+	if errno := n.Setlk(context.Background(), h, 7, unlock, 0); errno != 0 {
+		t.Fatalf("unlock: %v", errno)
+	}
+
+	recs := f.records()
+	if len(recs) != 2 {
+		t.Fatalf("expected write then unlock, got %+v", recs)
+	}
+	if recs[0].method != wire.Write || string(recs[0].p.Data) != "abc" || recs[0].p.Fh != 11 {
+		t.Fatalf("record[0]: %+v", recs[0])
+	}
+	if recs[1].method != wire.Setlk || recs[1].p.Lock != wire.LockUnlock || recs[1].p.Fh != 11 {
+		t.Fatalf("record[1]: %+v", recs[1])
+	}
+}
+
+// TestUnlockWithDrainErrorStillReleasesLock verifies unlock is sent even when drain fails.
+func TestUnlockWithDrainErrorStillReleasesLock(t *testing.T) {
+	f := &fakeCaller{}
+	n := &node{c: f, ino: 5}
+	h := &handle{c: f, n: n, ino: 5, fh: 11}
+	n.dirty = map[*handle]int64{h: 3}
+	h.wb.err = syscall.EIO
+
+	unlock := &fuse.FileLock{Start: 0, End: 9, Typ: syscall.F_UNLCK}
+	if errno := n.Setlk(context.Background(), h, 7, unlock, 0); errno != syscall.EIO {
+		t.Fatalf("unlock errno=%v, want EIO", errno)
+	}
+	recs := f.records()
+	if len(recs) != 1 || recs[0].method != wire.Setlk || recs[0].p.Lock != wire.LockUnlock {
+		t.Fatalf("expected setlk unlock despite drain error, got %+v", recs)
+	}
+
+	f.setDeny(true)
+	h.wb.err = syscall.EIO
+	if errno := n.Setlk(context.Background(), h, 7, unlock, 0); errno != syscall.EAGAIN {
+		t.Fatalf("unlock with both drain and call error = %v, want EAGAIN", errno)
+	}
+}
+
+// TestLockGrantDropsCachedAttrAndBlob verifies lock grants invalidate cached attr and body bytes.
+func TestLockGrantDropsCachedAttrAndBlob(t *testing.T) {
+	f := &fakeCaller{}
+	k := newKernel()
+	n := &node{c: f, k: k, ino: 5}
+	h := &handle{c: f, n: n, ino: 5, local: true}
+
+	n.remember(wire.Attr{Ino: 5, Size: 99})
+	k.rememberBlob(1, "db", 5, []byte("old"))
+
+	var out fuse.FileLock
+	ask := &fuse.FileLock{Start: 0, End: 9, Typ: syscall.F_WRLCK}
+	if errno := n.Getlk(context.Background(), h, 7, ask, 0, &out); errno != 0 {
+		t.Fatalf("getlk: %v", errno)
+	}
+	if _, hit := n.cached(); !hit {
+		t.Fatal("getlk dropped cached attr")
+	}
+	if _, hit := k.blob(5, 0, 3); !hit {
+		t.Fatal("getlk dropped cached blob")
+	}
+
+	f.setDeny(true)
+	read := &fuse.FileLock{Start: 0, End: 9, Typ: syscall.F_RDLCK}
+	if errno := n.Setlk(context.Background(), h, 7, read, 0); errno != syscall.EAGAIN {
+		t.Fatalf("denied setlk: %v", errno)
+	}
+	if _, hit := n.cached(); !hit {
+		t.Fatal("denied setlk dropped cached attr")
+	}
+	if _, hit := k.blob(5, 0, 3); !hit {
+		t.Fatal("denied setlk dropped cached blob")
+	}
+
+	f.setDeny(false)
+	if errno := n.Setlk(context.Background(), h, 7, read, 0); errno != 0 {
+		t.Fatalf("setlk grant: %v", errno)
+	}
+	if _, hit := n.cached(); hit {
+		t.Fatal("cached attr survived setlk grant")
+	}
+	if _, hit := k.blob(5, 0, 3); hit {
+		t.Fatal("cached blob survived setlk grant")
 	}
 }

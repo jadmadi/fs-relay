@@ -62,6 +62,8 @@ func (n *node) Setlkw(ctx context.Context, f fs.FileHandle, owner uint64, lk *fu
 	}
 }
 
+// lock drains buffered writes before an unlock, sends the lock call to the
+// server, and drops cached attributes and small-file bytes on a lock grant.
 func (n *node) lock(ctx context.Context, method string, f fs.FileHandle, owner uint64, lk *fuse.FileLock, flags uint32) (wire.Result, syscall.Errno) {
 	p, errno := lockParams(n, f, owner, lk, flags)
 	if errno != 0 {
@@ -78,10 +80,22 @@ func (n *node) lock(ctx context.Context, method string, f fs.FileHandle, owner u
 	if h != nil && h.fh == 0 && grant {
 		h.addOwner(owner)
 	}
+	var drainErr syscall.Errno
+	if method != wire.Getlk && p.Lock == wire.LockUnlock {
+		drainErr = n.drain(ctx)
+	}
 	res, err := n.c.Call(ctx, method, p)
-	return res, toErrno(err)
+	if grant && err == nil {
+		n.forgetAttr()
+		n.k.forgetIno(n.ino)
+	}
+	if err != nil {
+		return res, toErrno(err)
+	}
+	return res, drainErr
 }
 
+// lockParams translates a FUSE lock request into wire.Params.
 func lockParams(n *node, f fs.FileHandle, owner uint64, lk *fuse.FileLock, flags uint32) (wire.Params, syscall.Errno) {
 	if lk.Start > uint64(maxOffset) {
 		return wire.Params{}, syscall.EINVAL
