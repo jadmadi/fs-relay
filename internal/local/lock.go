@@ -148,15 +148,25 @@ func (r *lockRec) remove(key lockKey) {
 	}
 }
 
-// addWaiter records a waiting setlkw request if not already present.
+const maxWaiters = 64
+
+// addWaiter records a waiting setlkw request if not already present,
+// capping per-inode waiter state at maxWaiters.
 func (r *lockRec) addWaiter(w lockWaiter) {
 	if w.key.client == "" {
 		return
 	}
 	for i := range r.waiters {
-		if r.waiters[i] == w {
+		cur := r.waiters[i]
+		if cur.key == w.key && cur.fh == w.fh && cur.typ == w.typ && cur.flock == w.flock &&
+			(cur == w || cur.start >= w.start && cur.end <= w.end) {
+			r.waiters[i] = w
 			return
 		}
+	}
+	if len(r.waiters) >= maxWaiters {
+		r.waiters[0] = w
+		return
 	}
 	r.waiters = append(r.waiters, w)
 }
@@ -171,6 +181,17 @@ func (r *lockRec) keepWaiters(keep func(lockWaiter) bool) {
 	}
 	clear(r.waiters[len(out):])
 	r.waiters = out
+}
+
+// waiterDone reports whether key applying typ on [start, end] satisfies or cancels w.
+func (r *lockRec) waiterDone(w lockWaiter, key lockKey, start, end uint64, typ uint32) bool {
+	if w.key != key || w.flock || start > w.start || end < w.end {
+		return false
+	}
+	if typ == wire.LockUnlock {
+		return !r.wake || !r.conflicts(w.key, w.start, w.end, w.typ)
+	}
+	return w.typ == wire.LockRead || typ == wire.LockWrite
 }
 
 func (o *lockOwner) empty() bool {
@@ -269,6 +290,7 @@ func (r *lockRec) put(key lockKey, fh uint64, start, end uint64, typ uint32, pid
 	r.recount()
 }
 
+// apply updates canonical SQLite lock counters in place without a full recount.
 func (r *lockRec) apply(o *lockOwner, start, end uint64, typ uint32, pid uint32) {
 	switch {
 	case start == pendingByte && typ == wire.LockRead:
@@ -317,10 +339,20 @@ func (r *lockRec) apply(o *lockOwner, start, end uint64, typ uint32, pid uint32)
 	}
 }
 
+// overlaps reports whether this owner holds any span overlapping [start, end].
+func (o *lockOwner) overlaps(start, end uint64) bool {
+	for _, s := range o.spans {
+		if overlap(s.start, s.end, start, end) {
+			return true
+		}
+	}
+	return false
+}
+
 // unlock drops the range for one owner. It is a no-op for a range not held.
 func (r *lockRec) unlock(key lockKey, start, end uint64) {
 	o := r.find(key)
-	if o == nil {
+	if o == nil || !o.overlaps(start, end) {
 		return
 	}
 	o.trim(start, end)
@@ -374,6 +406,7 @@ func (r *lockRec) recount() {
 	}
 }
 
+// flockSet acquires, downgrades, or releases a whole-file flock lock for key.
 func (r *lockRec) flockSet(key lockKey, fh uint64, typ uint32) error {
 	o := r.owner(key, fh)
 	switch typ {
@@ -463,6 +496,7 @@ func (t *Tree) record(e *entry) *lockRec {
 	return e.locks
 }
 
+// lockTarget resolves p to a regular-file inode and composite lock owner key.
 func lockTarget(t *Tree, p wire.Params) (uint64, lockKey, error) {
 	ino := p.Inode
 	if ino == 0 && p.Fh != 0 {
@@ -567,7 +601,7 @@ func runLock(rec *lockRec, key lockKey, start, end uint64, p wire.Params) error 
 	case wire.LockUnlock:
 		rec.unlock(key, start, end)
 		rec.keepWaiters(func(w lockWaiter) bool {
-			return w.key != key || w.flock || !overlap(w.start, w.end, start, end)
+			return !rec.waiterDone(w, key, start, end, p.Lock)
 		})
 	case wire.LockRead, wire.LockWrite:
 		if rec.conflicts(key, start, end, p.Lock) {
@@ -575,7 +609,7 @@ func runLock(rec *lockRec, key lockKey, start, end uint64, p wire.Params) error 
 		}
 		rec.put(key, p.Fh, start, end, p.Lock, p.Pid)
 		rec.keepWaiters(func(w lockWaiter) bool {
-			return w.key != key || w.flock || !overlap(w.start, w.end, start, end)
+			return !rec.waiterDone(w, key, start, end, p.Lock)
 		})
 	default:
 		return syscall.EINVAL

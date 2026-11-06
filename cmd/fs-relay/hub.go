@@ -37,6 +37,7 @@ type member struct {
 	cancel func()
 }
 
+// newHub constructs a namespace pubsub hub authenticated with token.
 func newHub(token string) *hub {
 	return &hub{
 		rooms:   map[string]*room{},
@@ -162,6 +163,7 @@ func (h *hub) arm(ns, id string) {
 	time.AfterFunc(h.holdFor, func() { h.dropHold(ns, id) })
 }
 
+// dropHold expires a disconnected client's lock hold and wakes any waiting mounts.
 func (h *hub) dropHold(ns, id string) {
 	h.mu.Lock()
 	r := h.rooms[ns]
