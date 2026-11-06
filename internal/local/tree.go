@@ -128,7 +128,7 @@ func (t *Tree) CheckNamespace(ns string) error {
 	if err := wire.CheckNS(ns); err != nil {
 		return err
 	}
-	info, err := os.Stat(filepath.Join(t.root, ns))
+	info, err := os.Lstat(filepath.Join(t.root, ns))
 	if err != nil {
 		return err
 	}

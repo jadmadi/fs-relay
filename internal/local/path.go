@@ -2,6 +2,7 @@ package local
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -41,6 +42,9 @@ func (t *Tree) abs(ns, rel string) (string, error) {
 		return "", syscall.EINVAL
 	}
 	dir := filepath.Join(t.root, ns)
+	if info, err := os.Lstat(dir); err == nil && !info.IsDir() {
+		return "", syscall.ENOTDIR
+	}
 	if rel == "" {
 		return dir, nil
 	}
