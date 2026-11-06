@@ -29,7 +29,7 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 ## Summary
 - **Total Goals**: 16
 - 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
-- 🟢 **Implemented**: 16 (11 verified 📜, 5 stale ⚠️, 0 unverified)
+- 🟢 **Implemented**: 16 (5 verified 📜, 8 stale ⚠️, 3 unverified)
 - 🎯 **By Tier**: 0 immediate (Tier 1), 16 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
 - 📋 **Execution Tasks Progress**: 77/77 completed (100%)
 
@@ -44,14 +44,14 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 | [`startup-validation`](startup-validation/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `12bcc6e` |
 | [`lock-robustness`](lock-robustness/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `7399591` |
 | [`ci-race`](ci-race/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `8740b26` |
-| [`namespace-cache`](namespace-cache/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `f5e6f13` |
+| [`namespace-cache`](namespace-cache/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `f5e6f13` |
 | [`bind-grant-race`](bind-grant-race/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `30504b1` |
-| [`bind-lock-coherence`](bind-lock-coherence/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `636df49` |
+| [`bind-lock-coherence`](bind-lock-coherence/goal.md) | `⚡ Indep` | 🚢 SHIP | stale ⚠️ | Git Commit | `636df49` |
 | [`html-prototypes-10x`](html-prototypes-10x/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `b6464f2` |
-| [`reject-extra-args`](reject-extra-args/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `d71bffc` |
-| [`bind-mountpoint-arg`](bind-mountpoint-arg/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `c6bb7ee` |
+| [`reject-extra-args`](reject-extra-args/goal.md) | `⚡ Indep` | 🚢 SHIP | unverified | Git Commit | `d71bffc` |
+| [`bind-mountpoint-arg`](bind-mountpoint-arg/goal.md) | `⚡ Indep` | 🚢 SHIP | unverified | Git Commit | `c6bb7ee` |
+| [`bind-sigint-busy`](bind-sigint-busy/goal.md) | `⚡ Indep` | 🚢 SHIP | unverified | Git Commit | `532649e` |
 | [`sila-onboarding`](sila-onboarding/goal.md) | `⚡ Indep` | 🚢 SHIP | verified 📜 | Git Commit | `e991617` |
 | [`sqlite-rollback-journal`](sqlite-rollback-journal/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `daa9689` |
-| [`lock-wake-races`](lock-wake-races/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `63427fd` |
-| [`bind-sigint-busy`](bind-sigint-busy/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `532649e` |
-| [`single-serve-data-lock`](single-serve-data-lock/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `6b3482b` |
+| [`lock-wake-races`](lock-wake-races/goal.md) | `🔗 Dep` | 🚢 SHIP | stale ⚠️ | Git Commit | `63427fd` |
+| [`single-serve-data-lock`](single-serve-data-lock/goal.md) | `🔗 Dep` | 🚢 SHIP | verified 📜 | Git Commit | `5533496` |

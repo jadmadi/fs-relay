@@ -4,8 +4,7 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-mountpoint-arg_1793935904`
-
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-mountpoint-arg_1793985906`
 ## Context
 - **Goal ID**: `bind-mountpoint-arg` (Closes Upstream Issue `#22`)
 - **One-line why**: A previous refactor moved `fs-relay-bind` flags to a local `flag.FlagSet` while leaving `flag.Arg(0)` reading the global set, causing `fs-relay-bind` to mount over the current working directory (`""`); extracting `mountArg(fs *flag.FlagSet)` with unit tests and adding a pre-mount non-empty guard prevents any recurrence.

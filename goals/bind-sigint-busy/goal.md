@@ -4,8 +4,7 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-sigint-busy_1793936114`
-
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-sigint-busy_1793985909`
 ## Context
 - **Goal ID**: `bind-sigint-busy` (Closes Upstream Issue `#4`)
 - **One-line why**: `fs-relay-bind` hangs indefinitely on `SIGINT` or `SIGTERM` when a file on the mount is open because `unmountOnSignal` reads one signal, ignores `EBUSY` from `server.Unmount()`, and exits while `server.Wait()` blocks forever.

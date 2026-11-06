@@ -4,8 +4,7 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-- **Mystery Audited By**: @mystery-auditor | Report: `receipt_reject-extra-args_1793935897`
-
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_reject-extra-args_1793985901`
 ## Context
 - **Goal ID**: `reject-extra-args` (Closes Upstream Issue `#8`)
 - **One-line why**: Running `fs-relay help`, `fs-relay version`, or `fs-relay extra` silently ignores positional arguments, creates `./data`, prints a random token, and blocks listening on `:8080` instead of failing fast with exit status `2`.

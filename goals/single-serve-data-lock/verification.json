@@ -1,23 +1,43 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "single-serve-data-lock",
-  "level": "L1",
+  "level": "L3",
   "outcome": "passed",
-  "method": "evidence",
-  "spec_hash": "17105b5614799a898c7a80a3975ffefd10a7dc62acc21d2651b54eaed294ff12",
+  "method": "audit",
+  "spec_hash": "a72990b920493d0ec56493107de5f6daacd756d242119f9ff6fe5e09632023f1",
   "subject": {
     "algorithm": "sha256",
-    "hash": "00a1938b74e8f75316f5fa640a0c44a4fd4f98e226e659d619b512326221b543",
+    "hash": "71d0a11a62d424241d4df0b02922d1894ae032f0bfab08bc18742491853ab81c",
     "paths": [
       {
-        "path": "ROADMAP.md",
-        "kind": "file",
-        "hash": "022ee514b958bf80e7184668402b3bbd1708ad891f46e4a645729e126135ea74"
+        "path": "Edit: `README.md`",
+        "kind": "missing",
+        "hash": ""
       },
       {
-        "path": "cmd/fs-relay/main.go",
-        "kind": "file",
-        "hash": "369763ef0ed441ac7ff8f47d050ea7aed285dab23f4f24d84ab6c6ab8e4ccfcc"
+        "path": "Edit: `ROADMAP.md`",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "Edit: `SPEC.md`",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "Edit: `cmd/fs-relay/main.go` (`run",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "Edit: `internal/local/local_test.go` (`TestTreeLockRefusesSecondServerAndReleasesOnClose",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "Edit: `internal/local/tree.go` (`Tree`, `(*Tree).Lock`, `(*Tree).Close",
+        "kind": "missing",
+        "hash": ""
       },
       {
         "path": "go.mod",
@@ -38,16 +58,6 @@
         "path": "go.work.sum",
         "kind": "missing",
         "hash": ""
-      },
-      {
-        "path": "internal/local/local_test.go",
-        "kind": "file",
-        "hash": "a41e71069e21466d1fc2f19d9359111c26e4050d665544f5e674a9a3164851b7"
-      },
-      {
-        "path": "internal/local/tree.go",
-        "kind": "file",
-        "hash": "6c895b7e8edaf1f3423b5bfa339e39bdf4971fc385216aa3f90ec4687af133f0"
       }
     ]
   },
@@ -55,9 +65,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+40d2d9e8-dirty",
+    "sila_version": "dev+941a22a8-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "2e1b94d1bde4c939205c083334a482f62d32e1aa55f8e10077fe85dfd389ed5d",
-  "verified_at": "2026-11-06T07:36:21Z"
+  "previous": "886c0d8ea8277eec73f451288df4b6f3410b4e784eeef158ae9367ea8273034b",
+  "verified_at": "2026-11-06T17:24:57Z"
 }
