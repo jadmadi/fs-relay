@@ -7,7 +7,7 @@
 - token based security
 - Linux Kernel specific optimizations: zero-copy routines reducing context switching, memory allocation and fragmentation, ..etc.
 - specialized end point for large files
-- get sqlite working
+- get sqlite working; `fs-relay-bind` drains write-behind before unlocking and drops cached attributes and small-file bytes on lock grant.
 - Benchmark serving millions of rows to DuckDB.
 - CLI ergonomics: `-version` prints the build, `-h` prints purpose-driven help, and flags after the mountpoint get a hint.
 - Startup validation. The server creates and logs the data root, refuses a path that is not a directory, and never creates a namespace; a missing namespace is 404. The mount checks its mountpoint before connecting, and a non-empty directory needs `-force-existing-mnt`.
