@@ -1,0 +1,12 @@
+{
+  "command": "go test -race ./internal/local ./cmd/fs-relay",
+  "timeout_seconds": 300,
+  "expected_exit_code": 0,
+  "contract_hash": "4642b53c8470d15b7764f4ee4a2e7c5d3eb04cb1d566433b2b7ba9f2e98fa6cf",
+  "max_rounds": 5,
+  "test_paths": [
+    "cmd/fs-relay/lock_test.go",
+    "internal/local/lock_test.go"
+  ],
+  "created_at": "2026-11-06T01:51:40.042849839Z"
+}

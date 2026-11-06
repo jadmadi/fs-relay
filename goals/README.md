@@ -27,11 +27,21 @@ This index tracks all goal packages under `goals/`, their execution mode (Indepe
 6. **Auto-Reconciliation**: Run `sila goals` to scan commits, mark 🟢 **Implemented**, and clear the claim lock.
 
 ## Summary
-- **Total Goals**: 10
-- 🟡 **Ready to Execute (Pending)**: 0 (0 independent ⚡, 0 unblocked 🔗)
+- **Total Goals**: 12
+- 🟡 **Ready to Execute (Pending)**: 1 (1 independent ⚡, 0 unblocked 🔗)
+- ⛔ **Blocked on Prerequisites**: 1
 - 🟢 **Implemented**: 10 (5 verified 📜, 5 unbound ○, 0 unverified)
-- 🎯 **By Tier**: 0 immediate (Tier 1), 10 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
-- 📋 **Execution Tasks Progress**: 58/58 completed (100%)
+- 🎯 **By Tier**: 0 immediate (Tier 1), 12 roadmap (Tier 2), 0 nice-to-have (Tier 3), 0 wont-fix (Tier 4)
+- 📋 **Execution Tasks Progress**: 58/65 completed (89%)
+
+---
+
+## 🟡 Ready to Execute (Pending Goals)
+
+| Goal Package | Tier | Mode & Sequence | Dependencies | Focus & Description | Launch Command |
+| :--- | :---: | :---: | :--- | :--- | :--- |
+| [`bind-lock-coherence`](bind-lock-coherence/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⚡ Independent (#9)` | - | Drain write-behind before unlock and drop cached reads on lock grant — Ensure lock handoffs across mounts in `cmd/fs-relay-bind` are coherent with clie... | `/goal goals/bind-lock-coherence/goal.md` |
+| [`lock-wake-races`](lock-wake-races/goal.md) | `🗺️ Roadmap` | `🚢 SHIP ⛔ Blocked (#10)` | Prereqs: bind-lock-coherence | Close lock wake-up races across EAGAIN registration, downgrades, and multi-waiters — Eliminate the three server-side lock wake-up races in `internal/local` and `cmd/... | `/goal goals/lock-wake-races/goal.md` |
 
 ---
 

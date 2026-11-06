@@ -1,0 +1,11 @@
+{
+  "command": "go test -race ./cmd/fs-relay-bind",
+  "timeout_seconds": 300,
+  "expected_exit_code": 0,
+  "contract_hash": "d7596ad4c4b1ef703d940e2fea37b0e2238b8afac1ed8d1558a4016d23be18f2",
+  "max_rounds": 5,
+  "test_paths": [
+    "cmd/fs-relay-bind/lock_release_test.go"
+  ],
+  "created_at": "2026-11-06T01:51:39.984469016Z"
+}
