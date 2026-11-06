@@ -12,7 +12,7 @@ Read `facts.md` and `goal.md`.
     2. Implement `(*Tree).Lock() error` to open `filepath.Join(t.root, ".fs-relay.lock")` with `os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW` and mode `0o600`, and verify `info, err := f.Stat()` has `info.Mode().IsRegular()` before truncation.
     3. Acquire `unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB)`. On error, read the file, close `f`, and return `fmt.Errorf("data directory %s is already served by pid %s", t.root, pid)` (or without PID if empty).
     4. Truncate `f` to `0`, write `fmt.Fprintf(f, "%d\n", os.Getpid())`, and store `f` in `t.lockFile` under `t.fmu` (closing any prior `t.lockFile`).
-    5. In `(*Tree).abs(ns, rel string)`, verify when `filepath.Dir(full) != dir` that `filepath.EvalSymlinks(filepath.Dir(full))` resolves inside `filepath.EvalSymlinks(dir)` so namespace symlinks to `..` cannot unlink or replace `<root>/.fs-relay.lock`.
+    5. In `(*Tree).CheckNamespace(ns string)`, use `os.Lstat` so a symlink at `<root>/<ns>` (such as `<root>/demo -> .`) is rejected with `syscall.ENOTDIR`, and in `(*Tree).abs(ns, rel string)`, verify that resolved parent directories remain strictly inside `<root>/<ns>` and never equal `<root>`, while `(*Tree).source` and `readCapped` hold `t.op.RLock()` across path resolution and `os.OpenFile` so concurrent namespace `rename`/`symlink` calls cannot race between validation and open.
     6. In `(*Tree).Close()`, clear `t.lockFile` under `t.fmu` and join `lf.Close()` into the returned error without unlinking `.fs-relay.lock`.
   - Verification: `go test -race ./internal/local` (expected exit `0`).
 

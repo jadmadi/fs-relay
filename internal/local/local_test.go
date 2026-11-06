@@ -688,6 +688,13 @@ func TestTreeLockRejectsSymlinkAndProtectsLockFile(t *testing.T) {
 	if errnoOf(t, err) != syscall.EINVAL {
 		t.Fatalf("unlink via .. symlink = %v, want EINVAL", err)
 	}
+	if err := os.Symlink(".", filepath.Join(root, "symns")); err != nil {
+		t.Fatal(err)
+	}
+	_, err = tr.Call(context.Background(), wire.Unlink, wire.Params{Namespace: "symns", Inode: 1, Name: ".fs-relay.lock"})
+	if errnoOf(t, err) != syscall.ENOTDIR {
+		t.Fatalf("unlink via symlinked namespace = %v, want ENOTDIR", err)
+	}
 	second := New(root)
 	t.Cleanup(func() { _ = second.Close() })
 	if err := second.Prepare(); err != nil {

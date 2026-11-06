@@ -29,6 +29,7 @@ This goal adds:
 ## Files to Touch
 - internal/local/tree.go
 - internal/local/path.go
+- internal/local/file.go
 - internal/local/local_test.go
 - cmd/fs-relay/main.go
 - cmd/fs-relay/cli_test.go
@@ -37,8 +38,9 @@ This goal adds:
 - README.md
 
 ## File & Symbol Scope
-- Edit: `internal/local/tree.go` (`Tree`, `(*Tree).Lock`, `(*Tree).Close`)
+- Edit: `internal/local/tree.go` (`Tree`, `(*Tree).Lock`, `(*Tree).CheckNamespace`, `(*Tree).Close`)
 - Edit: `internal/local/path.go` (`(*Tree).abs`)
+- Edit: `internal/local/file.go` (`(*Tree).source`, `readCapped`)
 - Edit: `internal/local/local_test.go` (`TestTreeLockRefusesSecondServerAndReleasesOnClose`, `TestTreeLockRejectsSymlinkAndProtectsLockFile`)
 - Edit: `cmd/fs-relay/main.go` (`main`, `run`)
 - Edit: `cmd/fs-relay/cli_test.go` (`TestForceMultiServeFlag`)

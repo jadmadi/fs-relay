@@ -113,12 +113,11 @@ func run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	srv.RegisterOnShutdown(raw.closeAll)
-	errc := make(chan error, 1)
-	go func() { errc <- srv.Serve(ln) }()
-
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigc)
+	errc := make(chan error, 1)
+	go func() { errc <- srv.Serve(ln) }()
 	select {
 	case err := <-errc:
 		if err == http.ErrServerClosed {
