@@ -34,6 +34,7 @@ func handler(tree *local.Tree, h *hub) (http.Handler, *rawSet) {
 	return withToken(h.token, mux), set
 }
 
+// serve handles a FlatBuffers RPC POST or long-poll join for a namespace.
 func serve(h *hub, tree *local.Tree, w http.ResponseWriter, r *http.Request) {
 	ns := r.PathValue("ns")
 	if err := wire.CheckNS(ns); err != nil {

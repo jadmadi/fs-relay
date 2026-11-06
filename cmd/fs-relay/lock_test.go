@@ -239,6 +239,7 @@ func TestHoldKeepsLocksOnRejoin(t *testing.T) {
 	}
 }
 
+// TestThreeWaitersWakeOnSuccessiveUnlocks verifies three contending mounts wake across back-to-back unlocks.
 func TestThreeWaitersWakeOnSuccessiveUnlocks(t *testing.T) {
 	srv, _, _ := lockServer(t)
 	a := lockCaller(t, srv.URL, testToken)
@@ -311,6 +312,7 @@ func TestThreeWaitersWakeOnSuccessiveUnlocks(t *testing.T) {
 	}
 }
 
+// TestConcurrentSetlkwAndUnlockNeverMissesRelease verifies concurrent setlkw and unlock calls never lose a release wake.
 func TestConcurrentSetlkwAndUnlockNeverMissesRelease(t *testing.T) {
 	srv, _, _ := lockServer(t)
 	a := lockCaller(t, srv.URL, testToken)
