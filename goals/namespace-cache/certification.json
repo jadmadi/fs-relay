@@ -1,6 +1,6 @@
 {
   "goal_slug": "namespace-cache",
-  "certified_at": "2026-11-04T17:58:32.446102826Z",
+  "certified_at": "2026-11-06T03:36:56.536633575Z",
   "certified_by": "agent",
   "evidence_file": "goals/namespace-cache/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,19 +8,17 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "f5e6f13a6c82829e8d815c5bd77d7ca6103ef235",
+  "commit_sha": "2af729db4ad2d065c60b5faddbf10a68fd512b51",
   "memory_required": true,
-  "memory_waived": true,
-  "memory_waiver_reason": "facts ledger has pre-existing hash mismatches",
+  "memory_verified": true,
   "memory": {
     "required": true,
-    "status": "waived",
-    "prime": false,
-    "recall": false,
-    "writes": false,
-    "facts": false,
-    "handoff": false,
-    "waived": true,
-    "waiver_reason": "facts ledger has pre-existing hash mismatches"
+    "status": "verified",
+    "prime": true,
+    "recall": true,
+    "writes": true,
+    "facts": true,
+    "handoff": true,
+    "verified": true
   }
 }

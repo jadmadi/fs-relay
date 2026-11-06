@@ -7,7 +7,7 @@
   "spec_hash": "c0292e367b91a778c2aa456c74985136779fa3075118591a99b0602673c24bd4",
   "subject": {
     "algorithm": "sha256",
-    "hash": "e88971fc97c7de7d13d446f8354969ba049b4dbce3b9a7e06011f25d6668d0a7",
+    "hash": "7107a5b1a2b515b68e14a70225ac8e68a6ac99381237d2a60cf284caafcf2e63",
     "paths": [
       {
         "path": "go.mod",
@@ -32,16 +32,17 @@
       {
         "path": "internal/local/tree.go",
         "kind": "file",
-        "hash": "8e1236113c05f9eaa93a7d3a7b471eef2ebef3d58437b7a66f9a4664116e5bab"
+        "hash": "6c895b7e8edaf1f3423b5bfa339e39bdf4971fc385216aa3f90ec4687af133f0"
       }
     ]
   },
   "environment": {
-    "go_version": "go1.27.2",
+    "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+f41b5eac",
+    "sila_version": "dev+b8acfdcc-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "verified_at": "2026-11-04T17:58:32Z"
+  "previous": "d464eec64bf17607e0797c38806282502e602a39c3a88240b75dc5d2cb24b361",
+  "verified_at": "2026-11-06T03:36:56Z"
 }
