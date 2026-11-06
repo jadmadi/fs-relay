@@ -1,13 +1,13 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "lock-wake-races",
-  "level": "L1",
+  "level": "L3",
   "outcome": "passed",
-  "method": "evidence",
-  "spec_hash": "fd457073838a45a6903a9c979cce937f31fff9e5b36d142d59c4aef68fdecb53",
+  "method": "audit",
+  "spec_hash": "356ced8dbe07df2bfd2f2e263ab0d41142cedd13afbb0f3622de08142e6467dc",
   "subject": {
     "algorithm": "sha256",
-    "hash": "e3fea152acb390779609ea4495546d5b9bf69352687592185015a68700811657",
+    "hash": "4905000d79647c09cae523a6aa035fee0007a58579adf3edb7708fa362f346e1",
     "paths": [
       {
         "path": "SPEC.md",
@@ -17,12 +17,12 @@
       {
         "path": "cmd/fs-relay/hub.go",
         "kind": "file",
-        "hash": "e8c56b9a4b66c55deeab2cd639430e6923324b6f57f08c9fa5e9ded5e19b25d1"
+        "hash": "cc112327ab5aa794dfbb4e0905c8a0f4c5057beb80f70bc12517e7ac6f582adf"
       },
       {
         "path": "cmd/fs-relay/lock_test.go",
         "kind": "file",
-        "hash": "47e684f71e8b729874aee5e5833b36e2f3ed0691ec435e41ca684e0685321e78"
+        "hash": "c989693edd656c4f7f6b8d816b569cfc65e5c21ac955e565123e0263d6156c9f"
       },
       {
         "path": "cmd/fs-relay/lockwait.go",
@@ -32,12 +32,12 @@
       {
         "path": "cmd/fs-relay/serve.go",
         "kind": "file",
-        "hash": "368e1b428faedaf68aec425abf4a66924e4b39aa5dabe26257ef1d519e4ab51c"
+        "hash": "ff841c6c0639dab069d671b98ce46f2534227c98b0d7c09cf9deeb8bd577ada5"
       },
       {
         "path": "cmd/fs-relay/ws.go",
         "kind": "file",
-        "hash": "944a232cb9e37dc87b451b907f100f7fa8daac8f3e27b82e371f9d50b3ad65d7"
+        "hash": "61de1d5a8ddd553ad96376ef6a9c598b58df63605edb8c82a9822b25e442c6e8"
       },
       {
         "path": "go.mod",
@@ -67,12 +67,12 @@
       {
         "path": "internal/local/lock.go",
         "kind": "file",
-        "hash": "77014552827305057a401207596c363e01759a00a3a8f299646485bd956ef521"
+        "hash": "18d5625aec555e226786b71f3d3fd3328d8099b3c5038480d944d23c753ea842"
       },
       {
         "path": "internal/local/lock_test.go",
         "kind": "file",
-        "hash": "afaaa42c0c32027bd2e0e1e9beeebb38cce4c708210d91f0f894e6a5e3b541cd"
+        "hash": "ac5a9be7f0f06d937966bb15e749a45c5330b3d955d9ea6903dfed0bb5c8c98c"
       }
     ]
   },
@@ -80,9 +80,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+b8acfdcc-dirty",
+    "sila_version": "dev+40d2d9e8-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "b79da133429068f6cded5e8137ea1c8518c13ffc8e111addd2afeb1ee13de162",
-  "verified_at": "2026-11-06T03:35:52Z"
+  "previous": "3fde1882c982b40fe00a1c2bf088a1b772807493b6fd7061cd773f39326ae2cd",
+  "verified_at": "2026-11-06T08:04:36Z"
 }

@@ -4,7 +4,7 @@
 - **Registered By**: Pending Registration
 - **Spec Audited By**: Pending Spec Audit
 - **Implemented By**: Pending Implementation
-- **Mystery Audited By**: @mystery-auditor | Report: `receipt_lock-wake-races_1793935644`
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_lock-wake-races_1793952275`
 ## Goal Description
 
 Eliminate the three server-side lock wake-up races in `internal/local` and
