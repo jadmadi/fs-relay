@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fs-relay 3D Reference Explorer — Interactive Architecture Lab</title>
+<meta name="description" content="Interactive Three.js 3D architecture explorer, live protocol simulator, and self-test lab for fs-relay.">
+<meta name="theme-color" content="#0d1317">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23f43f5e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.min.js",
+    "three/addons/": "./vendor/"
+  }
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#inspector">Skip to inspector</a>
+
+<header class="topbar" role="banner">
+  <div class="brand-group">
+    <a class="brand" href="../html-prototypes/index.html">fs-relay</a>
+    <span class="eyebrow">3D ARCHITECTURE &amp; PROTOCOL LAB</span>
+  </div>
+  <div class="view-switcher" role="group" aria-label="Explorer view mode">
+    <button type="button" class="pill-btn active" data-view="topology" aria-pressed="true">1 · Macro Topology</button>
+    <button type="button" class="pill-btn" data-view="cutaway" aria-pressed="false">2 · Kernel &amp; Lock Cutaway</button>
+    <button type="button" class="pill-btn" data-view="quiz" aria-pressed="false" id="btn-quiz-mode">3 · Self-Test Quiz</button>
+  </div>
+  <div class="top-actions">
+    <button type="button" class="pill-btn" id="btn-reset-cam" aria-label="Reset 3D camera">Reset Camera</button>
+    <button type="button" class="pill-btn" id="btn-audio" aria-pressed="false">Audio: Off</button>
+  </div>
+</header>
+
+<nav class="system-tabs" aria-label="Subsystem filters">
+  <span class="filter-label">Subsystem:</span>
+  <button type="button" class="sys-tab active" data-sys="all" aria-pressed="true">All Systems (10)</button>
+  <button type="button" class="sys-tab" data-sys="transport" aria-pressed="false">Wire &amp; Transports</button>
+  <button type="button" class="sys-tab" data-sys="coherence" aria-pressed="false">Cache Coherence</button>
+  <button type="button" class="sys-tab" data-sys="locks" aria-pressed="false">SQLite Locks</button>
+  <button type="button" class="sys-tab" data-sys="raw" aria-pressed="false">Zero-Copy Splice</button>
+  <button type="button" class="sys-tab" data-sys="storage" aria-pressed="false">Inodes &amp; Disk</button>
+</nav>
+
+<main class="workspace">
+  <section class="viewport-wrap" aria-label="Interactive 3D system diagram">
+    <canvas id="canvas3d" tabindex="0" aria-label="Three.js 3D interactive topology of fs-relay. Use mouse to orbit, scroll to zoom, or click any structure to inspect."></canvas>
+
+    <div class="hud-overlay">
+      <div class="hud-badge" id="hud-hover">
+        <span class="dot"></span>
+        <span id="hud-hover-text">Drag to orbit · Scroll to zoom · Click any 3D structure</span>
+      </div>
+      <div class="hud-telemetry" id="hud-telemetry">IDLE · 10 structures online</div>
+    </div>
+
+    <div class="label-layer" id="label-layer" aria-hidden="true"></div>
+
+    <div class="sim-dock" role="region" aria-label="Live protocol simulations">
+      <div class="sim-buttons">
+        <span class="dock-label">Simulate:</span>
+        <button type="button" class="sim-btn" data-sim="write">Write + Cache Evict</button>
+        <button type="button" class="sim-btn" data-sim="lock">SQLite Lock Hand-off</button>
+        <button type="button" class="sim-btn" data-sim="splice">1 MiB Raw Splice</button>
+        <button type="button" class="sim-btn" data-sim="rejoin">8s Hold &amp; Rejoin</button>
+      </div>
+      <div class="router-control">
+        <label for="payload-slider">Payload size: <span id="payload-val">128 KiB</span></label>
+        <input type="range" id="payload-slider" min="1" max="1024" value="128" step="1">
+        <span class="route-pill" id="route-verdict">Route: raw splice(2)</span>
+      </div>
+    </div>
+  </section>
+
+  <aside class="inspector" id="inspector" aria-label="Structure reference inspector">
+    <div class="inspector-header">
+      <div class="struct-meta">
+        <span class="struct-id" id="ins-id">STRUCT · HUB-FANOUT</span>
+        <span class="struct-sys" id="ins-sys">coherence</span>
+      </div>
+      <h1 id="ins-title">fs-relay Hub &amp; Event Fan-out</h1>
+      <p class="struct-code" id="ins-pkg">cmd/fs-relay/hub.go · internal/local/tree.go</p>
+    </div>
+
+    <div class="ins-tabs" role="tablist" aria-label="Inspector sections">
+      <button type="button" role="tab" class="ins-tab active" data-tab="overview" aria-selected="true">Architecture</button>
+      <button type="button" role="tab" class="ins-tab" data-tab="invariants" aria-selected="false">Guarantees</button>
+      <button type="button" role="tab" class="ins-tab" data-tab="quiz" aria-selected="false">Self-Test (<span id="quiz-score-badge">0/8</span>)</button>
+    </div>
+
+    <div class="ins-body" id="tab-overview" role="tabpanel">
+      <p class="ins-summary" id="ins-summary"></p>
+      <div class="metrics-grid" id="ins-metrics"></div>
+      <h2>Protocol &amp; Code Facts</h2>
+      <ul class="fact-list" id="ins-facts"></ul>
+      <h2>Connected Structures</h2>
+      <div class="related-chips" id="ins-related"></div>
+    </div>
+
+    <div class="ins-body hidden" id="tab-invariants" role="tabpanel">
+      <h2>Operational Invariants (SPEC.md)</h2>
+      <p class="ins-invariant" id="ins-invariant"></p>
+      <h2>Failure &amp; Recovery Behavior</h2>
+      <p class="ins-failure" id="ins-failure"></p>
+      <div class="structure-directory">
+        <h2>All 10 Structures</h2>
+        <div class="dir-grid" id="dir-grid"></div>
+      </div>
+    </div>
+
+    <div class="ins-body hidden" id="tab-quiz" role="tabpanel">
+      <div class="quiz-card">
+        <div class="quiz-top">
+          <span class="quiz-step" id="quiz-step">Question 1 of 8</span>
+          <span class="quiz-streak" id="quiz-streak">Accuracy: 0 / 0</span>
+        </div>
+        <p class="quiz-prompt" id="quiz-prompt"></p>
+        <p class="quiz-hint">Click the matching 3D structure in the canvas (or pick from the list below) to answer.</p>
+        <div class="quiz-feedback" id="quiz-feedback" aria-live="polite"></div>
+        <div class="quiz-choices" id="quiz-choices"></div>
+        <div class="quiz-actions">
+          <button type="button" class="pill-btn" id="btn-quiz-next">Next Question →</button>
+          <button type="button" class="pill-btn" id="btn-quiz-reset">Reset Score</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

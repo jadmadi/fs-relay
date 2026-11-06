@@ -32,6 +32,11 @@ Upgrade the eight `html-prototypes/` pages and animated explainer with token-str
 - html-prototypes/locks.html
 - html-prototypes/raw.html
 - html-prototypes/explainer.html
+- interactive-prototype/index.html
+- interactive-prototype/style.css
+- interactive-prototype/app.js
+- interactive-prototype/vendor/three.module.min.js
+- interactive-prototype/vendor/controls/OrbitControls.js
 - cmd/fs-relay/root.go
 - cmd/fs-relay/root_test.go
 

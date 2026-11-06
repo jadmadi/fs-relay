@@ -30,6 +30,13 @@ Scope: `.ui-craft`, `html-prototypes`, `cmd/fs-relay/root.go`,
 5. Server welcome page: aligned `landingPage` in `cmd/fs-relay/root.go` and
    `cmd/fs-relay/root_test.go` with the ink-slate (`#0d1317`) and signal-rose
    (`#f43f5e`) token palette and quick-start mount command.
+6. Interactive 3D Three.js reference lab (`interactive-prototype/`): built
+   `index.html`, `style.css`, and `app.js` using vendored offline Three.js
+   `v0.170.0` (`OrbitControls`) and the Claude Interactive Diagram pattern
+   (macro topology vs cutaway view switcher, 6 subsystem filters, 10 clickable
+   3D structures with concentric SQLite byte-range lock rings and curved 3D
+   tubes, 4 live protocol simulations, payload size router, and 8-question
+   self-test quiz with muted-by-default Web Audio synth).
 
 ## Acceptance results
 
@@ -41,6 +48,7 @@ Scope: `.ui-craft`, `html-prototypes`, `cmd/fs-relay/root.go`,
 | AC-004 Progressive-enhancement lab features verified in headless Chromium | pass (copy buttons, checklists, filter, steppers, raw router) |
 | AC-005 `gofmt -l .`, `go vet ./...`, `go test -race ./...` | pass (exit 0) |
 | AC-006 No external URLs, CDNs, or webfonts in `html-prototypes/` | pass |
+| AC-007 `node --check interactive-prototype/app.js` and `ripwire . --quality-delta` | pass (`gating=0`, 10 3D nodes verified in headless Chromium) |
 
 ## Commands
 
@@ -51,6 +59,8 @@ go test ./...                                                  # exit 0
 go test -race ./...                                            # exit 0
 node --check html-prototypes/ui.js                             # exit 0
 node --check html-prototypes/explainer.js                      # exit 0
+node --check interactive-prototype/app.js                      # exit 0
+ripwire . --quality-delta --legend=compact                     # gating=0
 ```
 
 ## Memory Writes
