@@ -647,3 +647,53 @@ func TestTreeLockRefusesSecondServerAndReleasesOnClose(t *testing.T) {
 		t.Fatalf("second.Lock after first.Close: %v", err)
 	}
 }
+
+// TestTreeLockRejectsSymlinkAndProtectsLockFile verifies that Lock refuses a
+// symlinked .fs-relay.lock without truncating the target and that namespace
+// operations through a parent symlink cannot unlink .fs-relay.lock.
+func TestTreeLockRejectsSymlinkAndProtectsLockFile(t *testing.T) {
+	dir := t.TempDir()
+	victim := filepath.Join(dir, "victim")
+	if err := os.WriteFile(victim, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(dir, "data")
+	tr := New(root)
+	t.Cleanup(func() { _ = tr.Close() })
+	if err := tr.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(root, ".fs-relay.lock")
+	if err := os.Symlink(victim, lockPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := tr.Lock(); err == nil {
+		t.Fatal("Lock succeeded on a symlinked .fs-relay.lock")
+	}
+	got, err := os.ReadFile(victim)
+	if err != nil || string(got) != "keep" {
+		t.Fatalf("victim = %q, %v; want keep", got, err)
+	}
+	if err := os.Remove(lockPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "demo"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := tr.Lock(); err != nil {
+		t.Fatalf("tr.Lock: %v", err)
+	}
+	up := call(t, tr, wire.Symlink, wire.Params{Inode: 1, Name: "up", Target: ".."})
+	err = callErr(t, tr, wire.Unlink, wire.Params{Inode: up.Attr.Ino, Name: ".fs-relay.lock"})
+	if errnoOf(t, err) != syscall.EINVAL {
+		t.Fatalf("unlink via .. symlink = %v, want EINVAL", err)
+	}
+	second := New(root)
+	t.Cleanup(func() { _ = second.Close() })
+	if err := second.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	if err := second.Lock(); err == nil {
+		t.Fatal("second.Lock succeeded after attempted symlink unlink")
+	}
+}

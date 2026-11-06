@@ -19,6 +19,7 @@ import (
 
 var errUsage = errors.New("usage")
 
+// main runs the fs-relay command and exits with a status code on error.
 func main() {
 	if err := run(); err != nil {
 		if errors.Is(err, errUsage) {
@@ -29,6 +30,7 @@ func main() {
 	}
 }
 
+// run parses command-line flags, prepares the data directory, and serves HTTP.
 func run() error {
 	flags := flag.NewFlagSet("fs-relay", flag.ContinueOnError)
 	listen := flags.String("listen", "127.0.0.1:8080", "address to listen on")
@@ -105,6 +107,7 @@ func run() error {
 
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigc)
 	select {
 	case err := <-errc:
 		if err == http.ErrServerClosed {

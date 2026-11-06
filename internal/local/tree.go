@@ -85,9 +85,18 @@ func (t *Tree) Prepare() error {
 // server cannot serve the same directory unless forced.
 func (t *Tree) Lock() error {
 	path := filepath.Join(t.root, ".fs-relay.lock")
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0o600)
 	if err != nil {
 		return fmt.Errorf("data directory %s: %w", t.root, err)
+	}
+	info, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return fmt.Errorf("data directory %s: %w", t.root, err)
+	}
+	if !info.Mode().IsRegular() {
+		_ = f.Close()
+		return fmt.Errorf("data directory %s: %s is not a regular file", t.root, path)
 	}
 	if err := unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
 		b, _ := os.ReadFile(path)
