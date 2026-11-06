@@ -1,9 +1,9 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "bind-lock-coherence",
-  "level": "L3",
+  "level": "L1",
   "outcome": "passed",
-  "method": "audit",
+  "method": "evidence",
   "spec_hash": "98f5f53d2843faf5a01c850faee23617c291650e5251f43524c80f762d130ee4",
   "subject": {
     "algorithm": "sha256",
@@ -58,6 +58,6 @@
     "sila_version": "dev+b8acfdcc-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "ae936d20fed404e5e6b30aa8cd2b68e087eb5f56a62ba43f3005c99692499e1c",
-  "verified_at": "2026-11-06T03:27:20Z"
+  "previous": "3be673155fb90b7dfbfaa7f40b5079397266b12951d0af66be37f163384eccbf",
+  "verified_at": "2026-11-06T03:35:46Z"
 }

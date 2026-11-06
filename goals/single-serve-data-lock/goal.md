@@ -4,8 +4,7 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-- **Mystery Audited By**: Pending
-
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_single-serve-data-lock_1793936121`
 ## Goal Description
 Issue #7 reports that two `fs-relay` servers can serve the same `-data` directory on different ports with separate in-memory inode, handle, lock, and eviction tables. Nothing warns or refuses. The maintainer asked whether the override flag should be `-force-multi-serve` or `-allow-multi-serve`, noting that `-force-*` is the convention for discouraged, sharp-edge behavior (like `-force-existing-mnt` in #12/#20). Because a single Go `fs-relay` process already uses all CPU cores via `GOMAXPROCS` and splitting a `-data` directory across processes breaks inode stability, advisory locks, and cache eviction unless the tree is immutable and mounts are sticky, `-force-multi-serve` is the right flag name.
 

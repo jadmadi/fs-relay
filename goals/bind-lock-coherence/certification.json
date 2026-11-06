@@ -1,6 +1,6 @@
 {
   "goal_slug": "bind-lock-coherence",
-  "certified_at": "2026-11-06T03:27:15.929174723Z",
+  "certified_at": "2026-11-06T03:35:46.281508341Z",
   "certified_by": "agent",
   "evidence_file": "goals/bind-lock-coherence/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "636df49d2cf3aa86f3762a7fcaf22215776a0f8a",
+  "commit_sha": "86d253bf2493d4209c34182bee89f60c7f98fcbc",
   "memory_required": true,
   "memory_verified": true,
   "memory": {

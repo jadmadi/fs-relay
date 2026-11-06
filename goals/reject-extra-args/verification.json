@@ -1,0 +1,58 @@
+{
+  "version": "sila/verification/v2",
+  "goal_slug": "reject-extra-args",
+  "level": "L1",
+  "outcome": "passed",
+  "method": "evidence",
+  "spec_hash": "06f8a6ab2c3a373b3221c9916a77b874a10938697a5d5aeb7728a13ab9a6fb51",
+  "subject": {
+    "algorithm": "sha256",
+    "hash": "5b028ec00b7f8db045bd92a0fedd4adb3ada055e7ea955364752add25a7f9512",
+    "paths": [
+      {
+        "path": "cmd/fs-relay/cli.go",
+        "kind": "file",
+        "hash": "c61a32df7a0c0d2d8b5605b0e1ea80c0d4e9f88775abc72cc2f001e61e6a5a73"
+      },
+      {
+        "path": "cmd/fs-relay/cli_test.go",
+        "kind": "file",
+        "hash": "fd14293a48d890bd77c373e0070cdba82ad8b469a4dcc3d2e746d19f0f948131"
+      },
+      {
+        "path": "cmd/fs-relay/main.go",
+        "kind": "file",
+        "hash": "369763ef0ed441ac7ff8f47d050ea7aed285dab23f4f24d84ab6c6ab8e4ccfcc"
+      },
+      {
+        "path": "go.mod",
+        "kind": "file",
+        "hash": "ec75fb5a26908b423a649d514ea7674daa4e6e6ab1d92d51b27d2a145f2d3d47"
+      },
+      {
+        "path": "go.sum",
+        "kind": "file",
+        "hash": "22f46fc43dfdf65a599cc8bb6e67c2ff8553eba4a7aa31f1b73725f5ef12df21"
+      },
+      {
+        "path": "go.work",
+        "kind": "missing",
+        "hash": ""
+      },
+      {
+        "path": "go.work.sum",
+        "kind": "missing",
+        "hash": ""
+      }
+    ]
+  },
+  "environment": {
+    "go_version": "go1.27.3",
+    "os": "linux",
+    "arch": "amd64",
+    "sila_version": "dev+b8acfdcc-dirty",
+    "bwrap": "bubblewrap 0.12.0"
+  },
+  "previous": "558243a6039085c6aca500445b059825a632e591fe17ad39d8b395533da96f7a",
+  "verified_at": "2026-11-06T03:35:54Z"
+}

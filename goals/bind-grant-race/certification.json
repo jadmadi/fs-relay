@@ -1,6 +1,6 @@
 {
   "goal_slug": "bind-grant-race",
-  "certified_at": "2026-11-06T02:54:47.422705154Z",
+  "certified_at": "2026-11-06T03:35:45.363263081Z",
   "certified_by": "agent",
   "evidence_file": "goals/bind-grant-race/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "bb35398bf6f8bfc3f090368f202871fd975cbe31",
+  "commit_sha": "86d253bf2493d4209c34182bee89f60c7f98fcbc",
   "memory_required": true,
   "memory_verified": true,
   "memory": {

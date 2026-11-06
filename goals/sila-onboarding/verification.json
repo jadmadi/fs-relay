@@ -43,5 +43,6 @@
     "sila_version": "dev+b8acfdcc-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "verified_at": "2026-11-06T02:01:23Z"
+  "previous": "78b76782fa2226f48e9074eaf168998e8d60401304e7bb707c4334fe55b911f1",
+  "verified_at": "2026-11-06T03:35:55Z"
 }

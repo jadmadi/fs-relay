@@ -1,9 +1,9 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "lock-wake-races",
-  "level": "L3",
+  "level": "L1",
   "outcome": "passed",
-  "method": "audit",
+  "method": "evidence",
   "spec_hash": "fd457073838a45a6903a9c979cce937f31fff9e5b36d142d59c4aef68fdecb53",
   "subject": {
     "algorithm": "sha256",
@@ -83,6 +83,6 @@
     "sila_version": "dev+b8acfdcc-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "e3fb0fffa7f8d2e94e099d50d2c8f847de2a7a66267591ec3965d9e6e25abd6e",
-  "verified_at": "2026-11-06T03:27:24Z"
+  "previous": "b79da133429068f6cded5e8137ea1c8518c13ffc8e111addd2afeb1ee13de162",
+  "verified_at": "2026-11-06T03:35:52Z"
 }

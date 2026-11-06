@@ -4,8 +4,7 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-- **Mystery Audited By**: Pending
-
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-mountpoint-arg_1793935904`
 ## Goal Description
 Issue #22 notes that a previous refactor moved `fs-relay-bind` flags to a `flag.FlagSet` while leaving `flag.Arg(0)` reading the global set, which caused `fs-relay-bind` to pass an empty mountpoint and mount FUSE over the current directory. Although #19 and #20 fixed the call site and added `checkMountpoint`, there is no unit test covering the parsed mountpoint argument helper, no non-empty guard immediately before `fs.Mount`, and no smoke-check reminder in `README.md`.
 

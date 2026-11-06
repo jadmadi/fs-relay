@@ -4,8 +4,7 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-- **Mystery Audited By**: Pending
-
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_reject-extra-args_1793935897`
 ## Goal Description
 `fs-relay` parses flags with `flag.NewFlagSet("fs-relay", flag.ContinueOnError)` in `cmd/fs-relay/main.go`, checks `-version`, and then starts the server without checking `flags.NArg()`. Running `fs-relay help`, `fs-relay version`, or `fs-relay extra` silently ignores the positional arguments, creates `./data`, prints a random token, and blocks listening on `:8080`.
 

@@ -1,0 +1,24 @@
+{
+  "goal_slug": "reject-extra-args",
+  "certified_at": "2026-11-06T03:35:54.211489866Z",
+  "certified_by": "agent",
+  "evidence_file": "goals/reject-extra-args/evidence.md",
+  "note": "certified from review document: evidence.md",
+  "verified": true,
+  "facts_passed": 1,
+  "facts_total": 1,
+  "evidence_kind": "review_document",
+  "commit_sha": "86d253bf2493d4209c34182bee89f60c7f98fcbc",
+  "memory_required": true,
+  "memory_verified": true,
+  "memory": {
+    "required": true,
+    "status": "verified",
+    "prime": true,
+    "recall": true,
+    "writes": true,
+    "facts": true,
+    "handoff": true,
+    "verified": true
+  }
+}
