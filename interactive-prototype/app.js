@@ -1,7 +1,7 @@
 // fs-relay 3D Protocol & Topology Lab (Three.js + Claude Interactive Diagram Pattern)
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { STRUCTURES, EDGES, QUIZ, GUIDE_STEPS } from './data.js';
+import { STRUCTURES, EDGES, QUIZ, EVERYDAY_FLEET, GUIDE_STEPS } from './data.js';
 
 // --- Web Audio API Synthesizer (muted by default) ---
 let audioOn = false;
@@ -180,49 +180,107 @@ STRUCTURES.forEach((s) => {
 let currentView = 'everyday';
 let currentSystem = 'all';
 let selectedId = 'disk-store';
-let cameraGoalPos = new THREE.Vector3(0, 7.8, 22.0);
+let cameraGoalPos = new THREE.Vector3(0, 8.2, 23.2);
 let cameraGoalTarget = new THREE.Vector3(0, 0, 0);
 let cameraLerpFrames = 0;
+
+// --- Build Everyday Multi-Machine & AI Agent Fleet ---
+const fleetGroup = new THREE.Group();
+scene.add(fleetGroup);
+const fleetEntries = [];
+
+function buildFleetNode(f) {
+  const g = new THREE.Group();
+  g.position.set(...f.pos);
+  const mat = new THREE.MeshStandardMaterial({ color: f.color, roughness: 0.28, metalness: 0.28 });
+  if (f.kind === 'agent') {
+    const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.85, 0), mat);
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(1.25, 0.08, 12, 36),
+      new THREE.MeshBasicMaterial({ color: f.color, transparent: true, opacity: 0.78 })
+    );
+    halo.rotation.x = Math.PI / 3;
+    g.add(core, halo);
+    g.userData.halo = halo;
+  } else if (f.kind === 'server') {
+    for (let i = -1; i <= 1; i++) {
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.34, 1.35), mat);
+      blade.position.y = i * 0.48;
+      g.add(blade);
+    }
+  } else {
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.2, 1.35), mat);
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.15, 0.1), mat);
+    screen.position.set(0, 0.62, -0.62);
+    screen.rotation.x = -0.22;
+    g.add(base, screen);
+  }
+  fleetGroup.add(g);
+
+  const tag = document.createElement('button');
+  tag.type = 'button';
+  tag.className = 'node-tag';
+  const codeSpan = document.createElement('span');
+  codeSpan.className = 'code';
+  codeSpan.textContent = f.code + ' · ';
+  const nameSpan = document.createElement('span');
+  nameSpan.textContent = f.name.replace(/\s*\(.*\)/, '');
+  tag.append(codeSpan, nameSpan);
+  tag.addEventListener('click', () => {
+    selectStructure(f.linkedStruct);
+    spawnPacketFromVec(g.position, meshMap.get('ws-mux').group.position, f.color);
+    setTimeout(() => spawnPacket('ws-mux', 'disk-store', f.color, 0.024), 260);
+  });
+  labelLayer.appendChild(tag);
+  fleetEntries.push({ item: f, group: g, tag });
+}
+EVERYDAY_FLEET.forEach(buildFleetNode);
 
 // --- Build 3D Connecting Tubes ---
 const activeParticles = [];
 
-function rebuildTubes(activeSystem = 'all') {
+function addCurveTube(a, b, color, yLift, opacity) {
+  const mid = a.clone().lerp(b, 0.5);
+  mid.y += yLift;
+  const curve = new THREE.CatmullRomCurve3([a.clone(), mid, b.clone()]);
+  const geom = new THREE.TubeGeometry(curve, 28, 0.075, 8, false);
+  const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
+  tubeGroup.add(new THREE.Mesh(geom, mat));
+}
+
+function syncNetworkTubes(activeSystem = 'all') {
   while (tubeGroup.children.length) {
     const c = tubeGroup.children.pop();
     c.geometry.dispose();
     c.material.dispose();
   }
-  const edgeList = currentView === 'everyday'
-    ? [
-        { from: 'mount-a', to: 'ws-mux', system: 'transport', color: 0xf43f5e },
-        { from: 'mount-b', to: 'ws-mux', system: 'coherence', color: 0x38bdf8 },
-        { from: 'ws-mux', to: 'disk-store', system: 'storage', color: 0x34d399 }
-      ]
-    : EDGES;
-  edgeList.forEach((e) => {
-    const a = meshMap.get(e.from).targetPos;
-    const b = meshMap.get(e.to).targetPos;
-    const mid = a.clone().lerp(b, 0.5);
-    mid.y += (e.system === 'raw' ? -0.6 : 0.55);
-    const curve = new THREE.CatmullRomCurve3([a.clone(), mid, b.clone()]);
-    const geom = new THREE.TubeGeometry(curve, 28, 0.08, 8, false);
-    const match = activeSystem === 'all' || activeSystem === e.system;
-    const mat = new THREE.MeshBasicMaterial({
-      color: e.color,
-      transparent: true,
-      opacity: match ? 0.62 : 0.08
+  if (currentView === 'everyday') {
+    const muxPos = meshMap.get('ws-mux').targetPos;
+    const diskPos = meshMap.get('disk-store').targetPos;
+    addCurveTube(meshMap.get('mount-a').targetPos, muxPos, 0xf43f5e, 0.55, 0.62);
+    addCurveTube(meshMap.get('mount-b').targetPos, muxPos, 0x38bdf8, 0.55, 0.62);
+    addCurveTube(muxPos, diskPos, 0x34d399, 0.55, 0.68);
+    fleetEntries.forEach(({ item, group }) => {
+      addCurveTube(group.position, muxPos, item.color, 0.45, 0.52);
     });
-    const tube = new THREE.Mesh(geom, mat);
-    tube.userData = { curve, edge: e };
-    tubeGroup.add(tube);
+    return;
+  }
+  EDGES.forEach((e) => {
+    const match = activeSystem === 'all' || activeSystem === e.system;
+    addCurveTube(
+      meshMap.get(e.from).targetPos,
+      meshMap.get(e.to).targetPos,
+      e.color,
+      e.system === 'raw' ? -0.6 : 0.55,
+      match ? 0.52 : 0.08
+    );
   });
 }
-rebuildTubes();
+syncNetworkTubes();
 
-function spawnPacket(fromId, toId, colorHex, speed = 0.018) {
-  const a = meshMap.get(fromId).group.position.clone();
-  const b = meshMap.get(toId).group.position.clone();
+function spawnPacketFromVec(aVec, bVec, colorHex, speed = 0.02) {
+  const a = aVec.clone();
+  const b = bVec.clone();
   const mid = a.clone().lerp(b, 0.5);
   mid.y += 0.55;
   const curve = new THREE.CatmullRomCurve3([a, mid, b]);
@@ -232,6 +290,15 @@ function spawnPacket(fromId, toId, colorHex, speed = 0.018) {
   );
   scene.add(mesh);
   activeParticles.push({ mesh, curve, t: 0, speed });
+}
+
+function spawnPacket(fromId, toId, colorHex, speed = 0.018) {
+  spawnPacketFromVec(
+    meshMap.get(fromId).group.position,
+    meshMap.get(toId).group.position,
+    colorHex,
+    speed
+  );
 }
 
 function moveCameraTo(posArr, targetArr, frames = 45) {
@@ -434,10 +501,15 @@ const VIEW_PRESETS = {
 };
 
 function updateStructureVisibilityForView(view, posKey) {
+  const isEveryday = view === 'everyday';
+  fleetGroup.visible = isEveryday;
+  fleetEntries.forEach(({ tag }) => {
+    tag.style.visibility = isEveryday ? 'visible' : 'hidden';
+  });
   STRUCTURES.forEach((s) => {
     const entry = meshMap.get(s.id);
     entry.targetPos.set(...s.pos[posKey]);
-    const show = view !== 'everyday' || EVERYDAY_PRIMARY.has(s.id);
+    const show = !isEveryday || EVERYDAY_PRIMARY.has(s.id);
     entry.group.visible = show;
     entry.mat.opacity = 0.9;
     tagMap.get(s.id).style.visibility = show ? 'visible' : 'hidden';
@@ -456,7 +528,7 @@ function setViewMode(view, moveCam = true) {
   });
 
   updateStructureVisibilityForView(view, preset.posKey);
-  setTimeout(() => rebuildTubes(currentSystem), 180);
+  setTimeout(() => syncNetworkTubes(currentSystem), 180);
 
   document.getElementById('hud-hover-text').textContent = preset.hover;
   document.getElementById('hud-telemetry').textContent = preset.telemetry;
@@ -478,11 +550,12 @@ function setSystemFilter(sys) {
     meshMap.get(s.id).mat.opacity = match ? 0.9 : 0.16;
     tagMap.get(s.id).classList.toggle('dimmed', !match);
   });
-  rebuildTubes(sys);
+  syncNetworkTubes(sys);
   playTone(460, 0.04, 'sine', 0.035);
 }
 
 function runSimulation(simType) {
+  if (currentView === 'everyday') setViewMode('topology', true);
   playTone(640, 0.07, 'triangle', 0.05);
   document.getElementById('hud-telemetry').textContent = 'SIM · ' + simType.toUpperCase();
   if (simType === 'write') {
@@ -712,8 +785,21 @@ applyGuideStep(0, false);
 updateQuizUI();
 
 const projVec = new THREE.Vector3();
-function animate(now) {
-  requestAnimationFrame(animate);
+function projectTag(pos, yLift, tag, w, h) {
+  projVec.copy(pos);
+  projVec.y += yLift;
+  projVec.project(camera);
+  if (projVec.z > 1) {
+    tag.style.display = 'none';
+    return;
+  }
+  tag.style.display = 'inline-flex';
+  tag.style.left = (projVec.x * 0.5 + 0.5) * w + 'px';
+  tag.style.top = (-projVec.y * 0.5 + 0.5) * h + 'px';
+}
+
+function renderFrame(now) {
+  requestAnimationFrame(renderFrame);
   const t = now * 0.001;
 
   if (cameraLerpFrames > 0) {
@@ -746,20 +832,13 @@ function animate(now) {
       r1.rotation.x = Math.PI / 3 + t * 0.65;
       r2.rotation.y = Math.PI / 3 - t * 0.85;
     }
+    projectTag(entry.group.position, s.size[1] * 0.75 + 0.55, tagMap.get(s.id), w, h);
+  });
 
-    projVec.copy(entry.group.position);
-    projVec.y += s.size[1] * 0.75 + 0.55;
-    projVec.project(camera);
-    const tag = tagMap.get(s.id);
-    if (projVec.z > 1) {
-      tag.style.display = 'none';
-    } else {
-      tag.style.display = 'inline-flex';
-      const x = (projVec.x * 0.5 + 0.5) * w;
-      const y = (-projVec.y * 0.5 + 0.5) * h;
-      tag.style.left = x + 'px';
-      tag.style.top = y + 'px';
-    }
+  fleetEntries.forEach(({ group, tag }, idx) => {
+    group.rotation.y = Math.sin(t * 0.8 + idx) * 0.15;
+    if (group.userData.halo) group.userData.halo.rotation.z = t * 0.9;
+    projectTag(group.position, 1.45, tag, w, h);
   });
 
   for (let i = activeParticles.length - 1; i >= 0; i--) {
@@ -777,4 +856,4 @@ function animate(now) {
 
   renderer.render(scene, camera);
 }
-requestAnimationFrame(animate);
+requestAnimationFrame(renderFrame);

@@ -1,11 +1,10 @@
 {
   "goal_slug": "html-prototypes-10x",
-  "reopened_at": "2026-11-06T00:35:39.78550451Z",
+  "reopened_at": "2026-11-06T00:49:56.333248713Z",
   "reopened_by": "agent",
-  "reason": "Add Step 0 Everyday Multi-Machine View (3D Laptop, Desktop, Cloud VM accessing one shared folder) and Business + Technical layered walkthrough",
-  "original_commit": "f353ecd",
-  "resolved_commit": "619ab52",
-  "resolved_at": "2026-11-06T00:45:33.402396218Z",
-  "active": false,
-  "reopen_epoch": 6
+  "reason": "Auto-switch to System Topology on simulation click and expand Everyday View with more machines and AI agent nodes",
+  "original_commit": "619ab52",
+  "resolved_at": "0001-01-01T00:00:00Z",
+  "active": true,
+  "reopen_epoch": 7
 }

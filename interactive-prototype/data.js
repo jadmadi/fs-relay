@@ -263,39 +263,78 @@ export const QUIZ = [
   { q: 'Where do all shared files live as a single copy of ordinary POSIX files with zero client disk duplication?', target: 'disk-store', hint: 'Click the rightmost slate cylinder representing the One Shared Host Folder (DSK-01).' }
 ];
 
+export const EVERYDAY_FLEET = [
+  {
+    id: 'fleet-laptop-2',
+    code: 'LAP-02',
+    name: 'Field MacBook (/mnt/project)',
+    kind: 'laptop',
+    color: 0xf59e0b,
+    pos: [-8.6, 0.2, 3.6],
+    linkedStruct: 'mount-a'
+  },
+  {
+    id: 'fleet-cloud-vm',
+    code: 'CLD-01',
+    name: 'Cloud CI / Build Rack (/mnt/project)',
+    kind: 'server',
+    color: 0x818cf8,
+    pos: [-8.6, -0.3, -3.5],
+    linkedStruct: 'mount-b'
+  },
+  {
+    id: 'fleet-ai-coder',
+    code: 'AGT-01',
+    name: 'AI Coding Agent (Claude / Cursor)',
+    kind: 'agent',
+    color: 0x34d399,
+    pos: [-5.6, 3.1, -1.6],
+    linkedStruct: 'mount-a'
+  },
+  {
+    id: 'fleet-ai-eval',
+    code: 'AGT-02',
+    name: 'AI Research & Eval Agent Pod',
+    kind: 'agent',
+    color: 0xa78bfa,
+    pos: [-5.6, -2.9, 1.8],
+    linkedStruct: 'mount-b'
+  }
+];
+
 export const GUIDE_STEPS = [
   {
-    badge: 'STEP 0 OF 7 · BUSINESS & WORKFLOW LAYER',
-    title: '0. One Live Folder Across Laptop, Desktop & Cloud VM (Zero Copies)',
-    body: 'Instead of syncing duplicate copies of a folder to every computer, your Dev Laptop, Office Desktop, and Cloud VM all mount one shared directory over plain HTTP. Zero gigabytes are duplicated on client disks.',
+    badge: 'STEP 0 OF 7 · BUSINESS & AI WORKFLOW LAYER',
+    title: '0. Laptops, Desktops, Cloud VMs & AI Agents on One Live Folder',
+    body: 'Instead of copying or git-cloning gigabytes to every laptop, desktop, cloud VM, and AI agent container, all 6 machines and autonomous AI agents mount the exact same live directory over HTTP with 0 GB duplicated.',
     view: 'everyday',
     focus: 'disk-store',
     nextTarget: 'mount-a',
-    cam: [[0, 7.8, 22.0], [0, 0, 0]],
-    packets: [['mount-a', 'ws-mux', 0xf43f5e], ['ws-mux', 'disk-store', 0xf43f5e], ['mount-b', 'ws-mux', 0x38bdf8], ['ws-mux', 'disk-store', 0x38bdf8]],
-    tip: 'Click MNT-01 (Dev Laptop) or click here to see what happens when you save a file on your laptop.'
+    cam: [[0, 8.2, 23.2], [0, 0, 0]],
+    packets: [['mount-a', 'ws-mux', 0xf43f5e], ['ws-mux', 'disk-store', 0xf43f5e], ['mount-b', 'ws-mux', 0x38bdf8], ['ws-mux', 'disk-store', 0x34d399]],
+    tip: 'Click MNT-01 (Dev Laptop) or AGT-01 (AI Coding Agent), or click here to see instant live sharing.'
   },
   {
-    badge: 'STEP 1 OF 7 · BUSINESS & WORKFLOW LAYER',
-    title: '1. Save on Your Laptop, See It Immediately on Your Desktop',
-    body: 'When you save a file on your Laptop, it writes straight to the single host directory and notifies your Office Desktop and Cloud VM in milliseconds. Nobody waits for background file sync or deals with "conflicted copy" files.',
+    badge: 'STEP 1 OF 7 · BUSINESS & AI WORKFLOW LAYER',
+    title: '1. AI Agent Edits Code, Your Laptop & Desktop See It Immediately',
+    body: 'When an AI Coding Agent (AGT-01) or your Laptop (MNT-01) writes a file, it lands in the single server directory and pushes a sub-millisecond cache eviction to every desktop, VM, and peer agent. Zero sync lag or conflicted copies.',
     view: 'everyday',
     focus: 'mount-a',
     nextTarget: 'mount-b',
-    cam: [[-2.4, 6.8, 19.5], [-1.0, 0.2, 0.2]],
-    packets: [['mount-a', 'ws-mux', 0xf43f5e], ['ws-mux', 'disk-store', 0xf59e0b], ['hub-fanout', 'mount-b', 0x38bdf8]],
-    tip: 'Click MNT-02 (Office Desktop & Cloud VM) or click here to see how shared SQLite databases stay safe.'
+    cam: [[-2.0, 7.2, 20.5], [-1.0, 0.2, 0.2]],
+    packets: [['mount-a', 'ws-mux', 0xf43f5e], ['ws-mux', 'disk-store', 0x34d399], ['ws-mux', 'mount-b', 0x38bdf8]],
+    tip: 'Click MNT-02 (Office Desktop) or AGT-02 (AI Eval Agent) to see how concurrent SQLite locks work.'
   },
   {
-    badge: 'STEP 2 OF 7 · BUSINESS & WORKFLOW LAYER',
-    title: '2. Two Commands, No Root, 10x Faster Than WebDAV',
-    body: 'Sharing a directory usually requires root-run NFS/SMB daemons and firewall rules. fs-relay runs as a normal user over any HTTP port, coordinates SQLite locks across machines, and runs git status 10.6x faster than WebDAV.',
+    badge: 'STEP 2 OF 7 · BUSINESS & AI WORKFLOW LAYER',
+    title: '2. Safe Multi-Agent SQLite & 10x Faster Tree Walks Without Root',
+    body: 'Spawning 10 AI agents usually means 10 slow git clones or corrupted SQLite state. fs-relay mounts instantly with two user-space commands (no root or NFS firewall rules) and serializes SQLite byte-range locks across all agents and humans.',
     view: 'everyday',
     focus: 'mount-b',
     nextTarget: 'ws-mux',
-    cam: [[0.5, 6.8, 19.5], [0.5, 0.0, 0.0]],
-    packets: [['mount-b', 'ws-mux', 0x38bdf8], ['ws-mux', 'lock-table', 0x34d399], ['lock-table', 'disk-store', 0x34d399]],
-    tip: 'Ready for the OS internals? Click TRN-01 or click here to zoom into the Technical Protocol Layer →'
+    cam: [[0.5, 7.2, 20.5], [0.5, 0.0, 0.0]],
+    packets: [['mount-b', 'ws-mux', 0x38bdf8], ['ws-mux', 'disk-store', 0xa78bfa], ['mount-a', 'ws-mux', 0x34d399]],
+    tip: 'Ready for the OS internals? Click TRN-01 or click here to unfold the 10-node Technical Protocol Layer →'
   },
   {
     badge: 'STEP 3 OF 7 · TECHNICAL OS LAYER',
