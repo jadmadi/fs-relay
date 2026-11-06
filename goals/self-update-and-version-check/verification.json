@@ -1,9 +1,9 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "self-update-and-version-check",
-  "level": "L3",
+  "level": "L1",
   "outcome": "passed",
-  "method": "audit",
+  "method": "evidence",
   "spec_hash": "c3bf24bfbb9b331bad4517b0ab1b09f180d80c5921da9bd6b193020ad76d197d",
   "subject": {
     "algorithm": "sha256",
@@ -88,6 +88,6 @@
     "sila_version": "dev+1e4a5d73-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "4a5753615b0f6e590fe3801bdce012a24e7a51a000194ac0b9dc49b9e6c18ced",
-  "verified_at": "2026-11-06T19:13:51Z"
+  "previous": "032d6a7eb17d925c95ffd5362f7ac7ef7ecb7cb38ce011f3dc9b18ce4dbf80d2",
+  "verified_at": "2026-11-06T19:15:28Z"
 }

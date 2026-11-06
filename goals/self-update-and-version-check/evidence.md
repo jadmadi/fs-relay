@@ -16,3 +16,19 @@ Verdict: PASS
 - `CGO_ENABLED=0 go test -v -run 'Test(BindSubcommands|MountArg|VersionLine|UsageTextVersion)' ./cmd/fs-relay-bind` -> exit `0` (`PASS`)
 - `go test -race ./...` -> exit `0` (`PASS` across all packages)
 - `ripwire . --quality-delta --legend=compact` -> exit `0` (`gating="0"`)
+
+## Memory Writes
+
+```json
+{
+  "schema": "sila/memory-writes/v1",
+  "goal_slug": "self-update-and-version-check",
+  "prime": {"ran": true},
+  "recall": [{"query": "self-update version check update command go cli", "matches": 10}],
+  "memos": [{"id": "fact_9288582b"}],
+  "lessons": [{"id": "fact_a159e0e5"}],
+  "cases": [],
+  "facts_verify": {"exit_code": 0},
+  "handoff": {"id": "hoff_af4f3dc0607f"}
+}
+```

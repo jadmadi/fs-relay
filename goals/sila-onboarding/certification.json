@@ -1,6 +1,6 @@
 {
   "goal_slug": "sila-onboarding",
-  "certified_at": "2026-11-06T03:35:55.12101949Z",
+  "certified_at": "2026-11-06T19:15:28.939641821Z",
   "certified_by": "agent",
   "evidence_file": "goals/sila-onboarding/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "86d253bf2493d4209c34182bee89f60c7f98fcbc",
+  "commit_sha": "b38d3de69bad4e7c5cd57ed92089a73f03384e90",
   "memory_diagnostics": [
     "memory protocol not required for legacy goals (missing '- **Memory Protocol**: required' in goals/sila-onboarding/goal.md)"
   ],

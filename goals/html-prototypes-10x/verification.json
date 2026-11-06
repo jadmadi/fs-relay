@@ -150,9 +150,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+b8acfdcc-dirty",
+    "sila_version": "dev+1e4a5d73-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "4e142da23b83a66b95a1294340b08b88770972be1ec6f751dba309571f59ee0d",
-  "verified_at": "2026-11-06T03:35:50Z"
+  "previous": "0fbf4869f7585b4143f513ec4403cdfe51f0c0c29ae7bb95972006c167b7349a",
+  "verified_at": "2026-11-06T19:15:23Z"
 }

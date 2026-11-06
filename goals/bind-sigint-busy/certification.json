@@ -1,6 +1,6 @@
 {
   "goal_slug": "bind-sigint-busy",
-  "certified_at": "2026-11-06T19:14:14.042305663Z",
+  "certified_at": "2026-11-06T19:15:20.027833009Z",
   "certified_by": "agent",
   "evidence_file": "goals/bind-sigint-busy/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "2f082aab7cca47ea76b7e2b8a41ec817c8debc7f",
+  "commit_sha": "b38d3de69bad4e7c5cd57ed92089a73f03384e90",
   "memory_required": true,
   "memory_verified": true,
   "memory": {
