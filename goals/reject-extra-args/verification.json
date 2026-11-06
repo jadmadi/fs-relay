@@ -1,10 +1,10 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "reject-extra-args",
-  "level": "L1",
+  "level": "L3",
   "outcome": "passed",
-  "method": "evidence",
-  "spec_hash": "06f8a6ab2c3a373b3221c9916a77b874a10938697a5d5aeb7728a13ab9a6fb51",
+  "method": "audit",
+  "spec_hash": "5f52b2a1348ce1a5ea17897a6803c46d284f56eb5d8b8e8aa9650f39cf547020",
   "subject": {
     "algorithm": "sha256",
     "hash": "5b028ec00b7f8db045bd92a0fedd4adb3ada055e7ea955364752add25a7f9512",
@@ -50,9 +50,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+b8acfdcc-dirty",
+    "sila_version": "dev+649b8819-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "558243a6039085c6aca500445b059825a632e591fe17ad39d8b395533da96f7a",
-  "verified_at": "2026-11-06T03:35:54Z"
+  "previous": "ad5648016a66a8b25220e8cc0486d7510ec2c1163071c5bf7a2b961ea567ff89",
+  "verified_at": "2026-11-06T17:27:25Z"
 }

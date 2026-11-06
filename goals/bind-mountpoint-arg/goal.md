@@ -4,7 +4,18 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-mountpoint-arg_1793985906`
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-mountpoint-arg_1793986049`
+## Goal Description
+Extract `mountArg(fs *flag.FlagSet) (string, string, error)` in `cmd/fs-relay-bind/cli.go`, call it once in `cmd/fs-relay-bind/main.go` and reuse the returned `mnt` variable through `checkMountpoint`, a non-empty guard before `fs.Mount`, and the startup log line, table-test `mountArg` in `cmd/fs-relay-bind/cli_test.go`, and add the mountpoint check to `README.md`.
+
+## Dependencies & Execution Order
+- **Mode**: Independent
+- **Depends On**: none
+- **Sequence**: 14
+- **Shape**: ship
+- **Tier**: roadmap
+- **Memory Protocol**: required
+
 ## Context
 - **Goal ID**: `bind-mountpoint-arg` (Closes Upstream Issue `#22`)
 - **One-line why**: A previous refactor moved `fs-relay-bind` flags to a local `flag.FlagSet` while leaving `flag.Arg(0)` reading the global set, causing `fs-relay-bind` to mount over the current working directory (`""`); extracting `mountArg(fs *flag.FlagSet)` with unit tests and adding a pre-mount non-empty guard prevents any recurrence.
@@ -13,6 +24,12 @@
 - **Readiness**: READY (Await upstream issue `#22` assignment to `@jadmadi` before opening PR)
 
 ## Files to Touch
+- cmd/fs-relay-bind/main.go
+- cmd/fs-relay-bind/cli.go
+- cmd/fs-relay-bind/cli_test.go
+- README.md
+
+## File & Symbol Scope
 - **Edit**:
   - `cmd/fs-relay-bind/cli.go` (`mountArg`)
   - `cmd/fs-relay-bind/main.go` (`run`)

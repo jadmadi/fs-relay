@@ -1,10 +1,10 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "bind-sigint-busy",
-  "level": "L1",
+  "level": "L3",
   "outcome": "passed",
-  "method": "evidence",
-  "spec_hash": "1b6edf970c7685ce3ad14f83005cb3a6599ddd98ed63414c1409b4007cc17087",
+  "method": "audit",
+  "spec_hash": "bd61aabad3b7f6f1f588e2d163e0ef83f4193dad1b4886719b51b204f3f0caa7",
   "subject": {
     "algorithm": "sha256",
     "hash": "23f8cc5d548ea6a7386ca85fece3f180029a3451d02f72d60b6e932e7534383a",
@@ -50,9 +50,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+b8acfdcc-dirty",
+    "sila_version": "dev+649b8819-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "627dffe69d539bee9e75bda46f4e5a41d06d4827cf0398da67037313c597c1a7",
-  "verified_at": "2026-11-06T03:35:48Z"
+  "previous": "01eb0110935db557c1a9db7dcebc17397a88fbda275267f9633c886b143e4100",
+  "verified_at": "2026-11-06T17:27:34Z"
 }

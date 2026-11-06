@@ -1,6 +1,6 @@
 {
   "goal_slug": "namespace-cache",
-  "certified_at": "2026-11-06T03:36:56.536633575Z",
+  "certified_at": "2026-11-06T17:27:19.271235879Z",
   "certified_by": "agent",
   "evidence_file": "goals/namespace-cache/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "2af729db4ad2d065c60b5faddbf10a68fd512b51",
+  "commit_sha": "6a3142ef059f918620f9adaa93662646964b2c9f",
   "memory_required": true,
   "memory_verified": true,
   "memory": {

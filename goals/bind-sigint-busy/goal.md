@@ -4,7 +4,18 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-sigint-busy_1793985909`
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_bind-sigint-busy_1793986053`
+## Goal Description
+Replace the fire-and-forget `unmountOnSignal` goroutine with `waitMount(mnt string, srv mountServer, detach func(string) error, sigc <-chan os.Signal) error` so `fs-relay-bind` exits `0` on a clean unmount and lazily detaches (`fusermount3 -uz <mnt>`) and returns a descriptive busy error (exit `1`) on `EBUSY` or a second signal.
+
+## Dependencies & Execution Order
+- **Mode**: Sequential
+- **Depends On**: bind-mountpoint-arg
+- **Sequence**: 15
+- **Shape**: ship
+- **Tier**: roadmap
+- **Memory Protocol**: required
+
 ## Context
 - **Goal ID**: `bind-sigint-busy` (Closes Upstream Issue `#4`)
 - **One-line why**: `fs-relay-bind` hangs indefinitely on `SIGINT` or `SIGTERM` when a file on the mount is open because `unmountOnSignal` reads one signal, ignores `EBUSY` from `server.Unmount()`, and exits while `server.Wait()` blocks forever.
@@ -13,6 +24,11 @@
 - **Readiness**: READY (Await upstream issue `#4` assignment to `@jadmadi` before opening PR)
 
 ## Files to Touch
+- cmd/fs-relay-bind/main.go
+- cmd/fs-relay-bind/cli.go
+- cmd/fs-relay-bind/cli_test.go
+
+## File & Symbol Scope
 - **Edit**:
   - `cmd/fs-relay-bind/cli.go` (`mountServer`, `lazyUnmount`, `waitMount`)
   - `cmd/fs-relay-bind/main.go` (`run`, remove `unmountOnSignal`)

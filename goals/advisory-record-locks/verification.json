@@ -7,7 +7,7 @@
   "spec_hash": "da2563337555d988ee11492019d5c445c3d12cf93167d07ca1d617bd85fd97ad",
   "subject": {
     "algorithm": "sha256",
-    "hash": "5298f02d74d71997a8b5be1ec465165d81f6d6f2b9197b529c37fbc4c8c1fec5",
+    "hash": "4aa6c02a0a292be5d3a4d0381c5224fd3bfd6ba893cd78b6797a5da5a99900cf",
     "paths": [
       {
         "path": "ROADMAP.md",
@@ -17,17 +17,17 @@
       {
         "path": "SPEC.md",
         "kind": "file",
-        "hash": "8faa9a36dbde687304bea7115c862f6dd5d8d199af695e911776547d1068d757"
+        "hash": "b57e07d9e4d6b9c7d0f885193410b4a11fc1966468e109a6571d44ba50c3fe37"
       },
       {
         "path": "cmd/fs-relay",
         "kind": "dir",
-        "hash": "07c3901e73c7dd3411ad5b376df50748f0c299e65c0f8523287ec2aabcd7a9df"
+        "hash": "6da1f28f6f915f8fc36bc39dad673d790ecd24c8e2975897c5bc77a043c26a3e"
       },
       {
         "path": "cmd/fs-relay-bind",
         "kind": "dir",
-        "hash": "8096c87b646ae34e59b2929edbaeaf4021849e858fad69657930b3c60055a9c0"
+        "hash": "1c3db55ba7f49bed33a41398430de94a2727e5a649d464c697f29e1b7b3733ec"
       },
       {
         "path": "go.mod",
@@ -57,7 +57,7 @@
       {
         "path": "internal/local",
         "kind": "dir",
-        "hash": "468a655681ce8e50546e4a9103f3b07a5c57c28123bd00184f848a79e701399d"
+        "hash": "9fefbac9369f156a44791ee52a441313456de02d5b19ba2d0d8d34694723f28a"
       },
       {
         "path": "internal/wire",
@@ -70,9 +70,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+40d2d9e8-dirty",
+    "sila_version": "dev+649b8819-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "8e3b51689278f287cd818f4ace6e30934df8716a61263987d35f55ab00251c27",
-  "verified_at": "2026-11-06T07:36:19Z"
+  "previous": "d49ebfa922f340edc1b3f2a0ea6dd901ed5130a1cc9eeac5215ca7d5a654a5ce",
+  "verified_at": "2026-11-06T17:27:15Z"
 }

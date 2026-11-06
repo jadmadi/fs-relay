@@ -4,7 +4,7 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-- **Mystery Audited By**: @mystery-auditor | Report: `receipt_single-serve-data-lock_1793985897`
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_single-serve-data-lock_1793986057`
 ## Goal Description
 
 Prevent two `fs-relay` server processes from accidentally serving the same `-data` directory with split in-memory inode, handle, lock, and eviction state (upstream issue `muayyad-alsadi/fs-relay#7`, assigned to `@jadmadi` and agreed on `-force-multi-serve` in `issuecomment-6680908619`).
@@ -27,12 +27,22 @@ This goal adds:
 - **Memory Protocol**: required
 
 ## Files to Touch
+- internal/local/tree.go
+- internal/local/local_test.go
+- cmd/fs-relay/main.go
+- SPEC.md
+- ROADMAP.md
+- README.md
+
+## File & Symbol Scope
 - Edit: `internal/local/tree.go` (`Tree`, `(*Tree).Lock`, `(*Tree).Close`)
 - Edit: `internal/local/local_test.go` (`TestTreeLockRefusesSecondServerAndReleasesOnClose`)
 - Edit: `cmd/fs-relay/main.go` (`run`)
 - Edit: `SPEC.md` (`## Clients`)
 - Edit: `ROADMAP.md` (`## What is already done`)
 - Edit: `README.md` (`## Running it`)
+- Create: none
+- Read: `AGENTS.md` (`## Concurrency`, `## Errors`, `## Done means`)
 
 ## Interfaces / Signatures (Fixed)
 

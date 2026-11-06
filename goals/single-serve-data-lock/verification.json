@@ -4,40 +4,25 @@
   "level": "L3",
   "outcome": "passed",
   "method": "audit",
-  "spec_hash": "a72990b920493d0ec56493107de5f6daacd756d242119f9ff6fe5e09632023f1",
+  "spec_hash": "98baee0810c3509b9d2648f76d46c9cea69291670729ce1780a811011c3dcd9c",
   "subject": {
     "algorithm": "sha256",
-    "hash": "71d0a11a62d424241d4df0b02922d1894ae032f0bfab08bc18742491853ab81c",
+    "hash": "2c6433f88b73c44a4b88a40eb81177c5e1a439b9dc4b2c9b39912fa8a8a8a8f7",
     "paths": [
       {
-        "path": "Edit: `README.md`",
-        "kind": "missing",
-        "hash": ""
+        "path": "ROADMAP.md",
+        "kind": "file",
+        "hash": "022ee514b958bf80e7184668402b3bbd1708ad891f46e4a645729e126135ea74"
       },
       {
-        "path": "Edit: `ROADMAP.md`",
-        "kind": "missing",
-        "hash": ""
+        "path": "SPEC.md",
+        "kind": "file",
+        "hash": "b57e07d9e4d6b9c7d0f885193410b4a11fc1966468e109a6571d44ba50c3fe37"
       },
       {
-        "path": "Edit: `SPEC.md`",
-        "kind": "missing",
-        "hash": ""
-      },
-      {
-        "path": "Edit: `cmd/fs-relay/main.go` (`run",
-        "kind": "missing",
-        "hash": ""
-      },
-      {
-        "path": "Edit: `internal/local/local_test.go` (`TestTreeLockRefusesSecondServerAndReleasesOnClose",
-        "kind": "missing",
-        "hash": ""
-      },
-      {
-        "path": "Edit: `internal/local/tree.go` (`Tree`, `(*Tree).Lock`, `(*Tree).Close",
-        "kind": "missing",
-        "hash": ""
+        "path": "cmd/fs-relay/main.go",
+        "kind": "file",
+        "hash": "369763ef0ed441ac7ff8f47d050ea7aed285dab23f4f24d84ab6c6ab8e4ccfcc"
       },
       {
         "path": "go.mod",
@@ -58,6 +43,16 @@
         "path": "go.work.sum",
         "kind": "missing",
         "hash": ""
+      },
+      {
+        "path": "internal/local/local_test.go",
+        "kind": "file",
+        "hash": "0e28b688c2358fe2455176e9ffba744374a272c00397bf1d25956ebca9386878"
+      },
+      {
+        "path": "internal/local/tree.go",
+        "kind": "file",
+        "hash": "451912f1ac41e3a58593fd93ef8af8f20ae21bf57ff0dd145f7ef033f6116357"
       }
     ]
   },
@@ -65,9 +60,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+941a22a8-dirty",
+    "sila_version": "dev+649b8819-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "886c0d8ea8277eec73f451288df4b6f3410b4e784eeef158ae9367ea8273034b",
-  "verified_at": "2026-11-06T17:24:57Z"
+  "previous": "3b7f0fc1ef4535706cb997623359522e954385208d4eaad4d659e8b23a33eda7",
+  "verified_at": "2026-11-06T17:27:37Z"
 }

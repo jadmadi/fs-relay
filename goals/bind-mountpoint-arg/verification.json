@@ -1,10 +1,10 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "bind-mountpoint-arg",
-  "level": "L1",
+  "level": "L3",
   "outcome": "passed",
-  "method": "evidence",
-  "spec_hash": "a7f8963bfb4e9c1e79fd213fc3701011af2bffe687bd03fb15a0b6e14de0b47f",
+  "method": "audit",
+  "spec_hash": "9502eb535599ca5ec0edc30e2ad9a0a32f999b4f3617aef6296b1deb5d92c44f",
   "subject": {
     "algorithm": "sha256",
     "hash": "23f8cc5d548ea6a7386ca85fece3f180029a3451d02f72d60b6e932e7534383a",
@@ -50,9 +50,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+b8acfdcc-dirty",
+    "sila_version": "dev+649b8819-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "697d589dae9298e7baa918a250717597b3acfd20e6c7e0db8e10e4fe3e8db808",
-  "verified_at": "2026-11-06T03:35:47Z"
+  "previous": "fcd581bd3bad0df6ac23282e27b7edce4f6daa5946e941721143751216747417",
+  "verified_at": "2026-11-06T17:27:29Z"
 }

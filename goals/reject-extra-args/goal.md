@@ -4,7 +4,20 @@
 - **Registered By**: @golang-implementer
 - **Spec Audited By**: @golang-implementer
 - **Implemented By**: @golang-implementer
-- **Mystery Audited By**: @mystery-auditor | Report: `receipt_reject-extra-args_1793985901`
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_reject-extra-args_1793986045`
+## Goal Description
+`fs-relay` parses flags with `flag.NewFlagSet("fs-relay", flag.ContinueOnError)` in `cmd/fs-relay/main.go`, checks `-version`, and then starts the server without checking `flags.NArg()`. Running `fs-relay help`, `fs-relay version`, or `fs-relay extra` silently ignores the positional arguments, creates `./data`, prints a random token, and blocks listening on `:8080`.
+
+Reject any positional arguments (`flags.NArg() > 0`) before token selection or directory preparation by printing `unknown argument "<arg>"` followed by the usage text to `os.Stderr` and returning `errUsage` (exit status `2`).
+
+## Dependencies & Execution Order
+- **Mode**: Independent
+- **Depends On**: none
+- **Sequence**: 13
+- **Shape**: ship
+- **Tier**: roadmap
+- **Memory Protocol**: required
+
 ## Context
 - **Goal ID**: `reject-extra-args` (Closes Upstream Issue `#8`)
 - **One-line why**: Running `fs-relay help`, `fs-relay version`, or `fs-relay extra` silently ignores positional arguments, creates `./data`, prints a random token, and blocks listening on `:8080` instead of failing fast with exit status `2`.
@@ -13,6 +26,11 @@
 - **Readiness**: READY (Await upstream issue `#8` assignment to `@jadmadi` before opening PR)
 
 ## Files to Touch
+- cmd/fs-relay/main.go
+- cmd/fs-relay/cli.go
+- cmd/fs-relay/cli_test.go
+
+## File & Symbol Scope
 - **Edit**:
   - `cmd/fs-relay/cli.go` (`checkNoArgs`)
   - `cmd/fs-relay/main.go` (`run`)

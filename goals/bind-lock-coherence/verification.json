@@ -1,18 +1,18 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "bind-lock-coherence",
-  "level": "L3",
+  "level": "L1",
   "outcome": "passed",
-  "method": "audit",
+  "method": "evidence",
   "spec_hash": "3d977fdf24d53a9dc1a36d2f565437955ac04c5d2632fe7eff07952237d6febc",
   "subject": {
     "algorithm": "sha256",
-    "hash": "26726bca12b35c725848c310b759d127e4c7892e3836334a0422a93932d66b10",
+    "hash": "c0398ca377cece476667e704c93e30716a11c092612b97591c7b2c6aa910d046",
     "paths": [
       {
         "path": "SPEC.md",
         "kind": "file",
-        "hash": "8faa9a36dbde687304bea7115c862f6dd5d8d199af695e911776547d1068d757"
+        "hash": "b57e07d9e4d6b9c7d0f885193410b4a11fc1966468e109a6571d44ba50c3fe37"
       },
       {
         "path": "cmd/fs-relay-bind/lock.go",
@@ -55,9 +55,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+40d2d9e8-dirty",
+    "sila_version": "dev+649b8819-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "eed5208c357446a72786fda608b1b480ed68702cd9bca555e7cabe740c9b201f",
-  "verified_at": "2026-11-06T08:04:40Z"
+  "previous": "4aacda034c85c5ba8cce20bea546808985c8cb522d22b7f0416ee503f8806a0c",
+  "verified_at": "2026-11-06T17:27:20Z"
 }

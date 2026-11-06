@@ -1,18 +1,18 @@
 {
   "version": "sila/verification/v2",
   "goal_slug": "lock-wake-races",
-  "level": "L3",
+  "level": "L1",
   "outcome": "passed",
-  "method": "audit",
+  "method": "evidence",
   "spec_hash": "356ced8dbe07df2bfd2f2e263ab0d41142cedd13afbb0f3622de08142e6467dc",
   "subject": {
     "algorithm": "sha256",
-    "hash": "4905000d79647c09cae523a6aa035fee0007a58579adf3edb7708fa362f346e1",
+    "hash": "58869ffa57948189370e94f826a11b7ee84a7fe32be8bd4bda67913f34087d59",
     "paths": [
       {
         "path": "SPEC.md",
         "kind": "file",
-        "hash": "8faa9a36dbde687304bea7115c862f6dd5d8d199af695e911776547d1068d757"
+        "hash": "b57e07d9e4d6b9c7d0f885193410b4a11fc1966468e109a6571d44ba50c3fe37"
       },
       {
         "path": "cmd/fs-relay/hub.go",
@@ -80,9 +80,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+40d2d9e8-dirty",
+    "sila_version": "dev+649b8819-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "3fde1882c982b40fe00a1c2bf088a1b772807493b6fd7061cd773f39326ae2cd",
-  "verified_at": "2026-11-06T08:04:36Z"
+  "previous": "10555b5a35fa1fb6e43adc0c8fefc2724a7b1c2d7e6d9c4f3d0c39914f4ed952",
+  "verified_at": "2026-11-06T17:27:21Z"
 }
