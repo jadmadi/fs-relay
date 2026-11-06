@@ -27,6 +27,7 @@ type fakeCaller struct {
 	before func(method string, p wire.Params)
 }
 
+// Call records the request and returns a canned response or error.
 func (f *fakeCaller) Call(ctx context.Context, method string, p wire.Params) (wire.Result, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, callRecord{method: method, p: p})
@@ -315,6 +316,7 @@ func TestReleaseWithErrorStillDropsOwners(t *testing.T) {
 	}
 }
 
+// TestUnlockDrainsWriteBehindBeforeSetlk verifies buffered writes flush before F_UNLCK.
 func TestUnlockDrainsWriteBehindBeforeSetlk(t *testing.T) {
 	f := &fakeCaller{}
 	n := &node{c: f, ino: 5}
@@ -345,6 +347,7 @@ func TestUnlockDrainsWriteBehindBeforeSetlk(t *testing.T) {
 	}
 }
 
+// TestUnlockWithDrainErrorStillReleasesLock verifies unlock is sent even when drain fails.
 func TestUnlockWithDrainErrorStillReleasesLock(t *testing.T) {
 	f := &fakeCaller{}
 	n := &node{c: f, ino: 5}
@@ -368,6 +371,7 @@ func TestUnlockWithDrainErrorStillReleasesLock(t *testing.T) {
 	}
 }
 
+// TestLockGrantDropsCachedAttrAndBlob verifies lock grants invalidate cached attr and body bytes.
 func TestLockGrantDropsCachedAttrAndBlob(t *testing.T) {
 	f := &fakeCaller{}
 	k := newKernel()
