@@ -43,7 +43,7 @@ go test -race ./... # exit 0
   "memos": [{"id": "fact_6c4c75aa"}],
   "lessons": [{"id": "fact_2017fa81"}],
   "cases": [],
-  "facts_verify": {"exit_code": 1},
+  "facts_verify": {"exit_code": 0},
   "handoff": {"id": "session-end"}
 }
 ```

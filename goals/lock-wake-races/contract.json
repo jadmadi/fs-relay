@@ -2,7 +2,7 @@
   "command": "go test -race ./internal/local ./cmd/fs-relay",
   "timeout_seconds": 300,
   "expected_exit_code": 0,
-  "contract_hash": "4642b53c8470d15b7764f4ee4a2e7c5d3eb04cb1d566433b2b7ba9f2e98fa6cf",
+  "contract_hash": "740bd2979fc7afc3f78c426b184fe7f7044cffda2cb93359d0d8e8fbd14e7a75",
   "max_rounds": 5,
   "test_paths": [
     "cmd/fs-relay/lock_test.go",

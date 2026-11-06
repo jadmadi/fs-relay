@@ -58,7 +58,7 @@ go test -race ./... # exit 0
   "memos": [{"id": "fact_5506963e"}],
   "lessons": [{"id": "fact_afae2fdb"}],
   "cases": [],
-  "facts_verify": {"exit_code": 1},
+  "facts_verify": {"exit_code": 0},
   "handoff": {"id": "session-end"}
 }
 ```

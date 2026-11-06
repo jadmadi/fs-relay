@@ -1,6 +1,6 @@
 {
   "goal_slug": "startup-validation",
-  "certified_at": "2026-11-06T02:01:25.113873763Z",
+  "certified_at": "2026-11-06T02:54:14.030222683Z",
   "certified_by": "agent",
   "evidence_file": "goals/startup-validation/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "74b33ddee2e13503f8d25de25c7950faaa7dc06b",
+  "commit_sha": "bb35398bf6f8bfc3f090368f202871fd975cbe31",
   "memory_required": true,
   "memory_verified": true,
   "memory": {

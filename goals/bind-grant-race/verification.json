@@ -7,22 +7,22 @@
   "spec_hash": "a716293c30a8be1cac442b588c8ba5b5a8e66b06213b4be4ef48de81e85d8ff6",
   "subject": {
     "algorithm": "sha256",
-    "hash": "fb4120643499940f296adb7c41a89e8c868d633c3e8820fd46e06d8d22d011fc",
+    "hash": "a8764765fc98c566ccea39900e854ab757340869e9f48a1bebbb5c65e7c58a6d",
     "paths": [
       {
         "path": "cmd/fs-relay-bind/handle.go",
         "kind": "file",
-        "hash": "eb5eb231b4cc88c1cd9ba63d0358786342626671461b88d162f4dafb946f5a1b"
+        "hash": "8f1df750417459d3a7a05a90773aefaec7dff947874617e4e23f0fe3e1430ceb"
       },
       {
         "path": "cmd/fs-relay-bind/lock.go",
         "kind": "file",
-        "hash": "c67ba2a1fa3f0604dd93c362f3969793e85370f1fb42340e32af8cadaa054b53"
+        "hash": "47fbc7c6335194affc3f04dabc6a49f3b2afdfcbd89526c49ee6e6e68b4a3bee"
       },
       {
         "path": "cmd/fs-relay-bind/lock_release_test.go",
         "kind": "file",
-        "hash": "15a55fd30913945cb3856391c270d1ab5c92162556dd98fd9cfdf167e046ead2"
+        "hash": "1c3002bcd605d98127db5137e9b8ab0544510fc7c2ba14b03c9d3fcfd78ad0f8"
       },
       {
         "path": "go.mod",
@@ -47,12 +47,12 @@
     ]
   },
   "environment": {
-    "go_version": "go1.27.2",
+    "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+f41b5eac",
+    "sila_version": "dev+b8acfdcc-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "a689c599f939e767b59e204c87d0399abae68605c8e8acda162b9dda89c68c31",
-  "verified_at": "2026-11-04T18:09:16Z"
+  "previous": "5eb8f2f46bcd77e5e9c4bad076d399efd6ec80f5867d241b5bd374185ecf6814",
+  "verified_at": "2026-11-06T02:54:47Z"
 }

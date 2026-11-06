@@ -1,0 +1,7 @@
+{
+  "goal_slug": "lock-wake-races",
+  "patch_id": "74b6ab6ef42263adb6a94db9a5fcddf67ffac173",
+  "base_ref": "main",
+  "recorded_at": "2026-11-06T02:53:33.504788046Z",
+  "certified_by": "initial-certification"
+}
