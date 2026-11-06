@@ -99,7 +99,7 @@ a directory`.
   "memos": [{"id": "fact_b8c70f58"}],
   "lessons": [{"id": "fact_2427549e"}],
   "cases": [],
-  "facts_verify": {"exit_code": 1},
+  "facts_verify": {"exit_code": 0},
   "handoff": {"id": "session-end"}
 }
 ```

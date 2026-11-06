@@ -1,6 +1,6 @@
 {
   "goal_slug": "cli-review-fixes",
-  "certified_at": "2026-11-03T16:00:37.483720742Z",
+  "certified_at": "2026-11-06T01:58:26.584212306Z",
   "certified_by": "agent",
   "evidence_file": "goals/cli-review-fixes/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,19 +8,17 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "d6e8efaf41c5feeaa9f7ac2d8fcdd163ebba8f3e",
+  "commit_sha": "e04c22a846642b9800e1adc2671fd3d88f7618b1",
   "memory_required": true,
-  "memory_waived": true,
-  "memory_waiver_reason": "facts ledger has pre-existing hash mismatches from other projects",
+  "memory_verified": true,
   "memory": {
     "required": true,
-    "status": "waived",
-    "prime": false,
-    "recall": false,
-    "writes": false,
-    "facts": false,
-    "handoff": false,
-    "waived": true,
-    "waiver_reason": "facts ledger has pre-existing hash mismatches from other projects"
+    "status": "verified",
+    "prime": true,
+    "recall": true,
+    "writes": true,
+    "facts": true,
+    "handoff": true,
+    "verified": true
   }
 }

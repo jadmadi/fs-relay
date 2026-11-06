@@ -1,0 +1,8 @@
+{
+  "command": "go test ./...",
+  "timeout_seconds": 300,
+  "expected_exit_code": 0,
+  "contract_hash": "18372a860e41f944219b986d78d7051e447cb4f3d6aa9c7e23661582c8e22d85",
+  "max_rounds": 5,
+  "created_at": "2026-11-06T01:59:13.761298745Z"
+}

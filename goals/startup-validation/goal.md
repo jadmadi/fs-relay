@@ -1,5 +1,12 @@
 # Goal: Validate the mountpoint, data directory and namespace
 
+## Chain of Custody (Isnad)
+- **Registered By**: Pending Registration
+- **Spec Audited By**: Pending Spec Audit
+- **Implemented By**: Pending Implementation
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_startup-validation_1793930311`
+
+
 ## Goal Description
 
 Close the three assigned startup issues:

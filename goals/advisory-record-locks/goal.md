@@ -1,5 +1,12 @@
 # Goal: Advisory record locks across mounts
 
+## Chain of Custody (Isnad)
+- **Registered By**: Pending Registration
+- **Spec Audited By**: Pending Spec Audit
+- **Implemented By**: Pending Implementation
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_advisory-record-locks_1793930232`
+
+
 ## Goal Description
 
 Make `fs-relay` the authority for POSIX advisory byte-range locks, so two

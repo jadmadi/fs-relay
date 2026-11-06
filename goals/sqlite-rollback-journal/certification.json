@@ -1,6 +1,6 @@
 {
   "goal_slug": "sqlite-rollback-journal",
-  "certified_at": "2026-11-03T10:26:39.016863588Z",
+  "certified_at": "2026-11-06T01:57:14.844684607Z",
   "certified_by": "agent",
   "evidence_file": "goals/sqlite-rollback-journal/evidence.md",
   "note": "certified from review document: evidence.md",
@@ -8,7 +8,7 @@
   "facts_passed": 1,
   "facts_total": 1,
   "evidence_kind": "review_document",
-  "commit_sha": "eb5dd86012403308fe9ddc94cc6f31dd3f58682b",
+  "commit_sha": "e04c22a846642b9800e1adc2671fd3d88f7618b1",
   "memory_required": true,
   "memory_verified": true,
   "memory": {

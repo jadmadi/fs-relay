@@ -1,5 +1,12 @@
 # Goal: Close the CLI review findings on PR 19
 
+## Chain of Custody (Isnad)
+- **Registered By**: Pending Registration
+- **Spec Audited By**: Pending Spec Audit
+- **Implemented By**: Pending Implementation
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_cli-review-fixes_1793930308`
+
+
 ## Goal Description
 
 PR #19 implements #9 (`-version`), #10 (readable help) and #11 (flag-order

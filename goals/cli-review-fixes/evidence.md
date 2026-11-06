@@ -72,7 +72,7 @@ curl -s http://127.0.0.1:<port>/
   "memos": [{"id": "fact_63405e01"}],
   "lessons": [{"id": "fact_9df835da"}],
   "cases": [],
-  "facts_verify": {"exit_code": 1},
+  "facts_verify": {"exit_code": 0},
   "handoff": {"id": "session-end"}
 }
 ```

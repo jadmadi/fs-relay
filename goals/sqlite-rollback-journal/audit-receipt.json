@@ -1,0 +1,18 @@
+{
+  "version": "sila/audit-receipt/v1",
+  "goal_slug": "sqlite-rollback-journal",
+  "commit_sha": "e04c22a846642b9800e1adc2671fd3d88f7618b1",
+  "spec_hash": "c07e7b05343f6f88c7d8de8789aa9e6c0a4c130f66af495d1f8cce8da2a7a8a4",
+  "sandbox_nonce": "ebd34b133f2c6d35",
+  "candidate_selection": "A",
+  "blindfold_verified": true,
+  "canary_passed": true,
+  "ccdsi_score": 0.8333333333333334,
+  "req_coverage": 1,
+  "probes_executed": 6,
+  "probes_passed": 6,
+  "probe_manifest_hash": "9c3c599ac1f291d279fcfca8ab7da3daf6fe19403a9d7f921257d284d0acd7c7",
+  "auditor_pub_key": "AAXqAQkDDg1Dhbx8YabX7gFQ81wrhFPfUegNHLM4s5Y=",
+  "auditor_signature": "kDUW13/o6dsdpSQ1APza/FTZEjBaSNUkaxhS+rzkx31ACVuU2a8lQhb34mb9TlIr2uMJNCNhh46zH1uob733Cg==",
+  "certified_at": "2026-11-06T01:57:16Z"
+}

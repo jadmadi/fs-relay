@@ -1,0 +1,18 @@
+{
+  "version": "sila/audit-receipt/v1",
+  "goal_slug": "advisory-record-locks",
+  "commit_sha": "e04c22a846642b9800e1adc2671fd3d88f7618b1",
+  "spec_hash": "a19594bd95a31695bf97c81b46c6df4e24fffa59416ca61867857ecbb8ea0395",
+  "sandbox_nonce": "4359fbccd6944878",
+  "candidate_selection": "A",
+  "blindfold_verified": true,
+  "canary_passed": true,
+  "ccdsi_score": 0.8333333333333334,
+  "req_coverage": 1,
+  "probes_executed": 6,
+  "probes_passed": 6,
+  "probe_manifest_hash": "9c3c599ac1f291d279fcfca8ab7da3daf6fe19403a9d7f921257d284d0acd7c7",
+  "auditor_pub_key": "xJ0bjvBcUh/eABnvTaa3Mqn18jXTr7N4ggH/pYupQZ4=",
+  "auditor_signature": "pOBzRJEcwR35V3Thy+S8mGTcrh8V59RDQRWNIdWrmdT7hzr9swTN6UAPPwhScbnsX6OdjUwWyp991T6RrLBUCw==",
+  "certified_at": "2026-11-06T01:57:12Z"
+}

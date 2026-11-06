@@ -1,5 +1,12 @@
 # Goal: SQLite rollback journal across two mounts
 
+## Chain of Custody (Isnad)
+- **Registered By**: Pending Registration
+- **Spec Audited By**: Pending Spec Audit
+- **Implemented By**: Pending Implementation
+- **Mystery Audited By**: @mystery-auditor | Report: `receipt_sqlite-rollback-journal_1793930236`
+
+
 ## Goal Description
 
 Prove the lock table with the workload that needs it. Two mounts of one
