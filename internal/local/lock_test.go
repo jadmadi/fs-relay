@@ -282,3 +282,51 @@ func TestLockAnyCloseDropsOwner(t *testing.T) {
 	call(t, tr, wire.Setlk, lp(ino, 0, "B", 2, wire.LockWrite, 100, 1))
 	call(t, tr, wire.Setlk, lp(ino, 0, "B", 2, wire.LockWrite, 200, 1))
 }
+
+func TestLockDowngradeWakesWaitingReader(t *testing.T) {
+	cases := []struct {
+		name  string
+		start uint64
+		size  uint64
+		flags uint32
+	}{
+		{name: "canonical-shared", start: sharedStart, size: 510},
+		{name: "canonical-pending", start: pendingByte, size: 1},
+		{name: "non-canonical-range", start: 100, size: 50},
+		{name: "flock", start: 0, size: 0, flags: wire.FlagFlock},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tr, _ := newTree(t)
+			ino, fh := lockFile(t, tr, "a")
+
+			writeA := lp(ino, fh, "A", 1, wire.LockWrite, tc.start, tc.size)
+			writeA.Flags = tc.flags
+			call(t, tr, wire.Setlk, writeA)
+
+			readA := lp(ino, fh, "A", 1, wire.LockRead, tc.start, tc.size)
+			readA.Flags = tc.flags
+			call(t, tr, wire.Setlk, readA)
+			if gotIno, ok := tr.TookWake("demo", readA); ok || gotIno != 0 {
+				t.Fatalf("TookWake without waiter = (%d, %v), want (0, false)", gotIno, ok)
+			}
+
+			call(t, tr, wire.Setlk, writeA)
+
+			readB := lp(ino, fh, "B", 2, wire.LockRead, tc.start, tc.size)
+			readB.Flags = tc.flags
+			_, err := tr.Call(t.Context(), wire.Setlkw, readB)
+			wantErrno(t, err, syscall.EAGAIN)
+
+			call(t, tr, wire.Setlk, readA)
+			if gotIno, ok := tr.TookWake("demo", readA); !ok || gotIno != ino {
+				t.Fatalf("TookWake with waiting reader = (%d, %v), want (%d, true)", gotIno, ok, ino)
+			}
+
+			call(t, tr, wire.Setlkw, readB)
+			if tr.AnyWaiting("demo") {
+				t.Fatal("AnyWaiting true after waiter acquired lock")
+			}
+		})
+	}
+}

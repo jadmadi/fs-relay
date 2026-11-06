@@ -6,7 +6,7 @@ before starting this plan.
 
 ## Execution Steps
 
-- [ ] **T1 - Move waiter tracking into lockRec under t.mu and wake on lock downgrades**
+- [x] **T1 - Move waiter tracking into lockRec under t.mu and wake on lock downgrades**
   - Context: Goal `lock-wake-races` (upstream issue `#32`), cwd `/mnt/Jad/github/lab/fs-relay`, prerequisite: `bind-lock-coherence`.
   - Files:
     - Edit: `internal/local/lock.go` (`lockRec`, `trim`, `put`, `apply`, `flockSet`, `dropFH`, ` dropClient`, `DropOwner`, `setlk`, `setlkw`, `TookWake`, `AnyWaiting`)
@@ -33,7 +33,7 @@ before starting this plan.
     - AC-1.1: `go test ./internal/local` exits `0`.
     - AC-1.2: `TestLockCanonicalNoAlloc` passes with `0` allocations.
 
-- [ ] **T2 - Remove hub-side waiter map and wire server release broadcasts through Tree**
+- [x] **T2 - Remove hub-side waiter map and wire server release broadcasts through Tree**
   - Context: Eliminate the race window between `tree.Call` and `hub.markWaiting` in `cmd/fs-relay`, prerequisite: `T1`.
   - Files:
     - Edit: `cmd/fs-relay/hub.go` (`hub`, `newHub`, `dropHold`)
@@ -49,7 +49,7 @@ before starting this plan.
     - AC-2.1: `go test -race ./cmd/fs-relay ./internal/local` exits `0`.
     - AC-2.2: `ripwire . --quality-delta --legend=compact` reports `gating=0`.
 
-- [ ] **T3 - Add tests for downgrade wake-ups, three-waiter contention, and concurrent Setlkw/unlock**
+- [x] **T3 - Add tests for downgrade wake-ups, three-waiter contention, and concurrent Setlkw/unlock**
   - Context: Prove all three races in `#32` are closed, prerequisite: `T2`.
   - Files:
     - Edit: `internal/local/lock_test.go`
@@ -61,7 +61,7 @@ before starting this plan.
   - Acceptance criteria:
     - AC-3.1: `go test -v -race ./internal/local ./cmd/fs-relay` exits `0`.
 
-- [ ] **T4 - Update SPEC.md, run full verification gates, and certify goal**
+- [x] **T4 - Update SPEC.md, run full verification gates, and certify goal**
   - Context: Document downgrade wake-ups and close the goal in Sila, prerequisite: `T3`.
   - Files:
     - Edit: `SPEC.md` (section `Locks`)

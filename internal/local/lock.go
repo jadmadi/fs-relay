@@ -23,6 +23,11 @@ type lockKey struct {
 	owner  uint64
 }
 
+type lockWaiter struct {
+	key lockKey
+	fh  uint64
+}
+
 // lockSpan is one byte range held by one owner. end is inclusive.
 type lockSpan struct {
 	start uint64
@@ -79,6 +84,7 @@ type lockRec struct {
 	flockX    lockKey
 	flockS    uint32
 	owners    []lockOwner
+	waiters   []lockWaiter
 	pool      [][]lockSpan
 	wake      bool
 }
@@ -138,17 +144,48 @@ func (r *lockRec) remove(key lockKey) {
 	}
 }
 
+func (r *lockRec) addWaiter(key lockKey, fh uint64) {
+	if key.client == "" {
+		return
+	}
+	for i := range r.waiters {
+		if r.waiters[i].key == key {
+			if fh != 0 {
+				r.waiters[i].fh = fh
+			}
+			return
+		}
+	}
+	r.waiters = append(r.waiters, lockWaiter{key: key, fh: fh})
+}
+
+func (r *lockRec) dropWaiter(key lockKey) {
+	out := r.waiters[:0]
+	for _, w := range r.waiters {
+		if w.key != key {
+			out = append(out, w)
+		}
+	}
+	clear(r.waiters[len(out):])
+	r.waiters = out
+}
+
 func (o *lockOwner) empty() bool {
 	return len(o.spans) == 0 && o.flock == 0
 }
 
 // trim removes [start, end] from this owner, keeping any bytes on either side.
-func (o *lockOwner) trim(start, end uint64) {
+// It reports whether any trimmed span was a write lock.
+func (o *lockOwner) trim(start, end uint64) bool {
+	wrote := false
 	out := o.spans[:0]
 	for _, s := range o.spans {
 		if s.end < start || s.start > end {
 			out = append(out, s)
 			continue
+		}
+		if s.typ == wire.LockWrite {
+			wrote = true
 		}
 		if s.start < start {
 			out = append(out, lockSpan{start: s.start, end: start - 1, typ: s.typ, pid: s.pid})
@@ -158,6 +195,7 @@ func (o *lockOwner) trim(start, end uint64) {
 		}
 	}
 	o.spans = out
+	return wrote
 }
 
 // exact returns the type of a span covering exactly [start, end].
@@ -221,7 +259,9 @@ func (r *lockRec) put(key lockKey, fh uint64, start, end uint64, typ uint32, pid
 		r.apply(o, start, end, typ, pid)
 		return
 	}
-	o.trim(start, end)
+	if o.trim(start, end) && typ == wire.LockRead {
+		r.wake = true
+	}
 	o.spans = append(o.spans, lockSpan{start: start, end: end, typ: typ, pid: pid})
 	r.recount()
 }
@@ -237,6 +277,7 @@ func (r *lockRec) apply(o *lockOwner, start, end uint64, typ uint32, pid uint32)
 			}
 			o.spans = append(o.spans, lockSpan{start: start, end: end, typ: typ, pid: pid})
 			r.pendingR++
+			r.wake = true
 			return
 		}
 		if !ok {
@@ -255,6 +296,7 @@ func (r *lockRec) apply(o *lockOwner, start, end uint64, typ uint32, pid uint32)
 		if r.exclusive == o.key {
 			o.trim(start, end)
 			r.exclusive = lockKey{}
+			r.wake = true
 		}
 		if _, ok := o.exact(start, end); !ok {
 			o.spans = append(o.spans, lockSpan{start: start, end: end, typ: typ, pid: pid})
@@ -341,6 +383,9 @@ func (r *lockRec) flockSet(key lockKey, fh uint64, typ uint32) error {
 				return syscall.EAGAIN
 			}
 		}
+		if o.flock == wire.LockWrite {
+			r.wake = true
+		}
 		o.flock = wire.LockRead
 	case wire.LockWrite:
 		for i := range r.owners {
@@ -360,6 +405,16 @@ func (r *lockRec) flockSet(key lockKey, fh uint64, typ uint32) error {
 
 // dropFH drops every owner that last named this file handle.
 func (r *lockRec) dropFH(fh uint64) bool {
+	if fh != 0 {
+		out := r.waiters[:0]
+		for _, w := range r.waiters {
+			if w.fh != fh {
+				out = append(out, w)
+			}
+		}
+		clear(r.waiters[len(out):])
+		r.waiters = out
+	}
 	changed := false
 	for i := len(r.owners) - 1; i >= 0; i-- {
 		if !r.owners[i].hasFH(fh) {
@@ -377,6 +432,14 @@ func (r *lockRec) dropFH(fh uint64) bool {
 
 // dropClient drops every lock one mount holds on this inode.
 func (r *lockRec) dropClient(client string) bool {
+	out := r.waiters[:0]
+	for _, w := range r.waiters {
+		if w.key.client != client {
+			out = append(out, w)
+		}
+	}
+	clear(r.waiters[len(out):])
+	r.waiters = out
 	changed := false
 	for i := len(r.owners) - 1; i >= 0; i-- {
 		if r.owners[i].key.client != client {
@@ -414,7 +477,7 @@ func (t *Tree) record(e *entry) *lockRec {
 func lockTarget(t *Tree, p wire.Params) (uint64, lockKey, error) {
 	ino := p.Inode
 	if ino == 0 && p.Fh != 0 {
-		if id, ok := t.inoOf(p.Fh); ok {
+		if id, ok := t.InodeOf(p.Fh); ok {
 			ino = id
 		}
 	}
@@ -483,47 +546,77 @@ func getlk(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 	return wire.Result{Lock: &out}, nil
 }
 
-func setlk(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
+func prepLock(ctx context.Context, t *Tree, p wire.Params) (uint64, lockKey, uint64, uint64, error) {
 	if err := ctx.Err(); err != nil {
-		return wire.Result{}, err
+		return 0, lockKey{}, 0, 0, err
 	}
 	ino, key, err := lockTarget(t, p)
 	if err != nil {
-		return wire.Result{}, wrap("setlk", err)
+		return 0, lockKey{}, 0, 0, err
 	}
 	if p.Flags&^wire.FlagFlock != 0 {
-		return wire.Result{}, wrap("setlk", syscall.EINVAL)
+		return 0, lockKey{}, 0, 0, syscall.EINVAL
 	}
-	flock := p.Flags&wire.FlagFlock != 0
 	start, end, err := lockRange(p)
 	if err != nil {
-		return wire.Result{}, wrap("setlk", err)
+		return 0, lockKey{}, 0, 0, err
+	}
+	return ino, key, start, end, nil
+}
+
+func runLock(rec *lockRec, key lockKey, start, end uint64, p wire.Params) error {
+	if p.Flags&wire.FlagFlock != 0 {
+		if err := rec.flockSet(key, p.Fh, p.Lock); err != nil {
+			return err
+		}
+		rec.dropWaiter(key)
+		return nil
+	}
+	switch p.Lock {
+	case wire.LockUnlock:
+		rec.unlock(key, start, end)
+		rec.dropWaiter(key)
+	case wire.LockRead, wire.LockWrite:
+		if rec.conflicts(key, start, end, p.Lock) {
+			return syscall.EAGAIN
+		}
+		rec.put(key, p.Fh, start, end, p.Lock, p.Pid)
+		rec.dropWaiter(key)
+	default:
+		return syscall.EINVAL
+	}
+	return nil
+}
+
+func lockOp(ctx context.Context, t *Tree, name string, p wire.Params, onWait func(*lockRec, lockKey, uint64)) (wire.Result, error) {
+	ino, key, start, end, err := prepLock(ctx, t, p)
+	if err != nil {
+		return wire.Result{}, wrap(name, err)
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	e, ok := t.entry(p.Namespace, ino)
 	if !ok {
-		return wire.Result{}, wrap("setlk", syscall.ENOENT)
+		return wire.Result{}, wrap(name, syscall.ENOENT)
 	}
 	rec := t.record(e)
-	if flock {
-		if err := rec.flockSet(key, p.Fh, p.Lock); err != nil {
-			return wire.Result{}, wrap("setlk", err)
+	if err := runLock(rec, key, start, end, p); err != nil {
+		if err == syscall.EAGAIN && onWait != nil {
+			onWait(rec, key, p.Fh)
 		}
-		return wire.Result{}, nil
-	}
-	switch p.Lock {
-	case wire.LockUnlock:
-		rec.unlock(key, start, end)
-	case wire.LockRead, wire.LockWrite:
-		if rec.conflicts(key, start, end, p.Lock) {
-			return wire.Result{}, wrap("setlk", syscall.EAGAIN)
-		}
-		rec.put(key, p.Fh, start, end, p.Lock, p.Pid)
-	default:
-		return wire.Result{}, wrap("setlk", syscall.EINVAL)
+		return wire.Result{}, wrap(name, err)
 	}
 	return wire.Result{}, nil
+}
+
+func setlk(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
+	return lockOp(ctx, t, "setlk", p, nil)
+}
+
+func setlkw(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
+	return lockOp(ctx, t, "setlkw", p, func(rec *lockRec, key lockKey, fh uint64) {
+		rec.addWaiter(key, fh)
+	})
 }
 
 // DropFH drops the locks an open held on one inode.
@@ -537,7 +630,7 @@ func (t *Tree) DropFH(ns string, ino, fh uint64) bool {
 	return e.locks.dropFH(fh)
 }
 
-// DropClient drops every lock one mount holds on one inode.
+// DropOwner drops one owner's locks on one inode.
 func (t *Tree) DropOwner(ns string, ino uint64, client string, owner uint64) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -546,6 +639,7 @@ func (t *Tree) DropOwner(ns string, ino uint64, client string, owner uint64) boo
 		return false
 	}
 	key := lockKey{client: client, owner: owner}
+	e.locks.dropWaiter(key)
 	if e.locks.find(key) == nil {
 		return false
 	}
@@ -581,8 +675,8 @@ func (t *Tree) InodeOf(fh uint64) (uint64, bool) {
 	return t.inoOf(fh)
 }
 
-// TookWake consumes a pending release wake and returns the inode it
-// happened on.
+// TookWake consumes a pending release wake and returns the inode when at least
+// one client is waiting on it.
 func (t *Tree) TookWake(ns string, p wire.Params) (uint64, bool) {
 	ino := p.Inode
 	if ino == 0 && p.Fh != 0 {
@@ -598,5 +692,24 @@ func (t *Tree) TookWake(ns string, p wire.Params) (uint64, bool) {
 		return 0, false
 	}
 	e.locks.wake = false
+	if len(e.locks.waiters) == 0 {
+		return 0, false
+	}
 	return ino, true
+}
+
+// AnyWaiting reports whether any inode in ns has a waiting lock request.
+func (t *Tree) AnyWaiting(ns string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	st := t.ns[ns]
+	if st == nil {
+		return false
+	}
+	for _, e := range st.byIno {
+		if e.locks != nil && len(e.locks.waiters) > 0 {
+			return true
+		}
+	}
+	return false
 }

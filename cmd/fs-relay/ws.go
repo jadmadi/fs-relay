@@ -96,9 +96,6 @@ func readCalls(ctx context.Context, h *hub, tree *local.Tree, conn *websocket.Co
 			defer wg.Done()
 			defer release(lanes, &mu, req.ID)
 			res, callErr := tree.Call(ctx, req.Method, req.Params)
-			if req.Method == wire.Setlkw && errors.Is(callErr, syscall.EAGAIN) {
-				h.markWaiting(ns, lockInode(tree, req.Params), req.Params.Client)
-			}
 			publishCall(h, tree, ns, req.Method, req.Params, callErr)
 			b, err := wsBody(req.ID, res, callErr)
 			if err != nil {
