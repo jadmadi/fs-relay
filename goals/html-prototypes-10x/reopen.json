@@ -4,7 +4,8 @@
   "reopened_by": "antigravity",
   "reason": "Build interactive Three.js 3D reference explorer in interactive-prototype/",
   "original_commit": "8af6de3",
-  "resolved_at": "0001-01-01T00:00:00Z",
-  "active": true,
+  "resolved_commit": "d6e1b64",
+  "resolved_at": "2026-11-06T00:08:49.179581797Z",
+  "active": false,
   "reopen_epoch": 3
 }

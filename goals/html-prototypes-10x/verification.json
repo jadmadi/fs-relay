@@ -4,10 +4,10 @@
   "level": "L3",
   "outcome": "passed",
   "method": "audit",
-  "spec_hash": "a05f174dd5c6cf23203aa0c1142f78cd7670be56007f78209acc444abb603d1a",
+  "spec_hash": "238657d3a469d291c1addb75c870823ee6c1bd94088c353ce73445b1b8d27d44",
   "subject": {
     "algorithm": "sha256",
-    "hash": "f8e1d0bcaf07a2df4e6c610557292827ca5aae6fb0124d64892e0056d3651a87",
+    "hash": "344814f4a5137d5c30dd97ec43cf12843ffd8954f17466b57ea2257dd7bdcf26",
     "paths": [
       {
         "path": ".ui-craft/brief.md",
@@ -113,6 +113,31 @@
         "path": "html-prototypes/wire.html",
         "kind": "file",
         "hash": "d5a134bdcc64542fdb577fa463ea8569c68951de08f0d455f7956bdb56f1652e"
+      },
+      {
+        "path": "interactive-prototype/app.js",
+        "kind": "file",
+        "hash": "0714656c3dcc9745e0bb52e933b7f95ba36cc67e10144274104c8044795f9515"
+      },
+      {
+        "path": "interactive-prototype/index.html",
+        "kind": "file",
+        "hash": "6c68277611d763881ff0ea37e262c873afd11068d6299c42a06c30b1cea4cda7"
+      },
+      {
+        "path": "interactive-prototype/style.css",
+        "kind": "file",
+        "hash": "561af30253ac63538efbb467d085d8d9090126ea33d7cdf9bbc94d50ea95d959"
+      },
+      {
+        "path": "interactive-prototype/vendor/controls/OrbitControls.js",
+        "kind": "file",
+        "hash": "80efaadea4f8a636a65fb0bd08bfef62f3d93a0bb94e2e7500f23176c5c07f4e"
+      },
+      {
+        "path": "interactive-prototype/vendor/three.module.min.js",
+        "kind": "file",
+        "hash": "08fd7545d13d2c7fb65ab691530a802dafefd638596501854f267d0fb13c39e7"
       }
     ]
   },
@@ -120,9 +145,9 @@
     "go_version": "go1.27.3",
     "os": "linux",
     "arch": "amd64",
-    "sila_version": "dev+986d3374-dirty",
+    "sila_version": "dev+b8acfdcc-dirty",
     "bwrap": "bubblewrap 0.12.0"
   },
-  "previous": "7a2c169bac9e9dd702bd01efb80710a3bcb04346bd843fb40fbdd61ad2e26770",
-  "verified_at": "2026-11-05T18:43:13Z"
+  "previous": "58a87d56dce6e9a52fdebe4e22b7cf86ee91ce6dfab5f199e52946d5de14d819",
+  "verified_at": "2026-11-06T00:08:53Z"
 }
