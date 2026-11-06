@@ -6,7 +6,7 @@ in `cmd/fs-relay-bind/lock.go` is present.
 
 ## Execution Steps
 
-- [ ] **T1 - Drain write-behind before unlock and drop caches on lock grant**
+- [x] **T1 - Drain write-behind before unlock and drop caches on lock grant**
   - Context: Goal `bind-lock-coherence` (upstream issue `#31`), cwd `/mnt/Jad/github/lab/fs-relay`, prerequisite: none.
   - Files:
     - Edit: `cmd/fs-relay-bind/lock.go` (`(*node).lock`)
@@ -28,7 +28,7 @@ in `cmd/fs-relay-bind/lock.go` is present.
     - AC-1.1: `go build ./cmd/fs-relay-bind` in `/mnt/Jad/github/lab/fs-relay` exits `0`.
     - AC-1.2: `ripwire . --quality-delta --legend=compact` reports `gating=0`.
 
-- [ ] **T2 - Add unit tests for unlock write-behind drain, drain failure, and grant cache drop**
+- [x] **T2 - Add unit tests for unlock write-behind drain, drain failure, and grant cache drop**
   - Context: Prove all three behaviors in `cmd/fs-relay-bind` without a real FUSE mount, prerequisite: `T1`.
   - Files:
     - Edit: `cmd/fs-relay-bind/lock_release_test.go`
@@ -40,7 +40,7 @@ in `cmd/fs-relay-bind/lock.go` is present.
     - AC-2.1: `go test -v -run 'TestUnlockDrainsWriteBehindBeforeSetlk|TestUnlockWithDrainErrorStillReleasesLock|TestLockGrantDropsCachedAttrAndBlob' ./cmd/fs-relay-bind` exits `0`.
     - AC-2.2: `go test -race ./cmd/fs-relay-bind` exits `0`.
 
-- [ ] **T3 - Update SPEC.md, run full gates, and certify goal**
+- [x] **T3 - Update SPEC.md, run full gates, and certify goal**
   - Context: Keep `SPEC.md` aligned with the write-behind and lock coherence contract, prerequisite: `T2`.
   - Files:
     - Edit: `SPEC.md` (section `Coherence`, line 214, and section `Locks`)
