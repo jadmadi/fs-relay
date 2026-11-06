@@ -111,6 +111,9 @@ func (k *kernel) forgetName(parent uint64, name string) {
 }
 
 func (k *kernel) forgetIno(ino uint64) {
+	if k == nil {
+		return
+	}
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	k.dropBody(ino)

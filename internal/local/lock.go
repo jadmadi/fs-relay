@@ -24,8 +24,12 @@ type lockKey struct {
 }
 
 type lockWaiter struct {
-	key lockKey
-	fh  uint64
+	key   lockKey
+	fh    uint64
+	start uint64
+	end   uint64
+	typ   uint32
+	flock bool
 }
 
 // lockSpan is one byte range held by one owner. end is inclusive.
@@ -144,25 +148,24 @@ func (r *lockRec) remove(key lockKey) {
 	}
 }
 
-func (r *lockRec) addWaiter(key lockKey, fh uint64) {
-	if key.client == "" {
+// addWaiter records a waiting setlkw request if not already present.
+func (r *lockRec) addWaiter(w lockWaiter) {
+	if w.key.client == "" {
 		return
 	}
 	for i := range r.waiters {
-		if r.waiters[i].key == key {
-			if fh != 0 {
-				r.waiters[i].fh = fh
-			}
+		if r.waiters[i] == w {
 			return
 		}
 	}
-	r.waiters = append(r.waiters, lockWaiter{key: key, fh: fh})
+	r.waiters = append(r.waiters, w)
 }
 
-func (r *lockRec) dropWaiter(key lockKey) {
+// keepWaiters retains only waiters for which keep returns true.
+func (r *lockRec) keepWaiters(keep func(lockWaiter) bool) {
 	out := r.waiters[:0]
 	for _, w := range r.waiters {
-		if w.key != key {
+		if keep(w) {
 			out = append(out, w)
 		}
 	}
@@ -406,14 +409,7 @@ func (r *lockRec) flockSet(key lockKey, fh uint64, typ uint32) error {
 // dropFH drops every owner that last named this file handle.
 func (r *lockRec) dropFH(fh uint64) bool {
 	if fh != 0 {
-		out := r.waiters[:0]
-		for _, w := range r.waiters {
-			if w.fh != fh {
-				out = append(out, w)
-			}
-		}
-		clear(r.waiters[len(out):])
-		r.waiters = out
+		r.keepWaiters(func(w lockWaiter) bool { return w.fh != fh })
 	}
 	changed := false
 	for i := len(r.owners) - 1; i >= 0; i-- {
@@ -432,14 +428,7 @@ func (r *lockRec) dropFH(fh uint64) bool {
 
 // dropClient drops every lock one mount holds on this inode.
 func (r *lockRec) dropClient(client string) bool {
-	out := r.waiters[:0]
-	for _, w := range r.waiters {
-		if w.key.client != client {
-			out = append(out, w)
-		}
-	}
-	clear(r.waiters[len(out):])
-	r.waiters = out
+	r.keepWaiters(func(w lockWaiter) bool { return w.key.client != client })
 	changed := false
 	for i := len(r.owners) - 1; i >= 0; i-- {
 		if r.owners[i].key.client != client {
@@ -546,6 +535,7 @@ func getlk(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 	return wire.Result{Lock: &out}, nil
 }
 
+// prepLock validates a setlk or setlkw request and resolves its inode, owner key, and byte span.
 func prepLock(ctx context.Context, t *Tree, p wire.Params) (uint64, lockKey, uint64, uint64, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, lockKey{}, 0, 0, err
@@ -564,31 +554,37 @@ func prepLock(ctx context.Context, t *Tree, p wire.Params) (uint64, lockKey, uin
 	return ino, key, start, end, nil
 }
 
+// runLock applies one setlk or setlkw change to an inode lock record under t.mu.
 func runLock(rec *lockRec, key lockKey, start, end uint64, p wire.Params) error {
 	if p.Flags&wire.FlagFlock != 0 {
 		if err := rec.flockSet(key, p.Fh, p.Lock); err != nil {
 			return err
 		}
-		rec.dropWaiter(key)
+		rec.keepWaiters(func(w lockWaiter) bool { return w.key != key || !w.flock })
 		return nil
 	}
 	switch p.Lock {
 	case wire.LockUnlock:
 		rec.unlock(key, start, end)
-		rec.dropWaiter(key)
+		rec.keepWaiters(func(w lockWaiter) bool {
+			return w.key != key || w.flock || !overlap(w.start, w.end, start, end)
+		})
 	case wire.LockRead, wire.LockWrite:
 		if rec.conflicts(key, start, end, p.Lock) {
 			return syscall.EAGAIN
 		}
 		rec.put(key, p.Fh, start, end, p.Lock, p.Pid)
-		rec.dropWaiter(key)
+		rec.keepWaiters(func(w lockWaiter) bool {
+			return w.key != key || w.flock || !overlap(w.start, w.end, start, end)
+		})
 	default:
 		return syscall.EINVAL
 	}
 	return nil
 }
 
-func lockOp(ctx context.Context, t *Tree, name string, p wire.Params, onWait func(*lockRec, lockKey, uint64)) (wire.Result, error) {
+// lockOp executes setlk or setlkw and invokes onWait under t.mu when the lock conflicts.
+func lockOp(ctx context.Context, t *Tree, name string, p wire.Params, onWait func(*lockRec, lockWaiter)) (wire.Result, error) {
 	ino, key, start, end, err := prepLock(ctx, t, p)
 	if err != nil {
 		return wire.Result{}, wrap(name, err)
@@ -602,20 +598,29 @@ func lockOp(ctx context.Context, t *Tree, name string, p wire.Params, onWait fun
 	rec := t.record(e)
 	if err := runLock(rec, key, start, end, p); err != nil {
 		if err == syscall.EAGAIN && onWait != nil {
-			onWait(rec, key, p.Fh)
+			onWait(rec, lockWaiter{
+				key:   key,
+				fh:    p.Fh,
+				start: start,
+				end:   end,
+				typ:   p.Lock,
+				flock: p.Flags&wire.FlagFlock != 0,
+			})
 		}
 		return wire.Result{}, wrap(name, err)
 	}
 	return wire.Result{}, nil
 }
 
+// setlk acquires or releases a lock without registering a waiter on EAGAIN.
 func setlk(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
 	return lockOp(ctx, t, "setlk", p, nil)
 }
 
+// setlkw acquires or releases a lock and records a waiter under t.mu on EAGAIN.
 func setlkw(ctx context.Context, t *Tree, p wire.Params) (wire.Result, error) {
-	return lockOp(ctx, t, "setlkw", p, func(rec *lockRec, key lockKey, fh uint64) {
-		rec.addWaiter(key, fh)
+	return lockOp(ctx, t, "setlkw", p, func(rec *lockRec, w lockWaiter) {
+		rec.addWaiter(w)
 	})
 }
 
@@ -639,7 +644,7 @@ func (t *Tree) DropOwner(ns string, ino uint64, client string, owner uint64) boo
 		return false
 	}
 	key := lockKey{client: client, owner: owner}
-	e.locks.dropWaiter(key)
+	e.locks.keepWaiters(func(w lockWaiter) bool { return w.key != key })
 	if e.locks.find(key) == nil {
 		return false
 	}

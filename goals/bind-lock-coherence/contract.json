@@ -2,7 +2,7 @@
   "command": "go test -race ./cmd/fs-relay-bind",
   "timeout_seconds": 300,
   "expected_exit_code": 0,
-  "contract_hash": "d012b1c7f7221703f261992b95d21bcecbaf4ae92c7285a1e17717b00f244c8b",
+  "contract_hash": "64ca4541540fc049e93a181ed228a912d2ea07fe27a146f1bbd9f485faa619ee",
   "max_rounds": 5,
   "test_paths": [
     "cmd/fs-relay-bind/lock_release_test.go"

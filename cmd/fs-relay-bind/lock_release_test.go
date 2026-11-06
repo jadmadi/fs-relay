@@ -349,21 +349,22 @@ func TestUnlockWithDrainErrorStillReleasesLock(t *testing.T) {
 	f := &fakeCaller{}
 	n := &node{c: f, ino: 5}
 	h := &handle{c: f, n: n, ino: 5, fh: 11}
-	defer h.releaseBuf()
-
-	if _, errno := h.Write(context.Background(), []byte("abc"), 0); errno != 0 {
-		t.Fatalf("write: %v", errno)
-	}
+	n.dirty = map[*handle]int64{h: 3}
 	h.wb.err = syscall.EIO
 
 	unlock := &fuse.FileLock{Start: 0, End: 9, Typ: syscall.F_UNLCK}
 	if errno := n.Setlk(context.Background(), h, 7, unlock, 0); errno != syscall.EIO {
 		t.Fatalf("unlock errno=%v, want EIO", errno)
 	}
-
 	recs := f.records()
 	if len(recs) != 1 || recs[0].method != wire.Setlk || recs[0].p.Lock != wire.LockUnlock {
 		t.Fatalf("expected setlk unlock despite drain error, got %+v", recs)
+	}
+
+	f.setDeny(true)
+	h.wb.err = syscall.EIO
+	if errno := n.Setlk(context.Background(), h, 7, unlock, 0); errno != syscall.EAGAIN {
+		t.Fatalf("unlock with both drain and call error = %v, want EAGAIN", errno)
 	}
 }
 

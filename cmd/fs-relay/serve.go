@@ -81,6 +81,7 @@ func writeNamespaceErr(w http.ResponseWriter, ns string, err error) {
 	}
 }
 
+// publishCall broadcasts directory cache evictions and lock-release wakes after a call.
 func publishCall(h *hub, tree *local.Tree, ns, method string, p wire.Params, err error) {
 	if err != nil {
 		if method == wire.Release {

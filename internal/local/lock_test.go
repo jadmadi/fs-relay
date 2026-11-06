@@ -330,3 +330,35 @@ func TestLockDowngradeWakesWaitingReader(t *testing.T) {
 		})
 	}
 }
+
+func TestSameOwnerDifferentRangeKeepsWaiter(t *testing.T) {
+	tr, _ := newTree(t)
+	ino, fh1 := lockFile(t, tr, "a")
+	fh2 := call(t, tr, wire.Open, wire.Params{Inode: ino, Flags: syscall.O_RDWR}).Fh
+
+	call(t, tr, wire.Setlk, lp(ino, fh1, "A", 1, wire.LockWrite, 0, 20))
+	_, err := tr.Call(t.Context(), wire.Setlkw, lp(ino, fh1, "B", 2, wire.LockWrite, 0, 10))
+	wantErrno(t, err, syscall.EAGAIN)
+	_, err = tr.Call(t.Context(), wire.Setlkw, lp(ino, fh2, "B", 2, wire.LockWrite, 10, 10))
+	wantErrno(t, err, syscall.EAGAIN)
+
+	// Closing fh1 drops only fh1's waiter; fh2's waiter on [10, 19] stays active.
+	tr.DropFH("demo", ino, fh1)
+	if !tr.AnyWaiting("demo") {
+		t.Fatal("waiter on fh2 was dropped when fh1 closed")
+	}
+
+	// Same owner ("B", 2) locks and unlocks a non-overlapping range [100, 109].
+	// Its pending wait on [10, 19] must remain registered.
+	call(t, tr, wire.Setlk, lp(ino, fh2, "B", 2, wire.LockWrite, 100, 10))
+	call(t, tr, wire.Setlk, lp(ino, fh2, "B", 2, wire.LockUnlock, 100, 10))
+	if !tr.AnyWaiting("demo") {
+		t.Fatal("waiter on [10, 19] was dropped by non-overlapping lock/unlock on [100, 109]")
+	}
+
+	unlockA := lp(ino, fh1, "A", 1, wire.LockUnlock, 0, 20)
+	call(t, tr, wire.Setlk, unlockA)
+	if gotIno, ok := tr.TookWake("demo", unlockA); !ok || gotIno != ino {
+		t.Fatalf("TookWake = (%d, %v), want (%d, true)", gotIno, ok, ino)
+	}
+}
