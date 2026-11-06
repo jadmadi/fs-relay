@@ -4,7 +4,8 @@
   "reopened_by": "agent",
   "reason": "Make #guide-card a horizontal strip outside the 3D canvas so it never overlays the 3D viewport",
   "original_commit": "1f2a446",
-  "resolved_at": "0001-01-01T00:00:00Z",
-  "active": true,
+  "resolved_commit": "f353ecd",
+  "resolved_at": "2026-11-06T00:29:48.661104729Z",
+  "active": false,
   "reopen_epoch": 5
 }
