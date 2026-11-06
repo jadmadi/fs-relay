@@ -13,10 +13,10 @@ Two `fs-relay` processes could serve the same `-data` directory on different por
 
 | Change | File |
 |--------|------|
-| Add `(*Tree).Lock() error` acquiring `unix.Flock(fd, unix.LOCK_EX\|unix.LOCK_NB)` on `<root>/.fs-relay.lock` (`0600`), writing `<pid>\n`, and releasing in `(*Tree).Close()` | `internal/local/tree.go` |
+| Add `(*Tree).Lock() error` acquiring `unix.Flock(fd, unix.LOCK_EX\|unix.LOCK_NB)` on `<root>/.fs-relay.lock` (`0600`), writing `<pid>\n`, guarding `t.lockFile` under `t.fmu`, and releasing in `(*Tree).Close()` | `internal/local/tree.go` |
 | Add `-force-multi-serve` flag and call `tree.Lock()` when `!*forceMulti` | `cmd/fs-relay/main.go` |
-| Add `TestTreeLockRefusesSecondServerAndReleasesOnClose` | `internal/local/local_test.go` |
-| Document `-force-multi-serve` and single-server data root locking | `README.md`, `ROADMAP.md` |
+| Add `TestTreeLockRefusesSecondServerAndReleasesOnClose` with doc comment | `internal/local/local_test.go` |
+| Document `-force-multi-serve` and single-server data root locking | `SPEC.md`, `README.md`, `ROADMAP.md` |
 
 ## Commands
 

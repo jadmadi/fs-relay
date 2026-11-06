@@ -27,8 +27,6 @@ type Tree struct {
 	files    map[uint64]*openFile
 	nextFH   uint64
 	lockFile *os.File
-
-	dirs map[string]bool
 }
 
 type entry struct {
@@ -56,7 +54,6 @@ func New(root string) *Tree {
 		ns:     map[string]*names{},
 		files:  map[uint64]*openFile{},
 		nextFH: 1,
-		dirs:   map[string]bool{},
 	}
 }
 
@@ -103,7 +100,13 @@ func (t *Tree) Lock() error {
 	}
 	_ = f.Truncate(0)
 	_, _ = fmt.Fprintf(f, "%d\n", os.Getpid())
+	t.fmu.Lock()
+	old := t.lockFile
 	t.lockFile = f
+	t.fmu.Unlock()
+	if old != nil {
+		_ = old.Close()
+	}
 	return nil
 }
 
@@ -120,18 +123,6 @@ func (t *Tree) CheckNamespace(ns string) error {
 	if !info.IsDir() {
 		return syscall.ENOTDIR
 	}
-	return nil
-}
-
-// OpenNamespace checks that data/<ns> is an existing directory. A hit is
-// cached; a miss is not, so creating the directory later works.
-func (t *Tree) OpenNamespace(ns string) error {
-	if err := t.CheckNamespace(ns); err != nil {
-		return err
-	}
-	t.mu.Lock()
-	t.dirs[ns] = true
-	t.mu.Unlock()
 	return nil
 }
 
@@ -170,10 +161,7 @@ func (t *Tree) Call(ctx context.Context, method string, p wire.Params) (wire.Res
 	if err := ctx.Err(); err != nil {
 		return wire.Result{}, err
 	}
-	if err := wire.CheckNS(p.Namespace); err != nil {
-		return wire.Result{}, err
-	}
-	if err := t.OpenNamespace(p.Namespace); err != nil {
+	if err := t.CheckNamespace(p.Namespace); err != nil {
 		return wire.Result{}, err
 	}
 	fn, ok := operations[method]

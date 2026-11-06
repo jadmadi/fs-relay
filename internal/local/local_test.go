@@ -547,6 +547,8 @@ func TestPrepareRejectsFile(t *testing.T) {
 	}
 }
 
+// TestTreeLockRefusesSecondServerAndReleasesOnClose verifies that Lock refuses
+// a second Tree on the same data directory and releases the flock on Close.
 func TestTreeLockRefusesSecondServerAndReleasesOnClose(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "data")
 	first := New(root)
@@ -573,22 +575,6 @@ func TestTreeLockRefusesSecondServerAndReleasesOnClose(t *testing.T) {
 	}
 	if err := second.Lock(); err != nil {
 		t.Fatalf("second.Lock after first.Close: %v", err)
-	}
-}
-
-func TestOpenNamespace(t *testing.T) {
-	tr, dir := newTree(t)
-	if err := tr.OpenNamespace("demo"); err != nil {
-		t.Fatal(err)
-	}
-	if err := tr.OpenNamespace("missing"); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("missing: %v", err)
-	}
-	if err := os.Mkdir(filepath.Join(dir, "later"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := tr.OpenNamespace("later"); err != nil {
-		t.Fatal(err)
 	}
 }
 

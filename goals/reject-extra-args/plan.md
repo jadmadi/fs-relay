@@ -1,19 +1,22 @@
 # Plan: Reject unexpected positional arguments in fs-relay
 
-Read `facts.md`.
+Read `facts.md` and `goal.md` before executing any step.
 
 ## Execution Steps
 
 - [x] **T1 - Add `checkNoArgs` and reject positional arguments in `run()`**
   - Files: `cmd/fs-relay/cli.go`, `cmd/fs-relay/main.go`.
-  - Requirements: define `checkNoArgs(args []string) error` returning `nil` when `len(args) == 0` and `fmt.Errorf("unknown argument %q", args[0])` otherwise; call `checkNoArgs(flags.Args())` in `run()` right after `*showVersion`, writing the error and `usageText(flags)` to `os.Stderr` and returning `errUsage`.
-  - Acceptance: `fs-relay help` exits `2` without creating `./data` or opening a listener.
+  - Requirements:
+    1. Define `checkNoArgs(args []string) error` in `cmd/fs-relay/cli.go` returning `nil` when `len(args) == 0` and `fmt.Errorf("unknown argument %q", args[0])` otherwise.
+    2. Call `checkNoArgs(flags.Args())` in `run()` in `cmd/fs-relay/main.go` right after `*showVersion`, writing `fmt.Fprintf(os.Stderr, "%v\n\n%s", err, usageText(flags))` and returning `errUsage`.
+  - Acceptance (`AC-002`): `fs-relay help` exits `2` with `unknown argument "help"` on stderr without creating `./data` or opening a listener.
 
 - [x] **T2 - Table-test `checkNoArgs` in `cmd/fs-relay/cli_test.go`**
   - Files: `cmd/fs-relay/cli_test.go`.
-  - Requirements: add `TestCheckNoArgs` covering empty args, `["help"]`, `["version"]`, and `["extra", "more"]`.
-  - Acceptance: `go test -race ./cmd/fs-relay` passes and `gopls check ./cmd/fs-relay/*.go` prints nothing.
+  - Requirements:
+    1. Add `TestCheckNoArgs(t *testing.T)` covering empty args, `["help"]`, `["version"]`, and `["extra", "more"]`.
+  - Acceptance (`AC-001`): `CGO_ENABLED=0 go test -race -v -run TestCheckNoArgs ./cmd/fs-relay` passes with exit `0`.
 
-- [x] **T3 - Evidence**
+- [x] **T3 - Quality gates & Evidence**
   - Files: `goals/reject-extra-args/evidence.md`.
-  - Acceptance: `gofmt -l .` empty, `go vet ./...` and `go test -race ./...` pass; `evidence.md` has `Verdict: PASS`.
+  - Acceptance (`AC-003`): `gofmt -l .` empty, `go vet ./...` and `CGO_ENABLED=0 go test -race ./...` pass; `evidence.md` has `Verdict: PASS`.
