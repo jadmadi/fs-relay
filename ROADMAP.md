@@ -1,5 +1,15 @@
 # Roadmap
 
+## Coming Next
+
+- an admin web UI
+  - showing currently connected clients
+  - show available namespaces (drop down)
+  - a file manager that lists current working directory (go up one level, or deeper one level), download or upload a file
+- `fs-relay-router` clustering mechanism (sharding, replication, ..etc)
+  - first iteration just distributes load on exact copies of same road-only files
+  - `fs-relay-router` operates just like a web reverse proxy
+
 ## Done
 
 - a web server that servers the shared directories over a custom wire protocol on top of HTTP
