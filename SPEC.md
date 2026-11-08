@@ -37,7 +37,7 @@ The server names a mount with a UUIDv7 and returns `<uuid>.<signature>`. The sig
 
 A namespace is an existing directory under the data root. The server creates the data root at startup, locks it against a second fs-relay process unless `-force-multi-serve` is passed, and never creates a namespace. A `join` for a missing namespace is HTTP 404, and the mount stops.
 
-A mount is one of two clients. Both speak the same envelope. They differ in how calls and events travel. The mount defaults to the websocket. `-post` selects the other. `-ws` is the same as the default. Passing both flags is an error.
+A mount is one of two clients. Both speak the same envelope. They differ in how calls and events travel. Before dialing, `fs-relay-bind` requires a single non-empty mountpoint argument that names an existing directory (empty unless `-force-existing-mnt` is passed). The mount defaults to the websocket. `-post` selects the other. `-ws` is the same as the default. Passing both flags is an error.
 
 **Websocket.** One `GET /ws/<namespace>` stays open. The socket is bidirectional. Every call and every event is one binary message on it. There is no second stream, and there is no `Transfer-Encoding` header. The websocket frame is the framing, so an event has no length prefix. The server's first message carries the client id and no call id.
 
