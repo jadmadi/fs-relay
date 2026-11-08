@@ -116,6 +116,10 @@ func runBindSelfUpdate(ctx context.Context, cfg bindUpdateConfig) error {
 	if err != nil {
 		return err
 	}
+	if cfg.CurrentVersion == rel.TagName {
+		fmt.Fprintf(cfg.Stdout, "fs-relay-bind %s is already up to date\n", rel.TagName)
+		return nil
+	}
 	assetName := fmt.Sprintf("fs-relay-%s-%s.tar.gz", runtime.GOOS, runtime.GOARCH)
 	assetURL, wantSum, err := resolveBindAssetChecksum(ctx, cfg, rel, assetName)
 	if err != nil {
