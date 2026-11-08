@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
 	"os"
+	"os/exec"
 	"runtime/debug"
 	"strings"
+	"syscall"
+	"time"
 )
 
 // version is set at build time with -ldflags "-X main.version=<tag>".
@@ -64,4 +69,62 @@ func usageText(fs *flag.FlagSet) string {
 	fs.PrintDefaults()
 	fs.SetOutput(os.Stderr)
 	return b.String()
+}
+
+type mountServer interface {
+	Unmount() error
+	Wait()
+}
+
+// lazyUnmount detaches a busy FUSE mountpoint so it clears when open files close.
+func lazyUnmount(mnt string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := exec.CommandContext(ctx, "fusermount3", "-uz", mnt).Run(); err == nil {
+		return nil
+	}
+	return syscall.Unmount(mnt, syscall.MNT_DETACH)
+}
+
+func busyError(mnt string, detachErr error) error {
+	if detachErr != nil {
+		return fmt.Errorf("mount %s is busy and lazy unmount failed: %w", mnt, detachErr)
+	}
+	return fmt.Errorf("mount %s is busy; close open files or run fusermount3 -uz %s", mnt, mnt)
+}
+
+// waitMount waits for a FUSE server to exit or unmounts it on SIGINT/SIGTERM.
+// When the mount is busy or a second signal arrives, it detaches lazily and
+// returns an error so the process exits non-zero instead of hanging.
+func waitMount(mnt string, srv mountServer, detach func(string) error, sigc <-chan os.Signal) error {
+	done := make(chan struct{})
+	go func() {
+		srv.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-sigc:
+	}
+	umc := make(chan error, 1)
+	go func() {
+		umc <- srv.Unmount()
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-sigc:
+		return busyError(mnt, detach(mnt))
+	case err := <-umc:
+		if err != nil {
+			return busyError(mnt, detach(mnt))
+		}
+	}
+	select {
+	case <-done:
+		return nil
+	case <-sigc:
+		return busyError(mnt, detach(mnt))
+	}
 }

@@ -15,7 +15,6 @@ import (
 	"fs-relay/internal/wire"
 
 	"github.com/hanwen/go-fuse/v2/fs"
-	"github.com/hanwen/go-fuse/v2/fuse"
 )
 
 var errUsage = errors.New("usage")
@@ -121,9 +120,10 @@ func run() error {
 		return fmt.Errorf("mount: %w", err)
 	}
 	log.Printf("fs-relay-bind: mounted on %s, namespace %s, %s, %s", flags.Arg(0), *ns, mode, base)
-	go unmountOnSignal(server)
-	server.Wait()
-	return nil
+	sigc := make(chan os.Signal, 2)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigc)
+	return waitMount(flags.Arg(0), server, lazyUnmount, sigc)
 }
 
 func attachRaw(root *node, url, ns, token string, on bool) func() {
@@ -182,11 +182,4 @@ func openSocket(url, ns, token string) (caller, <-chan wire.Change, func(), erro
 		return nil, nil, nil, err
 	}
 	return sock, sock.Events(), func() { _ = sock.Close() }, nil
-}
-
-func unmountOnSignal(server *fuse.Server) {
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
-	<-sigc
-	_ = server.Unmount()
 }
