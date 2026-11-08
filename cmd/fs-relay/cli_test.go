@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -111,5 +113,44 @@ func TestCheckNoArgs(t *testing.T) {
 				t.Fatalf("checkNoArgs(%v) = %v, want %q", tc.args, err, tc.want)
 			}
 		})
+	}
+}
+
+func TestRunRejectsPositionalArgs(t *testing.T) {
+	origArgs := os.Args
+	origStderr := os.Stderr
+	t.Cleanup(func() {
+		os.Args = origArgs
+		os.Stderr = origStderr
+	})
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = w
+
+	root := filepath.Join(t.TempDir(), "data")
+	os.Args = []string{"fs-relay", "-data", root, "unexpected-arg"}
+	runErr := run()
+	_ = w.Close()
+
+	out, err := io.ReadAll(r)
+	_ = r.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(runErr, errUsage) {
+		t.Fatalf("run() = %v, want errUsage", runErr)
+	}
+	stderr := string(out)
+	if !strings.Contains(stderr, `unknown argument "unexpected-arg"`) {
+		t.Fatalf("stderr = %q, want unknown argument message", stderr)
+	}
+	if !strings.Contains(stderr, "Usage:\n  fs-relay") {
+		t.Fatalf("stderr = %q, want usage text", stderr)
+	}
+	if _, statErr := os.Stat(root); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("data dir %s should not exist when args are rejected: %v", root, statErr)
 	}
 }

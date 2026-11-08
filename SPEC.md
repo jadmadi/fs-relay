@@ -19,7 +19,7 @@ The path segment after `/fs/` is the namespace: `[A-Za-z0-9_-]+`, non-empty, at 
 
 ## Command line
 
-`fs-relay -version` prints the binary name, the build version and the revision when known, then exits 0. `-h` prints the purpose, usage, example, version and flags to stdout, then exits 0. A flag after the mountpoint prints `flags must come before the mountpoint: <flag>` and the usage to stderr, then exits 2. `fs-relay-bind` follows the same rules.
+`fs-relay -version` prints the binary name, the build version and the revision when known, then exits 0. `-h` prints the purpose, usage, example, version and flags to stdout, then exits 0. Any unexpected positional argument to `fs-relay` prints `unknown argument "<arg>"` and the usage to stderr, then exits 2. A flag after the mountpoint prints `flags must come before the mountpoint: <flag>` and the usage to stderr, then exits 2. `fs-relay-bind` follows the same rules.
 
 ## Token
 

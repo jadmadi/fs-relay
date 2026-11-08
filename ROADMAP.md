@@ -25,7 +25,7 @@
 
 ## Done
 
-- a web server that servers the shared directories over a custom wire protocol on top of HTTP
+- a web server that servers the shared directories over a custom wire protocol on top of HTTP, and refuses unexpected positional arguments with usage and exit code 2
 - a rootless remote client that connects to the server and mounts a share into a directory using Linux Fuse v3
 - token based security
 - Linux Kernel specific optimizations: zero-copy routines reducing context switching, memory allocation and fragmentation, ..etc.
