@@ -106,7 +106,11 @@ refuses a non-empty directory unless `-force-existing-mnt` is passed.
 
 Add `-post` to send each operation as its own request. `-raw=false` sends large reads and writes on the main connection. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
 
-Open the server URL in a browser for a welcome page. `curl` against the same URL returns a short status. Unmount with `fusermount3 -u /mnt/fs-relay`.
+Open the server URL in a browser for a welcome page. `curl` against the same
+URL returns a short status. Unmount with `fusermount3 -u /mnt/fs-relay`.
+Interrupting `fs-relay-bind` unmounts cleanly. If files remain open, it
+detaches lazily with `fusermount3 -uz` and exits with an error so the terminal
+does not hang.
 
 On a new mount, confirm `mount` shows the intended directory and not an empty path. Create a directory, write and read a small file, make a symlink, rename, and delete. Mount the same name a second time, write on one, and read on the other. Copy a file from one path on the mount to another. Append with `>>`. Write about 10 MiB with `dd bs=10k` and read it back. Repeat that write with `-raw=false` and compare the bytes.
 
