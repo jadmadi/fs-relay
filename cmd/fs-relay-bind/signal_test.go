@@ -115,4 +115,24 @@ func TestWaitMount(t *testing.T) {
 			t.Fatalf("waitMount detach failure error = %v, want operation not permitted", err)
 		}
 	})
+
+	t.Run("signal-racing-completed-mount", func(t *testing.T) {
+		waitCh := make(chan struct{})
+		srv := &fakeMount{
+			waitCh: waitCh,
+			unmountFn: func() error {
+				close(waitCh)
+				return syscall.EINVAL
+			},
+		}
+		sigc := make(chan os.Signal, 2)
+		sigc <- syscall.SIGINT
+		var detached bool
+		if err := waitMount("/tmp/mnt", srv, func(string) error { detached = true; return nil }, sigc); err != nil {
+			t.Fatalf("waitMount = %v, want nil when mount already completed", err)
+		}
+		if detached {
+			t.Fatal("completed mount should not lazy-detach")
+		}
+	})
 }

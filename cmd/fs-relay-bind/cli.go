@@ -93,6 +93,15 @@ func busyError(mnt string, detachErr error) error {
 	return fmt.Errorf("mount %s is busy; close open files or run fusermount3 -uz %s", mnt, mnt)
 }
 
+func isDone(done <-chan struct{}) bool {
+	select {
+	case <-done:
+		return true
+	case <-time.After(5 * time.Millisecond):
+		return false
+	}
+}
+
 // waitMount waits for a FUSE server to exit or unmounts it on SIGINT/SIGTERM.
 // When the mount is busy or a second signal arrives, it detaches lazily and
 // returns an error so the process exits non-zero instead of hanging.
@@ -106,6 +115,9 @@ func waitMount(mnt string, srv mountServer, detach func(string) error, sigc <-ch
 	case <-done:
 		return nil
 	case <-sigc:
+		if isDone(done) {
+			return nil
+		}
 	}
 	umc := make(chan error, 1)
 	go func() {
@@ -115,9 +127,15 @@ func waitMount(mnt string, srv mountServer, detach func(string) error, sigc <-ch
 	case <-done:
 		return nil
 	case <-sigc:
+		if isDone(done) {
+			return nil
+		}
 		return busyError(mnt, detach(mnt))
 	case err := <-umc:
 		if err != nil {
+			if isDone(done) {
+				return nil
+			}
 			return busyError(mnt, detach(mnt))
 		}
 	}
@@ -125,6 +143,9 @@ func waitMount(mnt string, srv mountServer, detach func(string) error, sigc <-ch
 	case <-done:
 		return nil
 	case <-sigc:
+		if isDone(done) {
+			return nil
+		}
 		return busyError(mnt, detach(mnt))
 	}
 }
