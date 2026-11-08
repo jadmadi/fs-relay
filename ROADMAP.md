@@ -2,6 +2,15 @@
 
 ## Coming Next
 
+- an HTTP interface so that we can run [duckdb httpfs core extension](https://duckdb.org/docs/2.0/core_extensions/httpfs/https) `SELECT max(column_a) FROM 'https://domain.tld/file.parquet';`
+  - support range queries
+  - use bearer token
+  - benchmark against
+    - `python -m http.server`
+    - `python -m aiohttp.web -H localhost -P 8000 aiohttp.web:static_handler`
+    - apache http server (docker or podman `docker run -d --name my-apache-app -p 8080:80 -v "$PWD":/usr/local/apache2/htdocs/ httpd:2.4`)
+    - nginx server (docker or podman `docker run -d --name my-nginx-app -p 8080:80 -v "$PWD":/usr/share/nginx/html:ro nginx:alpine`)
+    - lighttpd server (docker or podman `docker run -d --name my-lighttpd-app -p 8080:80 -v "$PWD":/var/www/localhost/htdocs/:ro sebp/lighttpd`)
 - an admin web UI
   - showing currently connected clients
   - show available namespaces (drop down)
