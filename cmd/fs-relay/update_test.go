@@ -193,4 +193,21 @@ func TestSelfUpdateAtomicSwapAndChecksum(t *testing.T) {
 	if err := runSelfUpdate(context.Background(), devCfg); err != nil {
 		t.Fatalf("runSelfUpdate for untagged build: %v", err)
 	}
+
+	_ = os.WriteFile(relayBin, []byte("rollback-original-relay"), 0o700)
+	roDir := t.TempDir()
+	roBind := filepath.Join(roDir, "fs-relay-bind")
+	_ = os.WriteFile(roBind, []byte("old-bind"), 0o700)
+	_ = os.Chmod(roDir, 0o500)
+	t.Cleanup(func() { _ = os.Chmod(roDir, 0o700) })
+	err := applyBinaryUpdates(relayBin, roBind, map[string][]byte{
+		"fs-relay":      []byte("partially-updated-relay"),
+		"fs-relay-bind": []byte("new-bind"),
+	})
+	if err == nil {
+		t.Fatal("expected companion update in read-only directory to fail")
+	}
+	if got, _ := os.ReadFile(relayBin); string(got) != "rollback-original-relay" {
+		t.Fatalf("primary binary was not rolled back after companion failure: got %q", got)
+	}
 }

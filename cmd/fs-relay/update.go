@@ -463,7 +463,7 @@ func runSelfUpdate(ctx context.Context, cfg updateConfig) error {
 	if err != nil {
 		return err
 	}
-	if err := applyBinaryUpdates(cfg.ExePath, bins); err != nil {
+	if err := applyBinaryUpdates(cfg.ExePath, companionPath(cfg.ExePath), bins); err != nil {
 		return err
 	}
 	fmt.Fprintf(cfg.Stdout, "Updated fs-relay %s -> %s\n  Why upgrade: %s\n  Contributors: %s\n",
@@ -607,7 +607,7 @@ func companionNeedsUpdate(ctx context.Context, exePath, latestTag string) bool {
 	return compareSemver(fields[1], latestTag) < 0
 }
 
-func applyBinaryUpdates(exePath string, bins map[string][]byte) error {
+func applyBinaryUpdates(exePath, sibling string, bins map[string][]byte) error {
 	targetName := filepath.Base(exePath)
 	primary := bins[targetName]
 	if len(primary) == 0 {
@@ -617,16 +617,17 @@ func applyBinaryUpdates(exePath string, bins map[string][]byte) error {
 	if err != nil {
 		return err
 	}
-	sibling := companionPath(exePath)
-	sibBytes := bins[filepath.Base(sibling)]
-	if len(sibBytes) > 0 {
-		if info, err := os.Lstat(sibling); err == nil && info.Mode().IsRegular() {
-			cleanupSib, _, sibErr := stageAndSwapBinary(sibling, sibBytes)
-			if sibErr != nil {
-				rollbackPrimary()
-				return sibErr
+	if sibling != "" {
+		sibBytes := bins[filepath.Base(sibling)]
+		if len(sibBytes) > 0 {
+			if info, err := os.Lstat(sibling); err == nil && info.Mode().IsRegular() {
+				cleanupSib, _, sibErr := stageAndSwapBinary(sibling, sibBytes)
+				if sibErr != nil {
+					rollbackPrimary()
+					return sibErr
+				}
+				cleanupSib()
 			}
-			cleanupSib()
 		}
 	}
 	cleanupPrimary()
