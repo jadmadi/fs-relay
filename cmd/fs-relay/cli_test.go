@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -84,5 +86,71 @@ func TestForceMultiServeFlag(t *testing.T) {
 	}
 	if err := <-errc; err != nil {
 		t.Fatalf("run with -force-multi-serve: %v", err)
+	}
+}
+
+func TestCheckNoArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "empty", args: nil, want: ""},
+		{name: "help-word", args: []string{"help"}, want: `unknown argument "help"`},
+		{name: "version-word", args: []string{"version"}, want: `unknown argument "version"`},
+		{name: "multiple", args: []string{"extra", "more"}, want: `unknown argument "extra"`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkNoArgs(tc.args)
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("checkNoArgs(%v) = %v, want nil", tc.args, err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tc.want {
+				t.Fatalf("checkNoArgs(%v) = %v, want %q", tc.args, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestRunRejectsPositionalArgs(t *testing.T) {
+	origArgs := os.Args
+	origStderr := os.Stderr
+	t.Cleanup(func() {
+		os.Args = origArgs
+		os.Stderr = origStderr
+	})
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = w
+
+	root := filepath.Join(t.TempDir(), "data")
+	os.Args = []string{"fs-relay", "-data", root, "unexpected-arg"}
+	runErr := run()
+	_ = w.Close()
+
+	out, err := io.ReadAll(r)
+	_ = r.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(runErr, errUsage) {
+		t.Fatalf("run() = %v, want errUsage", runErr)
+	}
+	stderr := string(out)
+	if !strings.Contains(stderr, `unknown argument "unexpected-arg"`) {
+		t.Fatalf("stderr = %q, want unknown argument message", stderr)
+	}
+	if !strings.Contains(stderr, "Usage:\n  fs-relay") {
+		t.Fatalf("stderr = %q, want usage text", stderr)
+	}
+	if _, statErr := os.Stat(root); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("data dir %s should not exist when args are rejected: %v", root, statErr)
 	}
 }

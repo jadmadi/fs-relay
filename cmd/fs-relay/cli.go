@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -39,6 +40,14 @@ func buildVersion() string {
 
 func versionLine(name string) string {
 	return name + " " + buildVersion()
+}
+
+// checkNoArgs rejects unexpected positional arguments passed to fs-relay.
+func checkNoArgs(args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	return fmt.Errorf("unknown argument %q", args[0])
 }
 
 func usageText(fs *flag.FlagSet) string {
