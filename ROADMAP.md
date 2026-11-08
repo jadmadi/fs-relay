@@ -2,10 +2,23 @@
 
 ## Coming Next
 
+- an HTTP interface so that we can run [duckdb httpfs core extension](https://duckdb.org/docs/2.0/core_extensions/httpfs/https) `SELECT max(column_a) FROM 'https://domain.tld/file.parquet';`
+  - support range queries
+  - use bearer token
+  - benchmark against
+    - `python -m http.server`
+    - `python -m aiohttp.web -H localhost -P 8000 aiohttp.web:static_handler`
+    - apache http server (docker or podman `docker run -d --name my-apache-app -p 8080:80 -v "$PWD":/usr/local/apache2/htdocs/ httpd:2.4`)
+    - nginx server (docker or podman `docker run -d --name my-nginx-app -p 8080:80 -v "$PWD":/usr/share/nginx/html:ro nginx:alpine`)
+    - lighttpd server (docker or podman `docker run -d --name my-lighttpd-app -p 8080:80 -v "$PWD":/var/www/localhost/htdocs/:ro sebp/lighttpd`)
 - an admin web UI
   - showing currently connected clients
   - show available namespaces (drop down)
   - a file manager that lists current working directory (go up one level, or deeper one level), download or upload a file
+- mDNS / Apple Bonjour / Avahi
+  - objective service discovery for HomeLabs as simple as `http://fs-relay-lab1.local/`
+  - can be achieved using `avahi-*` linux commands
+- integrate with systemd using `~/.config/systemd/user/fs-relay@.service`
 - `fs-relay-router` clustering mechanism (sharding, replication, ..etc)
   - first iteration just distributes load on exact copies of same road-only files
   - `fs-relay-router` operates just like a web reverse proxy
