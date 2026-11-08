@@ -84,15 +84,14 @@ func runBindUpdate() error {
 	if resolved, err := filepath.EvalSymlinks(self); err == nil {
 		self = resolved
 	}
-	sibling := filepath.Join(filepath.Dir(self), "fs-relay")
-	if info, err := os.Lstat(sibling); err == nil && info.Mode().IsRegular() {
-		cmd := exec.Command(sibling, "update")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if sibling := usableSiblingServer(ctx, self); sibling != "" {
+		cmd := exec.CommandContext(ctx, sibling, "update")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
 	return runBindSelfUpdate(ctx, bindUpdateConfig{
 		CurrentVersion: version,
 		APIBase:        bindDefaultGitHubAPI,
@@ -100,6 +99,24 @@ func runBindUpdate() error {
 		Stdout:         os.Stdout,
 		Client:         &http.Client{Timeout: 60 * time.Second},
 	})
+}
+
+func usableSiblingServer(ctx context.Context, self string) string {
+	sibling := filepath.Join(filepath.Dir(self), "fs-relay")
+	if resolved, err := filepath.EvalSymlinks(sibling); err == nil {
+		sibling = resolved
+	}
+	info, err := os.Stat(sibling)
+	if err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	hctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	out, _ := exec.CommandContext(hctx, sibling, "-h").CombinedOutput()
+	if !strings.Contains(string(out), "update") {
+		return ""
+	}
+	return sibling
 }
 
 func runBindSelfUpdate(ctx context.Context, cfg bindUpdateConfig) error {
@@ -258,8 +275,11 @@ func extractBindBinary(tarGz []byte) ([]byte, error) {
 		if filepath.Base(hdr.Name) != "fs-relay-bind" {
 			continue
 		}
-		b, err := io.ReadAll(io.LimitReader(tr, bindUpdateMaxBytes))
-		if err != nil {
+		if (hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA) || hdr.Size <= 0 || hdr.Size > bindUpdateMaxBytes {
+			return nil, errors.New("update archive: invalid fs-relay-bind entry")
+		}
+		b := make([]byte, hdr.Size)
+		if _, err := io.ReadFull(tr, b); err != nil {
 			return nil, fmt.Errorf("update archive fs-relay-bind: %w", err)
 		}
 		return b, nil

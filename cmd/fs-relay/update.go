@@ -569,8 +569,11 @@ func extractTarGzBinaries(tarGz []byte) (map[string][]byte, error) {
 		if base != "fs-relay" && base != "fs-relay-bind" {
 			continue
 		}
-		b, err := io.ReadAll(io.LimitReader(tr, maxReleaseAssetBytes))
-		if err != nil {
+		if (hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA) || hdr.Size <= 0 || hdr.Size > maxReleaseAssetBytes {
+			return nil, fmt.Errorf("update archive: invalid %s entry", base)
+		}
+		b := make([]byte, hdr.Size)
+		if _, err := io.ReadFull(tr, b); err != nil {
 			return nil, fmt.Errorf("update archive %s: %w", base, err)
 		}
 		bins[base] = b
@@ -607,34 +610,82 @@ func companionNeedsUpdate(ctx context.Context, exePath, latestTag string) bool {
 	return compareSemver(fields[1], latestTag) < 0
 }
 
+type stagedBinary struct {
+	target string
+	tmp    string
+	old    string
+}
+
+func (s stagedBinary) abort() {
+	_ = os.Remove(s.tmp)
+	_ = os.Remove(s.old)
+}
+
+func (s stagedBinary) cleanup() {
+	_ = os.Remove(s.old)
+}
+
+func (s stagedBinary) rollback() {
+	_ = os.Rename(s.old, s.target)
+	_ = os.Remove(s.old)
+}
+
+func (s stagedBinary) commit() error {
+	if err := os.Rename(s.target, s.old); err != nil {
+		s.abort()
+		return fmt.Errorf("update backup %s: %w", s.target, err)
+	}
+	if err := os.Rename(s.tmp, s.target); err != nil {
+		_ = os.Rename(s.old, s.target)
+		s.abort()
+		return fmt.Errorf("update replace %s: %w", s.target, err)
+	}
+	return nil
+}
+
 func applyBinaryUpdates(exePath, sibling string, bins map[string][]byte) error {
 	targetName := filepath.Base(exePath)
 	primary := bins[targetName]
 	if len(primary) == 0 {
 		primary = bins["fs-relay"]
 	}
-	cleanupPrimary, rollbackPrimary, err := stageAndSwapBinary(exePath, primary)
+	primaryStaged, err := stageBinary(exePath, primary)
 	if err != nil {
 		return err
 	}
+	var sibStaged stagedBinary
+	hasSib := false
 	if sibling != "" {
 		sibBytes := bins[filepath.Base(sibling)]
 		if len(sibBytes) > 0 {
 			if info, err := os.Lstat(sibling); err == nil && info.Mode().IsRegular() {
-				cleanupSib, _, sibErr := stageAndSwapBinary(sibling, sibBytes)
-				if sibErr != nil {
-					rollbackPrimary()
-					return sibErr
+				sibStaged, err = stageBinary(sibling, sibBytes)
+				if err != nil {
+					primaryStaged.abort()
+					return err
 				}
-				cleanupSib()
+				hasSib = true
 			}
 		}
 	}
-	cleanupPrimary()
+	if err := primaryStaged.commit(); err != nil {
+		if hasSib {
+			sibStaged.abort()
+		}
+		return err
+	}
+	if hasSib {
+		if err := sibStaged.commit(); err != nil {
+			primaryStaged.rollback()
+			return err
+		}
+		sibStaged.cleanup()
+	}
+	primaryStaged.cleanup()
 	return nil
 }
 
-func stageAndSwapBinary(target string, content []byte) (func(), func(), error) {
+func stageBinary(target string, content []byte) (stagedBinary, error) {
 	mode := os.FileMode(0o755)
 	if info, err := os.Lstat(target); err == nil && info.Mode().IsRegular() {
 		mode = info.Mode().Perm()
@@ -643,45 +694,29 @@ func stageAndSwapBinary(target string, content []byte) (func(), func(), error) {
 	base := "." + filepath.Base(target)
 	newFile, err := os.CreateTemp(dir, base+".new-*")
 	if err != nil {
-		return nil, nil, fmt.Errorf("update write %s: %w", target, err)
+		return stagedBinary{}, fmt.Errorf("update write %s: %w", target, err)
 	}
 	tmp := newFile.Name()
 	if _, err := newFile.Write(content); err != nil {
 		_ = newFile.Close()
 		_ = os.Remove(tmp)
-		return nil, nil, fmt.Errorf("update write %s: %w", target, err)
+		return stagedBinary{}, fmt.Errorf("update write %s: %w", target, err)
 	}
 	if err := newFile.Chmod(mode); err != nil {
 		_ = newFile.Close()
 		_ = os.Remove(tmp)
-		return nil, nil, fmt.Errorf("update chmod %s: %w", target, err)
+		return stagedBinary{}, fmt.Errorf("update chmod %s: %w", target, err)
 	}
 	if err := newFile.Close(); err != nil {
 		_ = os.Remove(tmp)
-		return nil, nil, fmt.Errorf("update close %s: %w", target, err)
+		return stagedBinary{}, fmt.Errorf("update close %s: %w", target, err)
 	}
 	oldFile, err := os.CreateTemp(dir, base+".old-*")
 	if err != nil {
 		_ = os.Remove(tmp)
-		return nil, nil, fmt.Errorf("update backup %s: %w", target, err)
+		return stagedBinary{}, fmt.Errorf("update backup %s: %w", target, err)
 	}
 	old := oldFile.Name()
 	_ = oldFile.Close()
-	if err := os.Rename(target, old); err != nil {
-		_ = os.Remove(tmp)
-		_ = os.Remove(old)
-		return nil, nil, fmt.Errorf("update backup %s: %w", target, err)
-	}
-	if err := os.Rename(tmp, target); err != nil {
-		_ = os.Rename(old, target)
-		_ = os.Remove(tmp)
-		_ = os.Remove(old)
-		return nil, nil, fmt.Errorf("update replace %s: %w", target, err)
-	}
-	cleanup := func() { _ = os.Remove(old) }
-	rollback := func() {
-		_ = os.Rename(old, target)
-		_ = os.Remove(old)
-	}
-	return cleanup, rollback, nil
+	return stagedBinary{target: target, tmp: tmp, old: old}, nil
 }

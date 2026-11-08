@@ -212,7 +212,28 @@ func TestSelfUpdateAtomicSwapAndChecksum(t *testing.T) {
 			t.Fatal("expected companion update in read-only directory to fail")
 		}
 		if got, _ := os.ReadFile(relayBin); string(got) != "rollback-original-relay" {
-			t.Fatalf("primary binary was not rolled back after companion failure: got %q", got)
+			t.Fatalf("primary binary was not rolled back after companion staging failure: got %q", got)
+		}
+
+		_ = os.Chmod(roDir, 0o700)
+		pStaged, err := stageBinary(relayBin, []byte("partially-updated-relay"))
+		if err != nil {
+			t.Fatalf("stageBinary primary: %v", err)
+		}
+		sStaged, err := stageBinary(roBind, []byte("new-bind"))
+		if err != nil {
+			t.Fatalf("stageBinary companion: %v", err)
+		}
+		if err := pStaged.commit(); err != nil {
+			t.Fatalf("commit primary: %v", err)
+		}
+		_ = os.Remove(roBind)
+		if err := sStaged.commit(); err == nil {
+			t.Fatal("expected companion commit to fail after target removal")
+		}
+		pStaged.rollback()
+		if got, _ := os.ReadFile(relayBin); string(got) != "rollback-original-relay" {
+			t.Fatalf("primary binary was not rolled back after companion commit failure: got %q", got)
 		}
 	})
 }
