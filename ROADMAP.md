@@ -15,6 +15,10 @@
   - showing currently connected clients
   - show available namespaces (drop down)
   - a file manager that lists current working directory (go up one level, or deeper one level), download or upload a file
+- mDNS / Apple Bonjour / Avahi
+  - objective service discovery for HomeLabs as simple as `http://fs-relay-lab1.local/`
+  - can be achieved using `avahi-*` linux commands
+- integrate with systemd using `~/.config/systemd/user/fs-relay@.service`
 - `fs-relay-router` clustering mechanism (sharding, replication, ..etc)
   - first iteration just distributes load on exact copies of same road-only files
   - `fs-relay-router` operates just like a web reverse proxy
