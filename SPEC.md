@@ -247,8 +247,8 @@ This is what SQLite's rollback journal needs (SHARED, RESERVED and EXCLUSIVE byt
 
 ## Packages
 
-- `cmd/fs-relay`: flags, HTTP decode and encode, the raw connection, calls `internal/local`.
-- `cmd/fs-relay-bind`: flags, FUSE nodes and the errno mapping, calls `internal/client`.
+- `cmd/fs-relay`: flags, `update`/`version`/`help` subcommands, 12-hour cached release check (`FS_RELAY_NO_UPDATE_CHECK` skips it), HTTP decode and encode, the raw connection, calls `internal/local`.
+- `cmd/fs-relay-bind`: flags, `update`/`version`/`help` subcommands, FUSE nodes and the errno mapping, calls `internal/client`.
 - `internal/wire`: FlatBuffers types, the schema, the generated file, and the raw header codec. No HTTP, no FUSE, no `os`.
 - `internal/local`: the directory, the inode map, handles, locks, and the pipe used by splice. Owns every `os` call and the error sentinels.
 - `internal/client`: the POST, the websocket, the `join` stream, and the raw connection.

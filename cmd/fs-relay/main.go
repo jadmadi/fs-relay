@@ -23,12 +23,15 @@ var errUsage = errors.New("usage")
 func main() {
 	if done, err := dispatchCLI(os.Args[1:]); done {
 		if err != nil {
+			if errors.Is(err, errUsage) {
+				os.Exit(2)
+			}
 			fmt.Fprintf(os.Stderr, "fs-relay: %v\n", err)
 			os.Exit(1)
 		}
 		return
 	}
-	go runCachedCheck()
+	checkDone := startBackgroundCheck(os.Args[1:])
 	if err := run(); err != nil {
 		if errors.Is(err, errUsage) {
 			os.Exit(2)
@@ -36,6 +39,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "fs-relay: %v\n", err)
 		os.Exit(1)
 	}
+	<-checkDone
 }
 
 // run parses command-line flags, prepares the data directory, and serves HTTP.

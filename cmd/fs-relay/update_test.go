@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,6 +23,7 @@ import (
 // TestUpdateCheckCacheTTLAndFormat verifies natural-language subcommands,
 // the 12-hour update check cache TTL, value summary formatting, and handle credit.
 func TestUpdateCheckCacheTTLAndFormat(t *testing.T) {
+	t.Setenv("FS_RELAY_NO_UPDATE_CHECK", "")
 	for _, word := range []string{"update", "version", "help"} {
 		if got, err := subcommand([]string{word}); err != nil || got != word {
 			t.Fatalf("subcommand(%q) = (%q, %v)", word, got, err)
@@ -29,6 +31,9 @@ func TestUpdateCheckCacheTTLAndFormat(t *testing.T) {
 	}
 	if _, err := subcommand([]string{"update", "extra"}); err == nil {
 		t.Fatal("expected error for extra argument after subcommand")
+	}
+	if done, err := dispatchCLI([]string{"update", "extra"}); !done || !errors.Is(err, errUsage) {
+		t.Fatalf("dispatchCLI(update extra) = (%v, %v), want (true, errUsage)", done, err)
 	}
 	if updateCheckTTL != 12*time.Hour || compareSemver("v0.1.2", "v0.2.0") >= 0 {
 		t.Fatal("unexpected TTL or semver ordering")
@@ -145,8 +150,8 @@ func TestSelfUpdateAtomicSwapAndChecksum(t *testing.T) {
 	dir := t.TempDir()
 	relayBin := filepath.Join(dir, "fs-relay")
 	bindBin := filepath.Join(dir, "fs-relay-bind")
-	_ = os.WriteFile(relayBin, []byte("old-relay"), 0o755)
-	_ = os.WriteFile(bindBin, []byte("old-bind"), 0o755)
+	_ = os.WriteFile(relayBin, []byte("old-relay"), 0o700)
+	_ = os.WriteFile(bindBin, []byte("old-bind"), 0o700)
 
 	badSrv := newMockReleaseServer(t, tarName, tarBytes, "sha256:"+strings.Repeat("0", 64), "")
 	badCfg := updateConfig{CurrentVersion: "v0.1.2", APIBase: badSrv.URL, ExePath: relayBin, Client: badSrv.Client()}
@@ -168,8 +173,20 @@ func TestSelfUpdateAtomicSwapAndChecksum(t *testing.T) {
 	if string(gotRelay) != "new-fs-relay-binary" || string(gotBind) != "new-fs-relay-bind-binary" {
 		t.Fatalf("binaries = (%q, %q)", gotRelay, gotBind)
 	}
+	if fi, err := os.Stat(relayBin); err != nil || fi.Mode().Perm() != 0o700 {
+		t.Fatalf("expected 0700 mode preserved on relayBin, got %v (%v)", fi.Mode().Perm(), err)
+	}
 	if !strings.Contains(out.String(), "Updated fs-relay v0.1.2 -> v0.2.0") {
 		t.Fatalf("missing upgrade confirmation in %q", out.String())
+	}
+
+	_ = os.WriteFile(bindBin, []byte("stale-bind"), 0o700)
+	compCfg := updateConfig{CurrentVersion: "v0.2.0", APIBase: okSrv.URL, ExePath: relayBin, Client: okSrv.Client(), Stdout: &out}
+	if err := runSelfUpdate(context.Background(), compCfg); err != nil {
+		t.Fatalf("runSelfUpdate for stale companion: %v", err)
+	}
+	if got, _ := os.ReadFile(bindBin); string(got) != "new-fs-relay-bind-binary" {
+		t.Fatalf("stale companion was not upgraded: %q", got)
 	}
 
 	devCfg := updateConfig{CurrentVersion: "1af47ad", APIBase: okSrv.URL, ExePath: relayBin, Client: okSrv.Client(), Stdout: &out}

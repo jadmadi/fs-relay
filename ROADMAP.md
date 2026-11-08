@@ -30,6 +30,7 @@
 - token based security
 - Linux Kernel specific optimizations: zero-copy routines reducing context switching, memory allocation and fragmentation, ..etc.
 - specialized end point for large files
+- Self-update and release checks: `fs-relay` and `fs-relay-bind` accept `update`, `version`, and `help` subcommands (plus `-update`), verify release tarballs with SHA-256 digests (`checksums.txt`), preserve installed binary permissions, and cache release checks for 12 hours (`FS_RELAY_NO_UPDATE_CHECK` skips the check).
 - get sqlite working; `fs-relay-bind` drains write-behind before unlocking and drops cached attributes and small-file bytes on lock grant.
 - Benchmark serving millions of rows to DuckDB.
 - CLI ergonomics: `-version` prints the build, `-h` prints purpose-driven help, and flags after the mountpoint get a hint.

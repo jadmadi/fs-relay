@@ -9,10 +9,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -45,11 +47,21 @@ func subcommand(args []string) (string, error) {
 }
 
 func dispatchCLI(args []string) (bool, error) {
-	if len(args) == 1 && (args[0] == "-update" || args[0] == "--update") {
-		args = []string{"update"}
+	if len(args) == 1 {
+		switch args[0] {
+		case "-update", "--update":
+			args = []string{"update"}
+		case "-version", "--version":
+			args = []string{"version"}
+		}
 	}
 	sub, err := subcommand(args)
-	if err != nil || sub == "" {
+	if err != nil {
+		fs := flag.NewFlagSet("fs-relay", flag.ContinueOnError)
+		fmt.Fprintf(os.Stderr, "%v\n\n%s", err, usageText(fs))
+		return true, errUsage
+	}
+	if sub == "" {
 		return false, nil
 	}
 	if sub == "help" {
@@ -64,6 +76,21 @@ func dispatchCLI(args []string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	return true, runSelfUpdate(ctx, defaultUpdateConfig())
+}
+
+func startBackgroundCheck(args []string) <-chan struct{} {
+	done := make(chan struct{})
+	for _, a := range args {
+		if a == "-h" || a == "-help" || a == "--help" {
+			close(done)
+			return done
+		}
+	}
+	go func() {
+		defer close(done)
+		runCachedCheck()
+	}()
+	return done
 }
 
 func runCachedCheck() {
@@ -116,19 +143,19 @@ type githubAsset struct {
 
 // defaultUpdateConfig builds the runtime configuration for version checks and self-update.
 func defaultUpdateConfig() updateConfig {
-	cacheRoot, err := os.UserCacheDir()
-	if err != nil || cacheRoot == "" {
-		cacheRoot = os.TempDir()
+	var cacheFile string
+	if cacheRoot, err := os.UserCacheDir(); err == nil && cacheRoot != "" {
+		cacheFile = filepath.Join(cacheRoot, "fs-relay", "update_check.json")
 	}
 	exe, _ := os.Executable()
 	return updateConfig{
 		CurrentVersion: buildVersion(),
 		APIBase:        defaultGitHubAPIBase,
-		CacheFile:      filepath.Join(cacheRoot, "fs-relay", "update_check.json"),
+		CacheFile:      cacheFile,
 		ExePath:        exe,
 		GOOS:           runtime.GOOS,
 		GOARCH:         runtime.GOARCH,
-		Client:         &http.Client{Timeout: 15 * time.Second},
+		Client:         &http.Client{Timeout: 60 * time.Second},
 		Stderr:         os.Stderr,
 		Stdout:         os.Stdout,
 	}
@@ -145,7 +172,7 @@ func (c updateConfig) withDefaults() updateConfig {
 		c.GOARCH = runtime.GOARCH
 	}
 	if c.Client == nil {
-		c.Client = &http.Client{Timeout: 15 * time.Second}
+		c.Client = &http.Client{Timeout: 60 * time.Second}
 	}
 	if c.Stderr == nil {
 		c.Stderr = io.Discard
@@ -342,18 +369,42 @@ func writeUpdateCache(path string, c updateCache) error {
 	if path == "" {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
+	}
+	fi, err := os.Lstat(dir)
+	if err != nil || !fi.IsDir() || fi.Mode().Perm()&0o077 != 0 {
+		return fmt.Errorf("unsafe cache directory %s", dir)
 	}
 	b, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
 	}
-	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+	f, err := os.CreateTemp(dir, ".update-check-*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	tmp := f.Name()
+	if _, err := f.Write(b); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 func fetchLatestRelease(ctx context.Context, cfg updateConfig) (githubRelease, error) {
@@ -395,7 +446,7 @@ func runSelfUpdate(ctx context.Context, cfg updateConfig) error {
 	}
 	entry := cacheFromRelease(rel)
 	_ = writeUpdateCache(cfg.CacheFile, entry)
-	if !isDevVersion(cfg.CurrentVersion) && compareSemver(cfg.CurrentVersion, rel.TagName) >= 0 {
+	if !isDevVersion(cfg.CurrentVersion) && compareSemver(cfg.CurrentVersion, rel.TagName) >= 0 && !companionNeedsUpdate(ctx, cfg.ExePath, rel.TagName) {
 		fmt.Fprintf(cfg.Stdout, "fs-relay %s is already up to date (%s)\n", cfg.CurrentVersion, rel.TagName)
 		return nil
 	}
@@ -530,44 +581,106 @@ func extractTarGzBinaries(tarGz []byte) (map[string][]byte, error) {
 	return bins, nil
 }
 
+func companionPath(exePath string) string {
+	if filepath.Base(exePath) == "fs-relay-bind" {
+		return filepath.Join(filepath.Dir(exePath), "fs-relay")
+	}
+	return filepath.Join(filepath.Dir(exePath), "fs-relay-bind")
+}
+
+func companionNeedsUpdate(ctx context.Context, exePath, latestTag string) bool {
+	sib := companionPath(exePath)
+	info, err := os.Lstat(sib)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	cctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(cctx, sib, "-version").Output()
+	if err != nil {
+		return true
+	}
+	fields := strings.Fields(string(out))
+	if len(fields) < 2 || isDevVersion(fields[1]) {
+		return true
+	}
+	return compareSemver(fields[1], latestTag) < 0
+}
+
 func applyBinaryUpdates(exePath string, bins map[string][]byte) error {
 	targetName := filepath.Base(exePath)
 	primary := bins[targetName]
 	if len(primary) == 0 {
 		primary = bins["fs-relay"]
 	}
-	if err := atomicReplaceBinary(exePath, primary); err != nil {
+	cleanupPrimary, rollbackPrimary, err := stageAndSwapBinary(exePath, primary)
+	if err != nil {
 		return err
 	}
-	sibling := filepath.Join(filepath.Dir(exePath), "fs-relay-bind")
-	if targetName == "fs-relay-bind" {
-		sibling = filepath.Join(filepath.Dir(exePath), "fs-relay")
-	}
+	sibling := companionPath(exePath)
 	sibBytes := bins[filepath.Base(sibling)]
 	if len(sibBytes) > 0 {
-		if info, err := os.Stat(sibling); err == nil && info.Mode().IsRegular() {
-			_ = atomicReplaceBinary(sibling, sibBytes)
+		if info, err := os.Lstat(sibling); err == nil && info.Mode().IsRegular() {
+			cleanupSib, _, sibErr := stageAndSwapBinary(sibling, sibBytes)
+			if sibErr != nil {
+				rollbackPrimary()
+				return sibErr
+			}
+			cleanupSib()
 		}
 	}
+	cleanupPrimary()
 	return nil
 }
 
-func atomicReplaceBinary(target string, content []byte) error {
-	tmp := fmt.Sprintf("%s.new.%d", target, os.Getpid())
-	old := target + ".old"
-	if err := os.WriteFile(tmp, content, 0o755); err != nil {
-		return fmt.Errorf("update write %s: %w", target, err)
+func stageAndSwapBinary(target string, content []byte) (func(), func(), error) {
+	mode := os.FileMode(0o755)
+	if info, err := os.Lstat(target); err == nil && info.Mode().IsRegular() {
+		mode = info.Mode().Perm()
 	}
-	_ = os.Remove(old)
+	dir := filepath.Dir(target)
+	base := "." + filepath.Base(target)
+	newFile, err := os.CreateTemp(dir, base+".new-*")
+	if err != nil {
+		return nil, nil, fmt.Errorf("update write %s: %w", target, err)
+	}
+	tmp := newFile.Name()
+	if _, err := newFile.Write(content); err != nil {
+		_ = newFile.Close()
+		_ = os.Remove(tmp)
+		return nil, nil, fmt.Errorf("update write %s: %w", target, err)
+	}
+	if err := newFile.Chmod(mode); err != nil {
+		_ = newFile.Close()
+		_ = os.Remove(tmp)
+		return nil, nil, fmt.Errorf("update chmod %s: %w", target, err)
+	}
+	if err := newFile.Close(); err != nil {
+		_ = os.Remove(tmp)
+		return nil, nil, fmt.Errorf("update close %s: %w", target, err)
+	}
+	oldFile, err := os.CreateTemp(dir, base+".old-*")
+	if err != nil {
+		_ = os.Remove(tmp)
+		return nil, nil, fmt.Errorf("update backup %s: %w", target, err)
+	}
+	old := oldFile.Name()
+	_ = oldFile.Close()
 	if err := os.Rename(target, old); err != nil {
 		_ = os.Remove(tmp)
-		return fmt.Errorf("update backup %s: %w", target, err)
+		_ = os.Remove(old)
+		return nil, nil, fmt.Errorf("update backup %s: %w", target, err)
 	}
 	if err := os.Rename(tmp, target); err != nil {
 		_ = os.Rename(old, target)
 		_ = os.Remove(tmp)
-		return fmt.Errorf("update replace %s: %w", target, err)
+		_ = os.Remove(old)
+		return nil, nil, fmt.Errorf("update replace %s: %w", target, err)
 	}
-	_ = os.Remove(old)
-	return nil
+	cleanup := func() { _ = os.Remove(old) }
+	rollback := func() {
+		_ = os.Rename(old, target)
+		_ = os.Remove(old)
+	}
+	return cleanup, rollback, nil
 }
