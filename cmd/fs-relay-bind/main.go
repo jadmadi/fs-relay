@@ -123,7 +123,7 @@ func run() error {
 	sigc := make(chan os.Signal, 2)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigc)
-	return waitMount(flags.Arg(0), server, lazyUnmount, sigc)
+	return waitMount(flags.Arg(0), server, lazyUnmount, sigc, 2*time.Second)
 }
 
 func attachRaw(root *node, url, ns, token string, on bool) func() {

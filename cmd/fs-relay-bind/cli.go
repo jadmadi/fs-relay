@@ -102,10 +102,34 @@ func isDone(done <-chan struct{}) bool {
 	}
 }
 
+func runDetach(mnt string, done <-chan struct{}, detach func(string) error, sigc <-chan os.Signal) error {
+	if isDone(done) {
+		return nil
+	}
+	dc := make(chan error, 1)
+	go func() {
+		dc <- detach(mnt)
+	}()
+	select {
+	case <-done:
+		return nil
+	case err := <-dc:
+		if isDone(done) {
+			return nil
+		}
+		return busyError(mnt, err)
+	case <-sigc:
+		if isDone(done) {
+			return nil
+		}
+		return fmt.Errorf("mount %s is busy and unmount was interrupted; run fusermount3 -uz %s", mnt, mnt)
+	}
+}
+
 // waitMount waits for a FUSE server to exit or unmounts it on SIGINT/SIGTERM.
-// When the mount is busy or a second signal arrives, it detaches lazily and
-// returns an error so the process exits non-zero instead of hanging.
-func waitMount(mnt string, srv mountServer, detach func(string) error, sigc <-chan os.Signal) error {
+// When the mount is busy, stalls past timeout, or receives a second signal, it
+// detaches lazily and returns an error so the process exits non-zero.
+func waitMount(mnt string, srv mountServer, detach func(string) error, sigc <-chan os.Signal, timeout time.Duration) error {
 	done := make(chan struct{})
 	go func() {
 		srv.Wait()
@@ -119,6 +143,8 @@ func waitMount(mnt string, srv mountServer, detach func(string) error, sigc <-ch
 			return nil
 		}
 	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 	umc := make(chan error, 1)
 	go func() {
 		umc <- srv.Unmount()
@@ -127,25 +153,20 @@ func waitMount(mnt string, srv mountServer, detach func(string) error, sigc <-ch
 	case <-done:
 		return nil
 	case <-sigc:
-		if isDone(done) {
-			return nil
-		}
-		return busyError(mnt, detach(mnt))
+		return runDetach(mnt, done, detach, sigc)
+	case <-timer.C:
+		return runDetach(mnt, done, detach, sigc)
 	case err := <-umc:
 		if err != nil {
-			if isDone(done) {
-				return nil
-			}
-			return busyError(mnt, detach(mnt))
+			return runDetach(mnt, done, detach, sigc)
 		}
 	}
 	select {
 	case <-done:
 		return nil
 	case <-sigc:
-		if isDone(done) {
-			return nil
-		}
-		return busyError(mnt, detach(mnt))
+		return runDetach(mnt, done, detach, sigc)
+	case <-timer.C:
+		return runDetach(mnt, done, detach, sigc)
 	}
 }
