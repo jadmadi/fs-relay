@@ -57,17 +57,18 @@ func run() error {
 		fmt.Println(versionLine("fs-relay-bind"))
 		return nil
 	}
-	if flags.NArg() != 1 {
-		if bad := misplacedFlag(flags.Args()); bad != "" {
+	mnt, bad, err := mountArg(flags)
+	if err != nil {
+		if bad != "" {
 			fmt.Fprintf(os.Stderr, "flags must come before the mountpoint: %s\n", bad)
 		}
 		fmt.Fprint(os.Stderr, usageText(flags))
-		return errUsage
+		return err
 	}
 	if *post && *useWS {
 		return fmt.Errorf("pass -post or -ws, not both")
 	}
-	if err := checkMountpoint(flags.Arg(0), *forceExisting); err != nil {
+	if err := checkMountpoint(mnt, *forceExisting); err != nil {
 		return err
 	}
 	if err := wire.CheckNS(*ns); err != nil {
