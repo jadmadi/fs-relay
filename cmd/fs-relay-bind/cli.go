@@ -53,6 +53,15 @@ func misplacedFlag(args []string) string {
 	return ""
 }
 
+// mountArg extracts the single mountpoint positional argument from a parsed
+// FlagSet, returning any misplaced trailing flag and errUsage when missing or extra.
+func mountArg(fs *flag.FlagSet) (string, string, error) {
+	if fs.NArg() != 1 || fs.Arg(0) == "" {
+		return "", misplacedFlag(fs.Args()), errUsage
+	}
+	return fs.Arg(0), "", nil
+}
+
 func usageText(fs *flag.FlagSet) string {
 	var b strings.Builder
 	b.WriteString("fs-relay-bind mounts an fs-relay namespace with FUSE.\n\n")
