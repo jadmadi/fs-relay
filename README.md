@@ -22,6 +22,12 @@ Can be used for:
 - SQLite works with its default rollback journal. `PRAGMA journal_mode=WAL` fails, because WAL needs a shared-memory file this filesystem cannot provide.
 - Writes reach other mounts when the file is closed or synced.
 
+| Concern | Traditional mounts (NFS, SMB, s3fs) | fs-relay |
+|---|---|---|
+| Privileges | Root daemons and kernel modules | Unprivileged client via `fusermount3` |
+| Network | Dedicated RPC/SMB ports and firewall rules | Plain HTTP and WebSocket (`-post` fallback if a proxy blocks WS) |
+| Multi-host locks | Missing or local-only on most FUSE mounts | Server-enforced POSIX byte-range and `flock` locks (safe for SQLite rollback journals) |
+
 ## How it compares
 
 On each filesystem we unpacked an archive, packed the tree again, copied the archive onto the mount, and listed that copy with `tar -tf`. A local directory is the floor. [kvfs](https://github.com/muayyad-alsadi/kvfs) is our ancestor in-memory filesystem (backed by Redis/Valkey). [s3fs](https://github.com/s3fs-fuse/s3fs-fuse) is mounted on [rustfs](https://github.com/rustfs/rustfs). [fuse-nfs](https://github.com/sahlberg/fuse-nfs) is NFS through FUSE.
@@ -52,7 +58,14 @@ On this archive the default mount unpacks ahead of s3fs (9.78 s against 21.01 s)
 
 ## Building
 
-You can build it using
+Install the latest release with `go install`:
+
+```bash
+go install github.com/muayyad-alsadi/fs-relay/cmd/fs-relay@latest
+go install github.com/muayyad-alsadi/fs-relay/cmd/fs-relay-bind@latest
+```
+
+Or build from a local checkout:
 
 ```bash
 go build -o fs-relay ./cmd/fs-relay
@@ -79,8 +92,6 @@ mkdir -p data/demo /mnt/fs-relay
 ./fs-relay-bind -url http://127.0.0.1:8080 -ns demo -token local-demo /mnt/fs-relay
 ```
 
-`-version` prints the build version and exits, and `-h` prints the usage. `-listen` defaults to `127.0.0.1:8080` and `-data` to `data`. Each name under `data` is one independent tree. `-url` defaults to `http://127.0.0.1:8080` and `-ns` to `default`. A bare `host:port` is accepted and gets the `http` scheme, as it does in `curl`. Leave `-token` off the server and it prints a secret on its error stream; copy that value onto every mount. A secret you pass yourself must be at least 8 characters, using letters, digits, hyphens, and underscores, and capitals count as different characters. The mount sends it with each connection. A missing or wrong secret is refused, and the mount stops instead of trying again. The server records the machine and the reason. A restarted server that was not given `-token` prints a new secret. The welcome page does not use the secret, and the server never sends it back.
-
 Generate the token once and keep it in a file only you can read:
 
 ```bash
@@ -90,9 +101,37 @@ install -d -m 700 ~/.config/fs-relay
 ./fs-relay-bind -token-file ~/.config/fs-relay/token /mnt/fs-relay
 ```
 
+### Flags and subcommands
+
+| Binary | Flag / Subcommand | Default | Purpose |
+|---|---|---|---|
+| `fs-relay` | `-listen` | `127.0.0.1:8080` | Address to listen on |
+| `fs-relay` | `-data` | `data` | Directory holding one subfolder per namespace |
+| `fs-relay` | `-token-file` | | Read shared secret from a mode-0600 file (recommended) |
+| `fs-relay` | `-token` | random on stderr | Pass secret on command line (visible in `ps aux`) |
+| `fs-relay` | `-force-multi-serve` | `false` | Serve a `-data` directory already locked by another `fs-relay` |
+| `fs-relay-bind` | `-url` | `http://127.0.0.1:8080` | Server URL (`http://` is added when the scheme is omitted) |
+| `fs-relay-bind` | `-ns` | `default` | Namespace directory under `-data` on the server |
+| `fs-relay-bind` | `-token-file` | | Read shared secret from a mode-0600 file |
+| `fs-relay-bind` | `-token` | | Pass shared secret on command line |
+| `fs-relay-bind` | `-post` | `false` | Send each operation as an HTTP POST instead of a WebSocket |
+| `fs-relay-bind` | `-raw` | `true` | Stream large reads and writes over the raw splice socket |
+| `fs-relay-bind` | `-allow-other` | `false` | Allow other local users on the client host to read the mount |
+| `fs-relay-bind` | `-force-existing-mnt` | `false` | Mount over a non-empty mountpoint directory |
+| `fs-relay-bind` | `-debug` | `false` | Log FUSE traffic |
+| Both | `update` | | Self-update both binaries from the latest GitHub release |
+| Both | `version` / `-version` | | Print build version and exit |
+| Both | `help` / `-h` | | Print usage and exit |
+
 `-token-file` reads a regular file, and the process stops if another user can
 read it, so keep the file at mode 600. `-token` still works, but the value
-sits in the process list (`ps aux`), which every local user can read.
+sits in the process list (`ps aux`), which every local user can read. Leave
+both off the server and it prints a random secret on its error stream; copy
+that value onto every mount. A secret you pass yourself must be at least 8
+characters, using letters, digits, hyphens, and underscores, and capitals count
+as different characters. A missing or wrong secret is refused, and the mount
+stops instead of trying again. The welcome page does not use the secret, and
+the server never sends it back.
 
 The server creates the `-data` directory if it is missing. It takes an advisory
 lock on the data root, so a second `fs-relay` exits with an error that can name
@@ -104,17 +143,33 @@ HTTP 404. The mount checks its
 mountpoint before connecting, refuses a missing or non-directory path, and
 refuses a non-empty directory unless `-force-existing-mnt` is passed.
 
-Add `-post` to send each operation as its own request. `-raw=false` sends large reads and writes on the main connection. `-allow-other` lets other users on the mount host use the mount. `-debug` logs FUSE traffic.
-
 Open the server URL in a browser for a welcome page. `curl` against the same
 URL returns a short status. Unmount with `fusermount3 -u /mnt/fs-relay`.
 Interrupting `fs-relay-bind` unmounts cleanly. If files remain open, it
 detaches lazily with `fusermount3 -uz` and exits with an error so the terminal
 does not hang.
 
+### Updating in place
+
+Both binaries can update themselves and their companion binary from the latest GitHub release:
+
+```bash
+./fs-relay update
+```
+
+`update` verifies the release archive against its SHA-256 digest, preserves existing file permissions, stages both binaries in temporary files in the target directory, and rolls back if either binary fails to swap. On startup, the binaries check once every 12 hours in the background whether a newer release is out and print a notice on stderr. Set `FS_RELAY_NO_UPDATE_CHECK=1` to disable the background check.
+
+### Smoke check
+
 On a new mount, confirm `mount` shows the intended directory and not an empty path. Create a directory, write and read a small file, make a symlink, rename, and delete. Mount the same name a second time, write on one, and read on the other. Copy a file from one path on the mount to another. Append with `>>`. Write about 10 MiB with `dd bs=10k` and read it back. Repeat that write with `-raw=false` and compare the bytes.
 
-Two mounts of one name exclude each other for advisory locks. `flock -n` on the second mount fails while the first holds the file, and an `fcntl` write lock on one mount makes the other's write lock fail with `EAGAIN` until it is released. A SQLite database opened through two mounts, in rollback journal mode, commits from both sides, and `PRAGMA integrity_check` returns `ok` on each. A lock is advisory: a process that opens the files under `data/` directly is outside the table.
+Two mounts of one name exclude each other for advisory locks. `flock -n` on the second mount fails while the first holds the file, and an `fcntl` write lock on one mount makes the other's write lock fail with `EAGAIN` until it is released. A SQLite database opened through two mounts, in rollback journal mode, commits from both sides, and `PRAGMA integrity_check` returns `ok` on each:
+
+```bash
+sqlite3 /mnt/fs-relay/app.db "PRAGMA journal_mode=DELETE; CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, host TEXT); INSERT INTO runs (host) VALUES (hex(randomblob(4))); PRAGMA integrity_check;"
+```
+
+A lock is advisory: a process that opens the files under `data/` directly is outside the table.
 
 ## How such performance is even possible?
 
@@ -148,3 +203,18 @@ This project is dual-licensed under either:
 
 See [LICENSE.md](LICENSE.md) for details.
 
+## Contributors
+
+<a href="https://github.com/muayyad-alsadi/fs-relay/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=muayyad-alsadi/fs-relay" alt="Contributors to muayyad-alsadi/fs-relay" />
+</a>
+
+## Star History
+
+<a href="https://www.star-history.com/#muayyad-alsadi/fs-relay&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=muayyad-alsadi/fs-relay&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=muayyad-alsadi/fs-relay&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=muayyad-alsadi/fs-relay&type=Date" />
+  </picture>
+</a>
